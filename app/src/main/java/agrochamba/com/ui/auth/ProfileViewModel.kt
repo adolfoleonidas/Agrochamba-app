@@ -1,0 +1,289 @@
+package agrochamba.com.ui.auth
+
+import android.content.Context
+import android.net.Uri
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import agrochamba.com.data.AuthManager
+import agrochamba.com.data.JobPost
+import agrochamba.com.data.MyJobResponse
+import agrochamba.com.data.UserProfileResponse
+import agrochamba.com.data.WordPressApi
+import agrochamba.com.data.toJobPost
+import kotlinx.coroutines.launch
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody
+import okio.BufferedSink
+import okio.source
+
+data class ProfileScreenState(
+    val isLoading: Boolean = false,
+    val error: String? = null,
+    val myJobs: List<MyJobResponse> = emptyList(),
+    val userProfile: UserProfileResponse? = null,
+    val isLoadingProfile: Boolean = false,
+    val favorites: List<JobPost> = emptyList(),
+    val saved: List<JobPost> = emptyList(),
+    val isLoadingFavorites: Boolean = false,
+    val isLoadingSaved: Boolean = false
+)
+
+class ProfileViewModel : ViewModel() {
+
+    var uiState by mutableStateOf(ProfileScreenState())
+        private set
+
+    init {
+        loadMyJobs()
+        loadUserProfile()
+        loadFavorites()
+        loadSaved()
+    }
+
+    fun loadUserProfile() {
+        viewModelScope.launch {
+            uiState = uiState.copy(isLoadingProfile = true, error = null)
+            try {
+                val token = AuthManager.token ?: throw Exception("No estás autenticado.")
+                val authHeader = "Bearer $token"
+
+                val profile = WordPressApi.retrofitService.getUserProfile(authHeader)
+                uiState = uiState.copy(
+                    isLoadingProfile = false,
+                    userProfile = profile
+                )
+                
+                // Actualizar el display name en AuthManager si cambió
+                if (profile.displayName != AuthManager.userDisplayName) {
+                    AuthManager.userDisplayName = profile.displayName
+                }
+            } catch (e: Exception) {
+                uiState = uiState.copy(
+                    isLoadingProfile = false,
+                    error = "No se pudo cargar el perfil: ${e.message}"
+                )
+            }
+        }
+    }
+
+    fun loadMyJobs() {
+        // Solo carga los trabajos si el usuario es una empresa o admin
+        if (!AuthManager.isUserAnEnterprise()) {
+            uiState = uiState.copy(isLoading = false, myJobs = emptyList())
+            return
+        }
+
+        viewModelScope.launch {
+            uiState = uiState.copy(isLoading = true, error = null)
+            try {
+                val token = AuthManager.token ?: throw Exception("No estás autenticado.")
+                val authHeader = "Bearer $token"
+
+                val response = WordPressApi.retrofitService.getMyJobs(authHeader, page = 1, perPage = 100)
+                val jobs = response.data
+                uiState = uiState.copy(isLoading = false, myJobs = jobs)
+
+            } catch (e: Exception) {
+                uiState = uiState.copy(isLoading = false, error = "No se pudieron cargar tus anuncios.")
+            }
+        }
+    }
+
+    fun deleteJob(jobId: Int) {
+        viewModelScope.launch {
+            try {
+                val token = AuthManager.token ?: throw Exception("No estás autenticado.")
+                val authHeader = "Bearer $token"
+
+                val response = WordPressApi.retrofitService.deleteJob(authHeader, jobId)
+
+                if (response.isSuccessful) {
+                    // Recargar la lista de trabajos después de eliminar
+                    loadMyJobs()
+                } else {
+                    uiState = uiState.copy(error = "Error al eliminar el trabajo: ${response.code()}")
+                }
+            } catch (e: Exception) {
+                uiState = uiState.copy(error = "Error al eliminar el trabajo: ${e.message}")
+            }
+        }
+    }
+
+    fun updateProfile(profileData: Map<String, Any>) {
+        viewModelScope.launch {
+            uiState = uiState.copy(isLoading = true, error = null)
+            try {
+                val token = AuthManager.token ?: throw Exception("No estás autenticado.")
+                val authHeader = "Bearer $token"
+
+                val response = WordPressApi.retrofitService.updateUserProfile(authHeader, profileData)
+
+                if (response.isSuccessful) {
+                    // Recargar el perfil después de actualizar
+                    loadUserProfile()
+                    uiState = uiState.copy(isLoading = false)
+                } else {
+                    uiState = uiState.copy(
+                        isLoading = false,
+                        error = "Error al actualizar el perfil: ${response.code()}"
+                    )
+                }
+            } catch (e: Exception) {
+                uiState = uiState.copy(
+                    isLoading = false,
+                    error = "Error al actualizar el perfil: ${e.message}"
+                )
+            }
+        }
+    }
+
+    fun uploadProfilePhoto(uri: Uri, context: Context) {
+        viewModelScope.launch {
+            uiState = uiState.copy(isLoading = true, error = null)
+            try {
+                val token = AuthManager.token ?: throw Exception("No estás autenticado.")
+                val authHeader = "Bearer $token"
+
+                val requestBody = createStreamingRequestBody(context, uri)
+                val part = MultipartBody.Part.createFormData("file", "profile_photo.jpg", requestBody)
+
+                val response = WordPressApi.retrofitService.uploadProfilePhoto(authHeader, part)
+
+                if (response.success) {
+                    // Recargar el perfil después de subir la foto
+                    loadUserProfile()
+                    uiState = uiState.copy(isLoading = false)
+                } else {
+                    uiState = uiState.copy(
+                        isLoading = false,
+                        error = "Error al subir la foto de perfil"
+                    )
+                }
+            } catch (e: Exception) {
+                uiState = uiState.copy(
+                    isLoading = false,
+                    error = "Error al subir la foto: ${e.message}"
+                )
+            }
+        }
+    }
+
+    fun deleteProfilePhoto() {
+        viewModelScope.launch {
+            uiState = uiState.copy(isLoading = true, error = null)
+            try {
+                val token = AuthManager.token ?: throw Exception("No estás autenticado.")
+                val authHeader = "Bearer $token"
+
+                val response = WordPressApi.retrofitService.deleteProfilePhoto(authHeader)
+
+                if (response.isSuccessful) {
+                    // Recargar el perfil después de eliminar la foto
+                    loadUserProfile()
+                    uiState = uiState.copy(isLoading = false)
+                } else {
+                    uiState = uiState.copy(
+                        isLoading = false,
+                        error = "Error al eliminar la foto: ${response.code()}"
+                    )
+                }
+            } catch (e: Exception) {
+                uiState = uiState.copy(
+                    isLoading = false,
+                    error = "Error al eliminar la foto: ${e.message}"
+                )
+            }
+        }
+    }
+
+    fun loadFavorites() {
+        viewModelScope.launch {
+            uiState = uiState.copy(isLoadingFavorites = true, error = null)
+            try {
+                val token = AuthManager.token ?: throw Exception("No estás autenticado.")
+                val authHeader = "Bearer $token"
+
+                val response = WordPressApi.retrofitService.getFavorites(authHeader)
+                // Necesitamos convertir FavoriteJob a JobPost completo
+                // Por ahora, cargamos los trabajos completos por ID
+                val jobIds = response.jobs.map { it.id }
+                val favoritesList = if (jobIds.isNotEmpty()) {
+                    // Cargar trabajos completos desde la API con _embed
+                    try {
+                        val allJobs = WordPressApi.retrofitService.getJobs(page = 1, perPage = 100)
+                        // Filtrar y mantener el orden de los IDs
+                        val jobsMap = allJobs.associateBy { it.id }
+                        jobIds.mapNotNull { id -> jobsMap[id] }
+                    } catch (e: Exception) {
+                        emptyList()
+                    }
+                } else {
+                    emptyList()
+                }
+
+                uiState = uiState.copy(
+                    isLoadingFavorites = false,
+                    favorites = favoritesList
+                )
+            } catch (e: Exception) {
+                uiState = uiState.copy(
+                    isLoadingFavorites = false,
+                    error = "No se pudieron cargar los favoritos: ${e.message}"
+                )
+            }
+        }
+    }
+
+    fun loadSaved() {
+        viewModelScope.launch {
+            uiState = uiState.copy(isLoadingSaved = true, error = null)
+            try {
+                val token = AuthManager.token ?: throw Exception("No estás autenticado.")
+                val authHeader = "Bearer $token"
+
+                val response = WordPressApi.retrofitService.getSaved(authHeader)
+                // Necesitamos convertir FavoriteJob a JobPost completo
+                val jobIds = response.jobs.map { it.id }
+                val savedList = if (jobIds.isNotEmpty()) {
+                    // Cargar trabajos completos desde la API con _embed
+                    try {
+                        val allJobs = WordPressApi.retrofitService.getJobs(page = 1, perPage = 100)
+                        // Filtrar y mantener el orden de los IDs
+                        val jobsMap = allJobs.associateBy { it.id }
+                        jobIds.mapNotNull { id -> jobsMap[id] }
+                    } catch (e: Exception) {
+                        emptyList()
+                    }
+                } else {
+                    emptyList()
+                }
+
+                uiState = uiState.copy(
+                    isLoadingSaved = false,
+                    saved = savedList
+                )
+            } catch (e: Exception) {
+                uiState = uiState.copy(
+                    isLoadingSaved = false,
+                    error = "No se pudieron cargar los guardados: ${e.message}"
+                )
+            }
+        }
+    }
+
+    private fun createStreamingRequestBody(context: Context, uri: Uri): RequestBody {
+        return object : RequestBody() {
+            override fun contentType() = context.contentResolver.getType(uri)?.toMediaTypeOrNull()
+
+            override fun writeTo(sink: BufferedSink) {
+                context.contentResolver.openInputStream(uri)?.source()?.use {
+                    sink.writeAll(it)
+                }
+            }
+        }
+    }
+}
