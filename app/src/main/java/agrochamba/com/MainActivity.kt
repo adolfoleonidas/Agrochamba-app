@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.viewinterop.AndroidView
+import agrochamba.com.BuildConfig
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -162,12 +163,12 @@ fun MainAppScreen() {
     ) { innerPadding ->
         NavHost(navController, startDestination = Screen.Jobs.route, Modifier.padding(innerPadding)) {
             composable(Screen.Jobs.route) { JobsScreen() }
-            composable(Screen.Routes.route) { WebViewScreen(url = "https://agrochamba.com/rutas/") }
-            composable(Screen.Dates.route) { WebViewScreen(url = "https://agrochamba.com/fechas/") }
-            composable(Screen.Rooms.route) { WebViewScreen(url = "https://agrochamba.com/cuartos/") }
+            composable(Screen.Routes.route) { WebViewScreen(url = BuildConfig.WEB_ROUTES_URL) }
+            composable(Screen.Dates.route) { WebViewScreen(url = BuildConfig.WEB_DATES_URL) }
+            composable(Screen.Rooms.route) { WebViewScreen(url = BuildConfig.WEB_ROOMS_URL) }
             composable(Screen.Profile.route) { ProfileScreen(navController) } 
             composable(Screen.CreateJob.route) { CreateJobScreen(navController) } 
-            composable(Screen.PrivacyPolicy.route) { WebViewScreen(url = "https://agrochamba.com/politica-de-privacidad/") }
+            composable(Screen.PrivacyPolicy.route) { WebViewScreen(url = BuildConfig.PRIVACY_URL) }
             
             composable(Screen.MyJobDetail.route) {
                 AppDataHolder.selectedJob?.let { job ->
@@ -212,9 +213,15 @@ fun WebViewScreen(url: String) {
     AndroidView(factory = {
         WebView(it).apply {
             webViewClient = WebViewClient()
+            // Endurecimiento de WebView
             settings.javaScriptEnabled = true
+            settings.domStorageEnabled = true
+            settings.allowFileAccess = false
+            settings.allowContentAccess = false
+            settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW
+            try { WebView.setWebContentsDebuggingEnabled(false) } catch (_: Throwable) {}
+            try { settings.safeBrowsingEnabled = true } catch (_: Throwable) {}
             loadUrl(url)
         }
     })
 }
-

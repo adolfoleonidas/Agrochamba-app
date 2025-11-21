@@ -15,18 +15,31 @@ android {
         minSdk = 24
         targetSdk = 36
         versionCode = 1
-        versionName = "1.0"
+        versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Constantes de configuración para evitar URLs hardcodeadas en el código
+        buildConfigField("String", "WEB_ROUTES_URL", "\"https://agrobus.agrochamba.com/\"")
+        buildConfigField("String", "WEB_DATES_URL", "\"https://agrochamba.com/wp-content/fechas.html\"")
+        buildConfigField("String", "WEB_ROOMS_URL", "\"https://cuartos.agrochamba.com/\"")
+        buildConfigField("String", "PRIVACY_URL", "\"https://agrochamba.com/politica-de-privacidad/\"")
+        buildConfigField("String", "WP_BASE_URL", "\"https://agrochamba.com/wp-json/\"")
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+        }
+        debug {
+            // Facilita distinguir builds internas
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
         }
     }
     compileOptions {
@@ -59,6 +72,7 @@ dependencies {
     implementation("com.squareup.retrofit2:retrofit:3.0.0")
     implementation("com.squareup.retrofit2:converter-moshi:3.0.0")
     implementation("com.squareup.moshi:moshi-kotlin:1.15.2")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
     implementation("io.coil-kt:coil-compose:2.7.0")
 
     testImplementation(libs.junit)

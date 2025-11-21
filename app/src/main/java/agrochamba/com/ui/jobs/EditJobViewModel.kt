@@ -50,11 +50,6 @@ class EditJobViewModel(private val job: JobPost) : ViewModel() {
 
     private fun loadFormData() {
         viewModelScope.launch {
-            // Preservar las imágenes existentes al actualizar el estado
-            val currentImageUrls = uiState.existingImageUrls
-            val currentImageIds = uiState.existingImageIds
-            val currentImagesLoaded = uiState.imagesLoaded
-            
             uiState = uiState.copy(isLoading = true, error = null)
             try {
                 val ubicacionesDeferred = async { WordPressApi.retrofitService.getUbicaciones() }
@@ -67,20 +62,14 @@ class EditJobViewModel(private val job: JobPost) : ViewModel() {
                     empresas = empresasDeferred.await(),
                     cultivos = cultivosDeferred.await(),
                     tiposPuesto = tiposPuestoDeferred.await(),
-                    isLoading = false,
-                    // Preservar las imágenes existentes
-                    existingImageUrls = currentImageUrls,
-                    existingImageIds = currentImageIds,
-                    imagesLoaded = currentImagesLoaded
+                    // Importante: no tocar el estado de imágenes aquí para evitar condiciones de carrera
+                    // loadExistingImages() se encarga de poblarlas de forma independiente
+                    isLoading = false
                 )
             } catch (e: Exception) {
                 uiState = uiState.copy(
-                    isLoading = false, 
-                    error = "No se pudieron cargar los datos del formulario.",
-                    // Preservar las imágenes existentes incluso en caso de error
-                    existingImageUrls = currentImageUrls,
-                    existingImageIds = currentImageIds,
-                    imagesLoaded = currentImagesLoaded
+                    isLoading = false,
+                    error = "No se pudieron cargar los datos del formulario."
                 )
             }
         }
