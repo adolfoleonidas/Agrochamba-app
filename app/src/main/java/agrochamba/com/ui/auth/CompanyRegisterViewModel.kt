@@ -1,16 +1,14 @@
 package agrochamba.com.ui.auth
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import agrochamba.com.data.ApiErrorResponse
-import agrochamba.com.data.AuthManager
-import agrochamba.com.data.WordPressApi
-import com.squareup.moshi.Moshi
-import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+import agrochamba.com.domain.usecase.auth.RegisterCompanyUseCase
+import agrochamba.com.util.WordPressErrorMapper
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 data class CompanyRegisterState(
     val isLoading: Boolean = false,
@@ -18,13 +16,13 @@ data class CompanyRegisterState(
     val registrationSuccess: Boolean = false
 )
 
-class CompanyRegisterViewModel : ViewModel() {
+@HiltViewModel
+class CompanyRegisterViewModel @Inject constructor(
+    private val registerCompanyUseCase: RegisterCompanyUseCase
+) : androidx.lifecycle.ViewModel() {
 
-    var uiState by mutableStateOf(CompanyRegisterState())
-        private set
-
-    private val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
-    private val errorAdapter = moshi.adapter(ApiErrorResponse::class.java)
+    private val _uiState = MutableStateFlow(CompanyRegisterState())
+    val uiState: StateFlow<CompanyRegisterState> = _uiState.asStateFlow()
 
     fun registerCompany(
         username: String,
@@ -33,64 +31,28 @@ class CompanyRegisterViewModel : ViewModel() {
         ruc: String,
         razonSocial: String
     ) {
-        uiState = uiState.copy(isLoading = true, error = null)
+        _uiState.value = _uiState.value.copy(isLoading = true, error = null)
         viewModelScope.launch {
             try {
-                if (username.isBlank() || email.isBlank() || password.isBlank() || ruc.isBlank() || razonSocial.isBlank()) {
-                    throw Exception("Todos los campos son obligatorios.")
-                }
-
-                val companyData = mapOf(
-                    "username" to username,
-                    "email" to email,
-                    "password" to password,
-                    "ruc" to ruc,
-                    "razon_social" to razonSocial
-                )
-                
-                val response = WordPressApi.retrofitService.registerCompany(companyData)
-                
-                AuthManager.login(response)
-
-                uiState = uiState.copy(isLoading = false, registrationSuccess = true)
-
-            } catch (e: retrofit2.HttpException) {
-                val errorBody = e.response()?.errorBody()?.string()
-                android.util.Log.e("CompanyRegisterViewModel", "Error HTTP: ${e.code()}, Body: $errorBody")
-                
-                val errorMessage = if (errorBody != null) {
-                    try {
-                        val errorJson = org.json.JSONObject(errorBody)
-                        val code = errorJson.optString("code", "")
-                        val message = errorJson.optString("message", "")
-                        
-                        when {
-                            e.code() == 404 -> "El endpoint de registro no está disponible. Verifica que el plugin esté activo."
-                            message.isNotEmpty() -> message
-                            code == "rest_user_exists" -> "El nombre de usuario ya está en uso."
-                            code == "rest_email_exists" -> "El email ya está registrado."
-                            code == "rest_invalid_param" -> "Datos inválidos. Verifica los campos."
-                            else -> "Error al registrar: ${e.code()}"
-                        }
-                    } catch (ex: Exception) {
-                        if (e.code() == 404) {
-                            "Error 404: El endpoint no está disponible. Verifica que el plugin esté activo en WordPress."
-                        } else {
-                            "Error al registrar: ${e.code()}"
-                        }
+                // Usar caso de uso para registro de empresa
+                when (val result = registerCompanyUseCase(username, email, password, ruc, razonSocial)) {
+                    is agrochamba.com.util.Result.Success -> {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false, 
+                            registrationSuccess = true
+                        )
                     }
-                } else {
-                    if (e.code() == 404) {
-                        "Error 404: El endpoint de registro no está disponible."
-                    } else {
-                        "Error al registrar: ${e.code()}"
+                    is agrochamba.com.util.Result.Error -> {
+                        throw WordPressErrorMapper.mapAuthError(result.exception)
                     }
                 }
-                
-                uiState = uiState.copy(isLoading = false, error = errorMessage)
+
             } catch (e: Exception) {
                 android.util.Log.e("CompanyRegisterViewModel", "Error general: ${e.message}", e)
-                uiState = uiState.copy(isLoading = false, error = e.message ?: "Ocurrió un error inesperado.")
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    error = e.message ?: "Ocurrió un error. Inténtalo de nuevo."
+                )
             }
         }
     }

@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowForwardIos
@@ -32,7 +31,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import agrochamba.com.ui.common.MenuItem
+import agrochamba.com.ui.common.MenuItemWithCount
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -61,9 +61,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import agrochamba.com.Screen
-import agrochamba.com.data.AppDataHolder
 import agrochamba.com.data.AuthManager
-import agrochamba.com.data.JobPost
 import agrochamba.com.utils.htmlToString
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -76,9 +74,6 @@ fun ProfileScreen(navController: NavController, viewModel: ProfileViewModel = vi
     val displayName = profile?.displayName ?: AuthManager.userDisplayName ?: "Usuario"
     val username = AuthManager.userDisplayName?.lowercase()?.replace(" ", "") ?: "usuario"
     val profilePhotoUrl = profile?.profilePhotoUrl
-    
-    var showFavorites by remember { mutableStateOf(false) }
-    var showSaved by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -163,55 +158,9 @@ fun ProfileScreen(navController: NavController, viewModel: ProfileViewModel = vi
                     icon = Icons.Default.Favorite,
                     title = "Mis Favoritos",
                     count = uiState.favorites.size,
-                    onClick = { showFavorites = !showFavorites },
+                    onClick = { navController.navigate(Screen.Favorites.route) },
                     isLoading = uiState.isLoadingFavorites
                 )
-            }
-
-            if (showFavorites && uiState.favorites.isNotEmpty()) {
-                items(uiState.favorites.take(5)) { job ->
-                    FavoriteSavedJobCard(
-                        job = job,
-                        onClick = {
-                            AppDataHolder.selectedJob = job
-                            navController.navigate(Screen.MyJobDetail.route)
-                        },
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-                    )
-                }
-                if (uiState.favorites.size > 5) {
-                    item {
-                        TextButton(
-                            onClick = { /* TODO: Ver todos los favoritos */ },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Ver todos los favoritos (${uiState.favorites.size})")
-                        }
-                    }
-                }
-            } else if (showFavorites && uiState.favorites.isEmpty() && !uiState.isLoadingFavorites) {
-                item {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(24.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "No tienes trabajos favoritos aún",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                    }
-                }
             }
 
             item {
@@ -219,55 +168,9 @@ fun ProfileScreen(navController: NavController, viewModel: ProfileViewModel = vi
                     icon = Icons.Default.Bookmark,
                     title = "Mis Guardados",
                     count = uiState.saved.size,
-                    onClick = { showSaved = !showSaved },
+                    onClick = { navController.navigate(Screen.Saved.route) },
                     isLoading = uiState.isLoadingSaved
                 )
-            }
-
-            if (showSaved && uiState.saved.isNotEmpty()) {
-                items(uiState.saved.take(5)) { job ->
-                    FavoriteSavedJobCard(
-                        job = job,
-                        onClick = {
-                            AppDataHolder.selectedJob = job
-                            navController.navigate(Screen.MyJobDetail.route)
-                        },
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-                    )
-                }
-                if (uiState.saved.size > 5) {
-                    item {
-                        TextButton(
-                            onClick = { /* TODO: Ver todos los guardados */ },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Ver todos los guardados (${uiState.saved.size})")
-                        }
-                    }
-                }
-            } else if (showSaved && uiState.saved.isEmpty() && !uiState.isLoadingSaved) {
-                item {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(24.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "No tienes trabajos guardados aún",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                    }
-                }
             }
 
             item {
@@ -294,6 +197,18 @@ fun ProfileScreen(navController: NavController, viewModel: ProfileViewModel = vi
                         onClick = { navController.navigate(Screen.Moderation.route) }
                     )
                 }
+            }
+
+            item {
+                Divider(modifier = Modifier.padding(vertical = 8.dp))
+            }
+
+            item {
+                MenuItem(
+                    icon = Icons.Default.Settings,
+                    title = "Política de Privacidad",
+                    onClick = { navController.navigate(Screen.PrivacyPolicy.route) }
+                )
             }
 
             item {
@@ -335,96 +250,4 @@ fun ProfileScreen(navController: NavController, viewModel: ProfileViewModel = vi
     }
 }
 
-@Composable
-fun MenuItem(icon: ImageVector, title: String, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 24.dp, vertical = 16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(modifier = Modifier.width(24.dp))
-        Text(text = title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-    }
-}
-
-@Composable
-fun MenuItemWithCount(icon: ImageVector, title: String, count: Int, isLoading: Boolean, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 24.dp, vertical = 16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(modifier = Modifier.width(24.dp))
-        Text(text = title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-        if (isLoading) {
-            CircularProgressIndicator(modifier = Modifier.size(20.dp))
-        } else {
-            Text(
-                text = count.toString(),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Bold
-            )
-            Icon(Icons.Default.ArrowForwardIos, contentDescription = null, modifier = Modifier.size(16.dp).padding(start = 8.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
-
-@Composable
-fun FavoriteSavedJobCard(job: JobPost, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val companyName = job.embedded?.terms?.flatten()?.find { it.taxonomy == "empresa" }?.name
-    val imageUrl = job.embedded?.featuredMedia?.firstOrNull()?.source_url
-
-    Card(
-        modifier = modifier.fillMaxWidth().clickable(onClick = onClick),
-        elevation = CardDefaults.cardElevation(2.dp)
-    ) {
-        Row(
-            modifier = Modifier.padding(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            if (imageUrl != null) {
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
-                        .data(imageUrl)
-                        .crossfade(true)
-                        .build(),
-                    contentDescription = "Logo de la empresa",
-                    modifier = Modifier.size(40.dp).clip(CircleShape),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                Box(
-                    modifier = Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondaryContainer),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.Business, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
-                }
-            }
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = job.title?.rendered?.htmlToString() ?: "Sin título",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                if (companyName != null) {
-                    Text(
-                        text = companyName.htmlToString(),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1
-                    )
-                }
-            }
-        }
-    }
-}
+// Componentes movidos a ui/common/MenuItems.kt y ui/common/JobCard.kt

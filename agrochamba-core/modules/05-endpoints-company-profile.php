@@ -15,6 +15,25 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+// =============================================================
+// SHIM DE COMPATIBILIDAD → Delegar a controlador namespaced
+// =============================================================
+if (!defined('AGROCHAMBA_COMPANY_PROFILE_NAMESPACE_INITIALIZED')) {
+    define('AGROCHAMBA_COMPANY_PROFILE_NAMESPACE_INITIALIZED', true);
+
+    if (class_exists('AgroChamba\\API\\Profile\\CompanyProfile')) {
+        if (function_exists('error_log')) {
+            error_log('AgroChamba: Delegando endpoints de perfil de empresa a AgroChamba\\API\\Profile\\CompanyProfile (migración namespaces).');
+        }
+        \AgroChamba\API\Profile\CompanyProfile::init();
+        return; // Evitar registrar endpoints legacy
+    } else {
+        if (function_exists('error_log')) {
+            error_log('AgroChamba: No se encontró AgroChamba\\API\\Profile\\CompanyProfile. Usando implementación procedural legacy.');
+        }
+    }
+}
+
 // ==========================================
 // 1. OBTENER PERFIL DE EMPRESA DEL USUARIO ACTUAL
 // ==========================================

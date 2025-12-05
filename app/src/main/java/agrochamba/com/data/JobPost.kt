@@ -34,7 +34,8 @@ data class JobMeta(
     val alimentacion: Boolean?,
     val requisitos: String?,
     val beneficios: String?,
-    @Json(name = "gallery_ids") val galleryIds: List<Int>? // IDs de las imágenes de la galería
+    @Json(name = "gallery_ids") val galleryIds: List<Int>?, // IDs de las imágenes de la galería
+    @Json(name = "facebook_post_id") val facebookPostId: String? // ID del post en Facebook si fue publicado
 )
 
 

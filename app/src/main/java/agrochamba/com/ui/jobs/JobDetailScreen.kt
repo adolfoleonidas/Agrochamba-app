@@ -45,11 +45,13 @@ import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.lifecycle.viewmodel.compose.viewModel
 import agrochamba.com.data.CompanyProfileResponse
 import agrochamba.com.data.WordPressApi
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
@@ -78,6 +80,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import agrochamba.com.data.JobPost
@@ -85,6 +88,7 @@ import agrochamba.com.data.MediaItem
 import agrochamba.com.utils.htmlToString
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import coil.size.Size
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
 import agrochamba.com.R
@@ -98,7 +102,53 @@ fun JobDetailScreen(
     navController: NavController? = null,
     modifier: Modifier = Modifier
 ) {
-    var fullscreenImageUrl by remember { mutableStateOf<String?>(null) }
+    var fullscreenImageIndex by remember { mutableStateOf<Int?>(null) }
+    
+    // Obtener todas las URLs de imágenes disponibles (optimizadas para el slider)
+    val allImageUrls = remember(mediaItems, job) {
+        val urls = mutableListOf<String>()
+        
+        // 1. Agregar imágenes de mediaItems
+        mediaItems.forEach { media ->
+            media.getImageUrl()?.let { url ->
+                if (url !in urls) urls.add(url)
+            }
+        }
+        
+        // 2. Si no hay imágenes, intentar desde embedded
+        if (urls.isEmpty()) {
+            job.embedded?.featuredMedia?.forEach { media ->
+                media.getImageUrl()?.let { url ->
+                    if (url !in urls) urls.add(url)
+                }
+            }
+        }
+        
+        urls
+    }
+    
+    // Obtener todas las URLs completas para pantalla completa
+    val allFullImageUrls = remember(mediaItems, job) {
+        val urls = mutableListOf<String>()
+        
+        // 1. Agregar imágenes completas de mediaItems
+        mediaItems.forEach { media ->
+            media.getFullImageUrl()?.let { url ->
+                if (url !in urls) urls.add(url)
+            }
+        }
+        
+        // 2. Si no hay imágenes, intentar desde embedded
+        if (urls.isEmpty()) {
+            job.embedded?.featuredMedia?.forEach { media ->
+                media.getFullImageUrl()?.let { url ->
+                    if (url !in urls) urls.add(url)
+                }
+            }
+        }
+        
+        urls
+    }
 
     Scaffold(
         topBar = {
@@ -115,32 +165,40 @@ fun JobDetailScreen(
         JobDetailContent(
             job = job,
             mediaItems = mediaItems,
-            onImageClick = { fullscreenImageUrl = it },
+            allImageUrls = allImageUrls,
+            allFullImageUrls = allFullImageUrls,
+            onImageClick = { clickedUrl ->
+                // Encontrar el índice de la imagen clickeada
+                // Primero intentar encontrar por URL exacta o parcial
+                val index = allFullImageUrls.indexOfFirst { url ->
+                    // Comparar URLs (puede haber variaciones con parámetros o tamaños)
+                    val clickedFileName = clickedUrl.substringAfterLast("/").substringBefore("?")
+                    val urlFileName = url.substringAfterLast("/").substringBefore("?")
+                    clickedFileName == urlFileName || 
+                    url.contains(clickedFileName) || 
+                    clickedUrl.contains(urlFileName)
+                }
+                fullscreenImageIndex = if (index >= 0) index else {
+                    // Si no se encuentra, buscar en las URLs optimizadas y mapear al índice correspondiente
+                    val optimizedIndex = allImageUrls.indexOfFirst { url ->
+                        val clickedFileName = clickedUrl.substringAfterLast("/").substringBefore("?")
+                        val urlFileName = url.substringAfterLast("/").substringBefore("?")
+                        clickedFileName == urlFileName || url.contains(clickedFileName)
+                    }
+                    optimizedIndex.coerceIn(0, allFullImageUrls.size - 1)
+                }
+            },
             navController = navController,
             modifier = modifier.padding(innerPadding)
         )
     }
 
-    if (fullscreenImageUrl != null) {
-        Dialog(
-            onDismissRequest = { fullscreenImageUrl = null },
-            properties = DialogProperties(usePlatformDefaultWidth = false)
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.8f))
-                    .clickable { fullscreenImageUrl = null },
-                contentAlignment = Alignment.Center
-            ) {
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current).data(fullscreenImageUrl).crossfade(true).build(),
-                    contentDescription = "Imagen a pantalla completa",
-                    modifier = Modifier.fillMaxWidth(),
-                    contentScale = ContentScale.Fit
-                )
-            }
-        }
+    if (fullscreenImageIndex != null && allFullImageUrls.isNotEmpty()) {
+        FullscreenImageSlider(
+            imageUrls = allFullImageUrls,
+            initialIndex = fullscreenImageIndex ?: 0,
+            onDismiss = { fullscreenImageIndex = null }
+        )
     }
 }
 
@@ -148,6 +206,8 @@ fun JobDetailScreen(
 private fun JobDetailContent(
     job: JobPost,
     mediaItems: List<MediaItem>,
+    allImageUrls: List<String>,
+    allFullImageUrls: List<String>,
     onImageClick: (String) -> Unit,
     navController: NavController? = null,
     modifier: Modifier = Modifier
@@ -179,33 +239,12 @@ private fun JobDetailContent(
 
     Column(modifier = modifier.fillMaxSize().verticalScroll(scrollState)) {
         // --- HEADER CON SLIDER DE IMÁGENES ---
-        // Obtener todas las URLs de imágenes disponibles
-        val allImageUrls = remember(mediaItems, job) {
-            val urls = mutableListOf<String>()
-            
-            // 1. Agregar imágenes de mediaItems
-            mediaItems.forEach { media ->
-                media.getImageUrl()?.let { url ->
-                    if (url !in urls) urls.add(url)
-                }
-            }
-            
-            // 2. Si no hay imágenes, intentar desde embedded
-            if (urls.isEmpty()) {
-                job.embedded?.featuredMedia?.forEach { media ->
-                    media.getImageUrl()?.let { url ->
-                        if (url !in urls) urls.add(url)
-                    }
-                }
-            }
-            
-            urls
-            }
             
         if (allImageUrls.isNotEmpty()) {
             // SLIDER DE IMÁGENES
             ImageSlider(
                 imageUrls = allImageUrls,
+                fullImageUrls = allFullImageUrls, // Pasar URLs completas para pantalla completa
                 onImageClick = onImageClick,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -233,28 +272,43 @@ private fun JobDetailContent(
             }
         }
 
-        Column(modifier = Modifier.padding(horizontal = 20.dp)) {
-            Spacer(Modifier.height(24.dp))
+        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+            Spacer(Modifier.height(20.dp))
 
-            // --- TÍTULO Y EMPRESA ---
+            // --- TÍTULO ---
             Text(
                 job.title?.rendered?.htmlToString() ?: "Sin título",
-                style = MaterialTheme.typography.headlineLarge,
+                style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
+                lineHeight = MaterialTheme.typography.headlineMedium.lineHeight * 1.2
             )
             
+            Spacer(Modifier.height(16.dp))
+            
+            // --- EMPRESA CON ICONO ---
             if (companyName != null) {
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    companyName.htmlToString(),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary,
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.clickable {
                         // Navegar al perfil de la empresa
                         navController?.navigate("company_profile/${companyName.htmlToString()}")
                     }
-                )
+                ) {
+                    Icon(
+                        Icons.Default.Business,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        companyName.htmlToString(),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
 
             Spacer(Modifier.height(20.dp))
@@ -280,19 +334,20 @@ private fun JobDetailContent(
                 }
             }
 
-            Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(24.dp))
 
             // --- DESCRIPCIÓN ---
             job.content?.rendered?.let {
                 SimpleSectionTitle("Descripción del Trabajo")
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(14.dp))
                 Text(
                     it.htmlToString(),
                     style = MaterialTheme.typography.bodyLarge,
                     lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * 1.6,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Normal
                 )
-                Spacer(Modifier.height(32.dp))
+                Spacer(Modifier.height(28.dp))
             }
             
             // --- REQUISITOS ---
@@ -343,197 +398,231 @@ private fun JobDetailContent(
                 }
             }
 
-            // --- INFORMACIÓN DE LA EMPRESA ---
+            // --- TARJETA DE INFORMACIÓN DE LA EMPRESA ---
             if (companyName != null && companyProfile != null) {
-                Divider(modifier = Modifier.padding(vertical = 16.dp))
-                SimpleSectionTitle("Acerca de la Empresa")
-                Spacer(Modifier.height(12.dp))
-                
-                // Nombre de la empresa
-                Text(
-                    text = companyProfile!!.companyName,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                Spacer(Modifier.height(8.dp))
+                CompanyInfoCard(
+                    companyProfile = companyProfile!!,
+                    context = context,
+                    navController = navController,
+                    companyName = companyName
                 )
-                
-                // Descripción
-                val companyDescription = companyProfile!!.description
-                if (!companyDescription.isNullOrBlank()) {
-                    Spacer(Modifier.height(12.dp))
-                    Text(
-                        text = companyDescription,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * 1.5
-                    )
-                }
-                
-                Spacer(Modifier.height(16.dp))
-                
-                // Información de contacto
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    // Dirección
-                    val companyAddress = companyProfile!!.address
-                    if (!companyAddress.isNullOrBlank()) {
-                        Row(
-                            verticalAlignment = Alignment.Top,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.LocationOn,
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp),
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Dirección",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Text(
-                                    text = companyAddress,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                        }
-                    }
-                    
-                    // Teléfono
-                    val companyPhone = companyProfile!!.phone
-                    if (!companyPhone.isNullOrBlank()) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.Phone,
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp),
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Teléfono",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Text(
-                                    text = companyPhone,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                        }
-                    }
-                    
-                    // Email
-                    val companyEmail = companyProfile!!.email
-                    if (!companyEmail.isNullOrBlank()) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.Email,
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp),
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Email",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Text(
-                                    text = companyEmail,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                        }
-                    }
-                    
-                    // Sitio web
-                    val companyWebsite = companyProfile!!.website
-                    if (!companyWebsite.isNullOrBlank()) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.Language,
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp),
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Sitio web",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Text(
-                                    text = companyWebsite,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.clickable {
-                                        // Abrir en navegador
-                                        Intent(Intent.ACTION_VIEW, Uri.parse(companyWebsite)).also {
-                                            context.startActivity(it)
-                                        }
-                                    }
-                                )
-                            }
-                        }
-                    }
-                    
-                    // Redes sociales
-                    val companyFacebook = companyProfile!!.facebook
-                    val companyInstagram = companyProfile!!.instagram
-                    val companyLinkedin = companyProfile!!.linkedin
-                    val companyTwitter = companyProfile!!.twitter
-                    val socialLinks = listOfNotNull(
-                        if (!companyFacebook.isNullOrBlank()) "Facebook" to companyFacebook else null,
-                        if (!companyInstagram.isNullOrBlank()) "Instagram" to companyInstagram else null,
-                        if (!companyLinkedin.isNullOrBlank()) "LinkedIn" to companyLinkedin else null,
-                        if (!companyTwitter.isNullOrBlank()) "Twitter" to companyTwitter else null
-                    )
-                    
-                    if (socialLinks.isNotEmpty()) {
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            text = "Redes Sociales",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            socialLinks.forEach { (name, url) ->
-                                TextButton(
-                                    onClick = {
-                                        Intent(Intent.ACTION_VIEW, Uri.parse(url)).also {
-                                            context.startActivity(it)
-                                        }
-                                    }
-                                ) {
-                                    Text(name)
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                Spacer(Modifier.height(32.dp))
+                Spacer(Modifier.height(24.dp))
             }
 
             Spacer(Modifier.height(32.dp)) // Espacio final
         }
+    }
+}
+
+@Composable
+private fun CompanyInfoCard(
+    companyProfile: CompanyProfileResponse,
+    context: android.content.Context,
+    navController: NavController?,
+    companyName: String
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        shape = RoundedCornerShape(24.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Foto de perfil centrada arriba
+            val photoUrl = companyProfile.logoUrl ?: companyProfile.profilePhotoUrl
+            photoUrl?.let { url ->
+                Card(
+                    shape = CircleShape,
+                    modifier = Modifier.size(100.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                ) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(context).data(url).build(),
+                        contentDescription = "Logo de empresa",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+            } ?: run {
+                Box(
+                    modifier = Modifier
+                        .size(100.dp)
+                        .background(
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+                            CircleShape
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.Business,
+                        contentDescription = null,
+                        modifier = Modifier.size(50.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+            
+            Spacer(Modifier.height(16.dp))
+            
+            // Nombre de la empresa
+            Text(
+                text = companyProfile.companyName,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center
+            )
+            
+            Spacer(Modifier.height(8.dp))
+            
+            // Descripción
+            companyProfile.description?.takeIf { it.isNotBlank() }?.let { desc ->
+                Text(
+                    text = if (desc.length > 150) desc.take(150) + "..." else desc,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * 1.5
+                )
+            }
+            
+            // Solo mostrar divider y contacto si hay información de contacto
+            val hasContactInfo = !companyProfile.address.isNullOrBlank() || 
+                                !companyProfile.phone.isNullOrBlank() || 
+                                !companyProfile.email.isNullOrBlank() || 
+                                !companyProfile.website.isNullOrBlank()
+            
+            if (hasContactInfo) {
+                Spacer(Modifier.height(20.dp))
+                Divider(
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
+                    thickness = 1.dp,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(20.dp))
+            } else {
+                Spacer(Modifier.height(20.dp))
+            }
+            
+            // Información de contacto
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Dirección
+                companyProfile.address?.takeIf { it.isNotBlank() }?.let { address ->
+                    ContactInfoRowModern(
+                        icon = Icons.Default.LocationOn,
+                        text = address,
+                        onClick = null
+                    )
+                }
+                
+                // Teléfono
+                companyProfile.phone?.takeIf { it.isNotBlank() }?.let { phone ->
+                    ContactInfoRowModern(
+                        icon = Icons.Default.Phone,
+                        text = phone,
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))
+                            context.startActivity(intent)
+                        }
+                    )
+                }
+                
+                // Email
+                companyProfile.email?.takeIf { it.isNotBlank() }?.let { email ->
+                    ContactInfoRowModern(
+                        icon = Icons.Default.Email,
+                        text = email,
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_SENDTO).apply {
+                                data = Uri.parse("mailto:$email")
+                            }
+                            context.startActivity(intent)
+                        }
+                    )
+                }
+                
+                // Sitio web
+                companyProfile.website?.takeIf { it.isNotBlank() }?.let { website ->
+                    ContactInfoRowModern(
+                        icon = Icons.Default.Language,
+                        text = website.replace(Regex("^https?://"), "").replace("/$", ""),
+                        onClick = {
+                            val url = if (website.startsWith("http")) website else "https://$website"
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                            context.startActivity(intent)
+                        }
+                    )
+                }
+            }
+            
+            // Botón para ver perfil completo
+            Spacer(Modifier.height(20.dp))
+            Button(
+                onClick = {
+                    navController?.navigate("company_profile/$companyName")
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary
+                )
+            ) {
+                Text(
+                    text = "Ver Perfil Completo",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ContactInfoRowModern(
+    icon: ImageVector,
+    text: String,
+    onClick: (() -> Unit)?
+) {
+    val modifier = if (onClick != null) {
+        Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+    } else {
+        Modifier.fillMaxWidth()
+    }
+    
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Icon(
+            icon,
+            contentDescription = null,
+            modifier = Modifier.size(22.dp),
+            tint = MaterialTheme.colorScheme.primary
+        )
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Normal,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
@@ -549,7 +638,7 @@ private fun SimpleSectionTitle(title: String) {
         Spacer(Modifier.width(8.dp))
         Text(
             title,
-            style = MaterialTheme.typography.titleLarge,
+            style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary
         )
@@ -562,14 +651,15 @@ private fun SimpleInfoRow(icon: ImageVector, text: String) {
         Icon(
             icon,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(18.dp)
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(20.dp)
         )
-        Spacer(Modifier.width(6.dp))
+        Spacer(Modifier.width(8.dp))
         Text(
             text,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurface
         )
     }
 }
@@ -579,20 +669,22 @@ private fun RequirementItem(text: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp),
+            .padding(vertical = 8.dp),
         verticalAlignment = Alignment.Top
     ) {
         Icon(
             Icons.Default.CheckCircle,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(20.dp)
+            modifier = Modifier.size(22.dp)
         )
         Spacer(Modifier.width(12.dp))
         Text(
             text = text,
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurface,
+            lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * 1.5,
+            fontWeight = FontWeight.Normal,
             modifier = Modifier.weight(1f)
         )
     }
@@ -605,28 +697,22 @@ private fun BenefitItemSimple(text: String, icon: ImageVector) {
             .fillMaxWidth()
             .background(
                 MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
-                RoundedCornerShape(8.dp)
+                RoundedCornerShape(12.dp)
             )
-            .padding(12.dp),
+            .padding(14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            Icons.Default.CheckCircle,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(20.dp)
-        )
-        Spacer(Modifier.width(12.dp))
         Icon(
             icon,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(18.dp)
+            modifier = Modifier.size(24.dp)
         )
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(12.dp))
         Text(
             text = text,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f)
         )
@@ -638,19 +724,133 @@ private fun SimpleDetailRow(label: String, value: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp)
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.Top
     ) {
-        Text(
-            "$label: ",
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Text(
-            value,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                label,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                value,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Normal,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun FullscreenImageSlider(
+    imageUrls: List<String>,
+    initialIndex: Int,
+    onDismiss: () -> Unit
+) {
+    val pagerState = rememberPagerState(
+        pageCount = { imageUrls.size },
+        initialPage = initialIndex.coerceIn(0, imageUrls.size - 1)
+    )
+    val context = LocalContext.current
+    
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.95f))
+        ) {
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize()
+            ) { page ->
+                val imageUrl = imageUrls[page]
+                var imageLoadError by remember(page) { mutableStateOf(false) }
+                
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clickable { onDismiss() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (imageLoadError) {
+                        // Mostrar mensaje de error
+                        Text(
+                            text = "Error al cargar la imagen",
+                            color = Color.White,
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    } else {
+                        AsyncImage(
+                            model = ImageRequest.Builder(context)
+                                .data(imageUrl)
+                                .crossfade(true)
+                                .size(Size.ORIGINAL) // Solicitar imagen original sin redimensionar
+                                .allowHardware(false) // Desactivar hardware para mejor calidad
+                                .build(),
+                            contentDescription = "Imagen ${page + 1} de ${imageUrls.size}",
+                            modifier = Modifier
+                                .fillMaxSize(),
+                            contentScale = ContentScale.Fit, // Mantener proporción completa sin recortar
+                            onError = {
+                                android.util.Log.e("FullscreenImageSlider", "Error loading image: $imageUrl")
+                                imageLoadError = true
+                            },
+                            onSuccess = {
+                                imageLoadError = false
+                            }
+                        )
+                    }
+                }
+            }
+            
+            // Indicador de página (contador)
+            if (imageUrls.size > 1) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 32.dp)
+                        .background(
+                            Color.Black.copy(alpha = 0.6f),
+                            RoundedCornerShape(16.dp)
+                        )
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    Text(
+                        text = "${pagerState.currentPage + 1} / ${imageUrls.size}",
+                        color = Color.White,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+            
+            // Botón de cerrar
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp)
+                    .background(
+                        Color.Black.copy(alpha = 0.6f),
+                        CircleShape
+                    )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Cerrar",
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
     }
 }
 
@@ -658,6 +858,7 @@ private fun SimpleDetailRow(label: String, value: String) {
 @Composable
 private fun ImageSlider(
     imageUrls: List<String>,
+    fullImageUrls: List<String> = emptyList(),
     onImageClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -674,12 +875,18 @@ private fun ImageSlider(
                 .height(300.dp)
         ) { page ->
             val imageUrl = imageUrls[page]
+            // Usar URL completa si está disponible, sino usar la optimizada
+            val fullImageUrl = if (fullImageUrls.isNotEmpty() && page < fullImageUrls.size) {
+                fullImageUrls[page]
+            } else {
+                imageUrl
+            }
             var imageLoadError by remember(page) { mutableStateOf(false) }
             
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .clickable { onImageClick(imageUrl) }
+                    .clickable { onImageClick(fullImageUrl) }
             ) {
                 if (imageLoadError) {
                     // Mostrar logo de marca cuando hay error al cargar imagen

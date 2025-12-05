@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
@@ -23,12 +24,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import androidx.hilt.navigation.compose.hiltViewModel
 import agrochamba.com.R
 import agrochamba.com.Screen
 
 @Composable
-fun RegisterScreen(navController: NavController, registerViewModel: RegisterViewModel = viewModel()) {
-    val uiState = registerViewModel.uiState
+fun RegisterScreen(navController: NavController, registerViewModel: RegisterViewModel = hiltViewModel()) {
+    val uiState by registerViewModel.uiState.collectAsState()
     var username by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -36,6 +38,7 @@ fun RegisterScreen(navController: NavController, registerViewModel: RegisterView
 
     // La navegación ahora la controla el componente AppEntry
     LaunchedEffect(uiState.registrationSuccess) {
+        // Navegación/acciones post registro si hiciera falta
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -126,9 +129,9 @@ fun RegisterScreen(navController: NavController, registerViewModel: RegisterView
                 }
             }
 
-            if (uiState.error != null) {
+            uiState.error?.let { err ->
                 Spacer(modifier = Modifier.height(16.dp))
-                Text(text = uiState.error, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
+                Text(text = err, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
             }
 
             Spacer(modifier = Modifier.height(24.dp))

@@ -16,6 +16,26 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+// =============================================================
+// SHIM DE COMPATIBILIDAD → Delegar a controlador namespaced
+// =============================================================
+if (!defined('AGROCHAMBA_FAVORITES_CONTROLLER_NAMESPACE_INITIALIZED')) {
+    define('AGROCHAMBA_FAVORITES_CONTROLLER_NAMESPACE_INITIALIZED', true);
+
+    // Si existe el controlador moderno, delegar y salir para evitar duplicidad
+    if (class_exists('AgroChamba\\API\\Favorites\\FavoritesController')) {
+        if (function_exists('error_log')) {
+            error_log('AgroChamba: Delegando endpoints de favoritos a AgroChamba\\API\\Favorites\\FavoritesController (migración namespaces).');
+        }
+        \AgroChamba\API\Favorites\FavoritesController::init();
+        return; // Evitar registrar endpoints legacy duplicados
+    } else {
+        if (function_exists('error_log')) {
+            error_log('AgroChamba: No se encontró AgroChamba\\API\\Favorites\\FavoritesController. Usando implementación procedural legacy.');
+        }
+    }
+}
+
 // ==========================================
 // 1. AGREGAR/QUITAR FAVORITO
 // ==========================================

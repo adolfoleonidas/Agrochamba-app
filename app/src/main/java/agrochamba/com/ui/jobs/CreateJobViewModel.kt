@@ -2,6 +2,7 @@ package agrochamba.com.ui.jobs
 
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -10,14 +11,13 @@ import androidx.lifecycle.viewModelScope
 import agrochamba.com.data.AuthManager
 import agrochamba.com.data.Category
 import agrochamba.com.data.WordPressApi
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
-import okhttp3.RequestBody
-import okio.BufferedSink
-import okio.source
+import retrofit2.HttpException
+import java.util.Collections
+import javax.inject.Inject
 
 data class CreateJobScreenState(
     val isLoading: Boolean = true,
@@ -29,11 +29,11 @@ data class CreateJobScreenState(
     val cultivos: List<Category> = emptyList(),
     val tiposPuesto: List<Category> = emptyList(),
     val selectedImages: List<Uri> = emptyList(),
-    val featuredImageIndex: Int = 0, // Índice de la imagen destacada
-    val userCompanyId: Int? = null // ID de la empresa del usuario si es empresa
+    val userCompanyId: Int? = null
 )
 
-class CreateJobViewModel : ViewModel() {
+@HiltViewModel
+class CreateJobViewModel @Inject constructor() : androidx.lifecycle.ViewModel() {
 
     var uiState by mutableStateOf(CreateJobScreenState())
         private set
@@ -46,37 +46,22 @@ class CreateJobViewModel : ViewModel() {
         viewModelScope.launch {
             uiState = uiState.copy(isLoading = true, error = null)
             try {
-                val ubicacionesDeferred = async { WordPressApi.retrofitService.getUbicaciones() }
-                val empresasDeferred = async { WordPressApi.retrofitService.getEmpresas() }
-                val cultivosDeferred = async { WordPressApi.retrofitService.getCultivos() }
-                val tiposPuestoDeferred = async { WordPressApi.retrofitService.getTiposPuesto() }
-
-                val ubicaciones = ubicacionesDeferred.await()
-                val empresas = empresasDeferred.await()
-                val cultivos = cultivosDeferred.await()
-                val tiposPuesto = tiposPuestoDeferred.await()
-                
-                // Si el usuario es empresa, buscar su empresa por nombre (usando displayName)
-                var userCompanyId: Int? = null
-                if (AuthManager.isUserAnEnterprise()) {
-                    val userDisplayName = AuthManager.userDisplayName
-                    if (userDisplayName != null) {
-                        // Buscar la empresa que coincida con el nombre del usuario
-                        userCompanyId = empresas.find { 
-                            it.name.equals(userDisplayName, ignoreCase = true) 
-                        }?.id
-                    }
-                }
+                // Cargar catálogos desde WordPress API (taxonomías)
+                val ubicaciones = WordPressApi.retrofitService.getUbicaciones()
+                val empresas = WordPressApi.retrofitService.getEmpresas()
+                val cultivos = WordPressApi.retrofitService.getCultivos()
+                val tiposPuesto = WordPressApi.retrofitService.getTiposPuesto()
 
                 uiState = uiState.copy(
                     ubicaciones = ubicaciones,
                     empresas = empresas,
                     cultivos = cultivos,
                     tiposPuesto = tiposPuesto,
-                    userCompanyId = userCompanyId,
+                    userCompanyId = AuthManager.userCompanyId,
                     isLoading = false
                 )
             } catch (e: Exception) {
+                Log.e("CreateJobViewModel", "Error loading form data", e)
                 uiState = uiState.copy(isLoading = false, error = "No se pudieron cargar los datos del formulario.")
             }
         }
@@ -85,224 +70,199 @@ class CreateJobViewModel : ViewModel() {
     fun onImagesSelected(uris: List<Uri>) {
         val currentImages = uiState.selectedImages.toMutableList()
         currentImages.addAll(uris)
-        val newImages = currentImages.take(10) // Limitar a 10 imágenes
-        // Si no hay imágenes destacadas y agregamos nuevas, la primera será destacada
-        val newFeaturedIndex = if (uiState.selectedImages.isEmpty() && newImages.isNotEmpty()) {
-            0
-        } else {
-            uiState.featuredImageIndex.coerceIn(0, newImages.size - 1)
-        }
-        uiState = uiState.copy(
-            selectedImages = newImages,
-            featuredImageIndex = newFeaturedIndex
-        )
+        uiState = uiState.copy(selectedImages = currentImages.take(10))
     }
 
     fun removeImage(uri: Uri) {
-        val currentImages = uiState.selectedImages.toMutableList()
-        val indexToRemove = currentImages.indexOf(uri)
-        currentImages.remove(uri)
-        val updatedImages = currentImages
-        
-        // Ajustar el índice de la imagen destacada si es necesario
-        val newFeaturedIndex = when {
-            updatedImages.isEmpty() -> 0
-            indexToRemove < uiState.featuredImageIndex -> uiState.featuredImageIndex - 1
-            indexToRemove == uiState.featuredImageIndex -> {
-                // Si eliminamos la imagen destacada, la primera será la nueva destacada
-                0.coerceAtMost(updatedImages.size - 1)
-            }
-            else -> uiState.featuredImageIndex
-        }.coerceIn(0, updatedImages.size - 1)
-        
-        uiState = uiState.copy(
-            selectedImages = updatedImages,
-            featuredImageIndex = newFeaturedIndex
-        )
+        val updatedImages = uiState.selectedImages.toMutableList().also { it.remove(uri) }
+        uiState = uiState.copy(selectedImages = updatedImages)
     }
-
-    fun setFeaturedImage(index: Int) {
-        if (index in uiState.selectedImages.indices) {
-            uiState = uiState.copy(featuredImageIndex = index)
+    
+    fun reorderImages(from: Int, to: Int) {
+        if (from >= 0 && to >= 0 && from < uiState.selectedImages.size && to < uiState.selectedImages.size) {
+            val mutableList = uiState.selectedImages.toMutableList()
+            Collections.swap(mutableList, from, to)
+            uiState = uiState.copy(selectedImages = mutableList)
         }
     }
 
-    fun reorderImages(fromIndex: Int, toIndex: Int) {
-        if (fromIndex == toIndex || fromIndex !in uiState.selectedImages.indices || toIndex !in uiState.selectedImages.indices) {
-            return
-        }
-        val images = uiState.selectedImages.toMutableList()
-        val item = images.removeAt(fromIndex)
-        images.add(toIndex, item)
-        // La primera imagen siempre es la destacada después de reordenar
-        uiState = uiState.copy(
-            selectedImages = images,
-            featuredImageIndex = 0
-        )
-    }
-
-    fun createJob(jobData: Map<String, Any>, context: Context) {
+    fun createJob(jobData: Map<String, Any?>, context: Context) {
         viewModelScope.launch {
             uiState = uiState.copy(isLoading = true, error = null, loadingMessage = "Publicando, por favor espera...")
             try {
-                val token = AuthManager.token ?: throw Exception("No estás autenticado.")
-                val authHeader = "Bearer $token"
+                val token = AuthManager.token
+                if (token == null) {
+                    throw Exception("Debes iniciar sesión para crear trabajos.")
+                }
 
-                val finalJobData = jobData.toMutableMap()
-                
-                // 1. Subir imágenes solo si hay imágenes seleccionadas
+                // Primero subir imágenes si hay
+                val galleryIds = mutableListOf<Int>()
                 if (uiState.selectedImages.isNotEmpty()) {
                     uiState = uiState.copy(loadingMessage = "Subiendo imágenes...")
-                    val uploadedImageIds = mutableListOf<Int>()
-                    val totalImages = uiState.selectedImages.size
-                    
-                    // Subir imágenes una por una para mejor manejo de errores
-                    uiState.selectedImages.forEachIndexed { index, uri ->
+                    for (imageUri in uiState.selectedImages) {
                         try {
-                            uiState = uiState.copy(loadingMessage = "Subiendo imagen ${index + 1} de $totalImages...")
+                            // Leer el archivo desde el URI
+                            val inputStream = context.contentResolver.openInputStream(imageUri)
+                            val bytes = inputStream?.readBytes()
+                            inputStream?.close()
                             
-                            // Validar que el URI sea accesible
-                            val inputStream = context.contentResolver.openInputStream(uri)
-                            if (inputStream == null) {
-                                android.util.Log.e("CreateJobViewModel", "No se pudo abrir el archivo: $uri")
-                                return@forEachIndexed
-                            }
-                            inputStream.close()
-                            
-                            val requestBody = createStreamingRequestBody(context, uri)
-                            if (requestBody == null) {
-                                android.util.Log.e("CreateJobViewModel", "No se pudo crear RequestBody para: $uri")
-                                return@forEachIndexed
-                            }
-                            
-                            val fileName = getFileName(context, uri) ?: "image.jpg"
-                            val part = MultipartBody.Part.createFormData("file", fileName, requestBody)
-                            val mediaItem = WordPressApi.retrofitService.uploadImage(authHeader, part, emptyMap())
-                            
-                            mediaItem.id?.let { id ->
-                                uploadedImageIds.add(id)
-                                android.util.Log.d("CreateJobViewModel", "Imagen subida exitosamente: ID=$id")
-                            } ?: run {
-                                android.util.Log.e("CreateJobViewModel", "La imagen se subió pero no se recibió ID")
+                            if (bytes != null && bytes.isNotEmpty()) {
+                                // Determinar el tipo MIME basado en el URI
+                                val mimeType = context.contentResolver.getType(imageUri) ?: "image/jpeg"
+                                val mediaType = mimeType.toMediaTypeOrNull() ?: "image/jpeg".toMediaTypeOrNull()
+                                
+                                // Obtener el nombre del archivo si está disponible
+                                val fileName = try {
+                                    val cursor = context.contentResolver.query(
+                                        imageUri,
+                                        arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),
+                                        null,
+                                        null,
+                                        null
+                                    )
+                                    cursor?.use {
+                                        if (it.moveToFirst()) {
+                                            val nameIndex = it.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                                            if (nameIndex >= 0) it.getString(nameIndex) else null
+                                        } else null
+                                    } ?: "image_${System.currentTimeMillis()}.jpg"
+                                } catch (e: Exception) {
+                                    "image_${System.currentTimeMillis()}.jpg"
+                                }
+                                
+                                val requestFile = okhttp3.RequestBody.create(mediaType, bytes)
+                                val body = MultipartBody.Part.createFormData(
+                                    "file",
+                                    fileName,
+                                    requestFile
+                                )
+                                
+                                // Subir imagen a WordPress
+                                val authHeader = "Bearer $token"
+                                val mediaItem = WordPressApi.retrofitService.uploadImage(
+                                    authHeader,
+                                    body,
+                                    emptyMap()
+                                )
+                                // Añadir solo si el ID no es nulo
+                                mediaItem.id?.let { galleryIds.add(it) }
                             }
                         } catch (e: Exception) {
-                            android.util.Log.e("CreateJobViewModel", "Error al subir imagen ${index + 1}: ${e.message}", e)
-                            // Continuar con las siguientes imágenes en lugar de fallar completamente
+                            Log.e("CreateJobViewModel", "Error uploading image", e)
+                            // Continuar aunque falle una imagen
                         }
-                    }
-
-                    if (uploadedImageIds.isNotEmpty()) {
-                        // La primera imagen siempre es la destacada
-                        finalJobData["featured_media"] = uploadedImageIds[0]
-                        finalJobData["gallery_ids"] = uploadedImageIds
-                        android.util.Log.d("CreateJobViewModel", "Total de imágenes subidas: ${uploadedImageIds.size}")
-                    } else {
-                        throw Exception("No se pudo subir ninguna imagen. Verifica que los archivos sean válidos.")
                     }
                 }
 
-                // 2. Crear el post con los IDs de las imágenes
-                uiState = uiState.copy(loadingMessage = "Creando anuncio...")
-                val response = WordPressApi.retrofitService.createJob(authHeader, finalJobData)
+                // Preparar payload para WordPress
+                uiState = uiState.copy(loadingMessage = "Creando trabajo...")
+                
+                // Validaciones básicas
+                val title = jobData["title"] as? String
+                val content = jobData["content"] as? String
+                val ubicacionId = jobData["ubicacion_id"] as? Number
+                
+                if (title.isNullOrBlank()) {
+                    throw Exception("El título es obligatorio.")
+                }
+                if (content.isNullOrBlank()) {
+                    throw Exception("La descripción es obligatoria.")
+                }
+                if (ubicacionId == null) {
+                    throw Exception("La ubicación es obligatoria.")
+                }
+                
+                val payload: MutableMap<String, Any> = mutableMapOf<String, Any>().apply {
+                    // Campos obligatorios (no nulos)
+                    put("title", title.trim())
+                    put("content", content.trim())
+                    put("ubicacion_id", ubicacionId.toInt()) // Obligatorio
 
-                if (response.isSuccessful) {
+                    // Convertir valores numéricos
+                    val salarioMin = (jobData["salario_min"] as? Number)?.toInt() ?: 0
+                    val salarioMax = (jobData["salario_max"] as? Number)?.toInt() ?: 0
+                    val vacantes = (jobData["vacantes"] as? Number)?.toInt() ?: 1
+
+                    if (salarioMin > 0) put("salario_min", salarioMin)
+                    if (salarioMax > 0) put("salario_max", salarioMax)
+                    if (vacantes > 0) put("vacantes", vacantes)
+
+                    // Taxonomías opcionales (solo si están seleccionadas)
+                    (jobData["empresa_id"] as? Number)?.toInt()?.let { put("empresa_id", it) }
+                    (jobData["cultivo_id"] as? Number)?.toInt()?.let { put("cultivo_id", it) }
+                    (jobData["tipo_puesto_id"] as? Number)?.toInt()?.let { put("tipo_puesto_id", it) }
+
+                    // Beneficios (solo enviar si son true)
+                    val alojamiento = jobData["alojamiento"] as? Boolean ?: false
+                    val transporte = jobData["transporte"] as? Boolean ?: false
+                    val alimentacion = jobData["alimentacion"] as? Boolean ?: false
+
+                    if (alojamiento) put("alojamiento", true)
+                    if (transporte) put("transporte", true)
+                    if (alimentacion) put("alimentacion", true)
+
+                    // Publicar en Facebook
+                    val publishToFacebook = jobData["publish_to_facebook"] as? Boolean ?: false
+                    if (publishToFacebook) {
+                        put("publish_to_facebook", true)
+                    }
+
+                    // Galería de imágenes
+                    if (galleryIds.isNotEmpty()) {
+                        put("gallery_ids", galleryIds)
+                    }
+                }
+
+                // Crear trabajo en WordPress
+                val authHeader = "Bearer $token"
+                val response = WordPressApi.retrofitService.createJob(authHeader, payload.toMap())
+
+                // Verificar respuesta
+                if (response.success) {
                     uiState = uiState.copy(isLoading = false, postSuccess = true)
                 } else {
-                    val errorBody = response.errorBody()?.string() ?: "Error desconocido"
-                    throw Exception("Error al publicar el trabajo: ${response.code()} - $errorBody")
+                    throw Exception(response.message ?: "No se pudo crear el trabajo.")
                 }
-            } catch (e: Exception) {
-                uiState = uiState.copy(isLoading = false, error = e.message ?: "Ocurrió un error desconocido")
-            }
-        }
-    }
-
-    // Función para crear un RequestBody que hace streaming del contenido de la URI
-    private fun createStreamingRequestBody(context: Context, uri: Uri): RequestBody? {
-        return try {
-            val contentType = context.contentResolver.getType(uri)?.toMediaTypeOrNull() 
-                ?: "image/jpeg".toMediaTypeOrNull()
-            
-            if (contentType == null) {
-                android.util.Log.e("CreateJobViewModel", "No se pudo determinar el tipo de contenido para: $uri")
-                return null
-            }
-            
-            object : RequestBody() {
-                override fun contentType() = contentType
-
-                override fun contentLength(): Long {
-                    return try {
-                        context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
-                            pfd.statSize
-                        } ?: -1L
-                    } catch (e: Exception) {
-                        android.util.Log.e("CreateJobViewModel", "Error al obtener tamaño del archivo", e)
-                        -1L
-                    }
-                }
-
-                override fun writeTo(sink: BufferedSink) {
-                    try {
-                        context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                            inputStream.source().use { source ->
-                                sink.writeAll(source)
+            } catch (e: HttpException) {
+                val errorMessage = try {
+                    // Intentar leer el mensaje del cuerpo de la respuesta
+                    val errorBody = e.response()?.errorBody()?.string()
+                    if (!errorBody.isNullOrBlank()) {
+                        // Intentar parsear el JSON de error de WordPress
+                        val jsonStart = errorBody.indexOf("\"message\"")
+                        if (jsonStart != -1) {
+                            val messageStart = errorBody.indexOf("\"", jsonStart + 10) + 1
+                            val messageEnd = errorBody.indexOf("\"", messageStart)
+                            if (messageEnd != -1) {
+                                errorBody.substring(messageStart, messageEnd)
+                            } else {
+                                null
                             }
-                        } ?: throw Exception("No se pudo abrir el archivo: $uri")
-                    } catch (e: Exception) {
-                        android.util.Log.e("CreateJobViewModel", "Error al escribir archivo al sink", e)
-                        throw e
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            android.util.Log.e("CreateJobViewModel", "Error al crear RequestBody", e)
-            null
-        }
-    }
-    
-    // Función para obtener el nombre del archivo desde la URI
-    private fun getFileName(context: Context, uri: Uri): String? {
-        return try {
-            var fileName: String? = null
-            
-            // Intentar obtener el nombre desde la URI
-            if (uri.scheme == "content") {
-                val cursor = context.contentResolver.query(uri, null, null, null, null)
-                cursor?.use {
-                    if (it.moveToFirst()) {
-                        val nameIndex = it.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-                        if (nameIndex != -1) {
-                            fileName = it.getString(nameIndex)
+                        } else {
+                            null
                         }
+                    } else {
+                        null
+                    } ?: when (e.code()) {
+                        400 -> "Datos inválidos. Verifica la información."
+                        401 -> "No estás autenticado. Inicia sesión nuevamente."
+                        403 -> "No tienes permiso para crear trabajos."
+                        500, 502, 503 -> "Error del servidor. Inténtalo más tarde."
+                        else -> "Error al crear el trabajo (${e.code()})"
+                    }
+                } catch (parseError: Exception) {
+                    when (e.code()) {
+                        400 -> "Datos inválidos. Verifica la información."
+                        401 -> "No estás autenticado. Inicia sesión nuevamente."
+                        403 -> "No tienes permiso para crear trabajos."
+                        500, 502, 503 -> "Error del servidor. Inténtalo más tarde."
+                        else -> "Error al crear el trabajo (${e.code()})"
                     }
                 }
+                uiState = uiState.copy(isLoading = false, error = errorMessage)
+            } catch (e: Exception) {
+                uiState = uiState.copy(isLoading = false, error = e.message ?: "Ocurrió un error inesperado.")
             }
-            
-            // Si no se encontró, intentar desde el path
-            if (fileName.isNullOrBlank()) {
-                val path = uri.path
-                if (!path.isNullOrBlank()) {
-                    fileName = path.substringAfterLast('/')
-                }
-            }
-            
-            // Si aún no hay nombre, usar uno por defecto basado en el tipo
-            if (fileName.isNullOrBlank()) {
-                val mimeType = context.contentResolver.getType(uri)
-                fileName = when {
-                    mimeType?.startsWith("image/png") == true -> "image.png"
-                    mimeType?.startsWith("image/jpeg") == true -> "image.jpg"
-                    mimeType?.startsWith("image/jpg") == true -> "image.jpg"
-                    mimeType?.startsWith("image/webp") == true -> "image.webp"
-                    else -> "image.jpg"
-                }
-            }
-            
-            fileName
-        } catch (e: Exception) {
-            android.util.Log.e("CreateJobViewModel", "Error al obtener nombre de archivo", e)
-            "image.jpg"
         }
     }
 }

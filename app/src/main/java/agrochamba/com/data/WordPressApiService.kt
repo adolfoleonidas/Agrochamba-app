@@ -1,44 +1,45 @@
 package agrochamba.com.data
 
-import agrochamba.com.BuildConfig
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
-import okhttp3.Interceptor
-import okhttp3.MultipartBody
+import agrochamba.com.BuildConfig
+import agrochamba.com.network.DetailedLoggingInterceptor
 import okhttp3.OkHttpClient
+import okhttp3.MultipartBody
 import okhttp3.RequestBody
-import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Response
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 import retrofit2.http.*
+import java.util.concurrent.TimeUnit
+
+private const val BASE_URL = "https://agrochamba.com/wp-json/"
 
 private val moshi = Moshi.Builder()
-    .add(KotlinJsonAdapterFactory())
+    .add(TitleAdapterFactory())
+    .add(ContentAdapterFactory())
+    .add(BooleanAdapterFactory())
+    .add(EmpresaDataAdapterFactory())
+    .addLast(KotlinJsonAdapterFactory())
     .build()
-
-private val authHeaderSanitizer = Interceptor { chain ->
-    val request = chain.request()
-    // No modificamos la request; este Interceptor es un placeholder por si se desea añadir headers globales
-    chain.proceed(request)
-}
-
-private val loggingInterceptor: HttpLoggingInterceptor by lazy {
-    HttpLoggingInterceptor().apply {
-        level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY else HttpLoggingInterceptor.Level.NONE
-    }
-}
 
 private val okHttpClient: OkHttpClient by lazy {
     OkHttpClient.Builder()
-        .addInterceptor(authHeaderSanitizer)
-        .addInterceptor(loggingInterceptor)
+        .connectTimeout(20, TimeUnit.SECONDS)
+        .writeTimeout(60, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(true)
+        .apply {
+            if (BuildConfig.DEBUG) {
+                addInterceptor(DetailedLoggingInterceptor())
+            }
+        }
         .build()
 }
 
 private val retrofit = Retrofit.Builder()
     .addConverterFactory(MoshiConverterFactory.create(moshi))
-    .baseUrl(BuildConfig.WP_BASE_URL)
+    .baseUrl(BASE_URL)
     .client(okHttpClient)
     .build()
 
@@ -89,7 +90,7 @@ interface WordPressApiService {
     suspend fun createJob(
         @Header("Authorization") token: String,
         @Body jobData: Map<String, @JvmSuppressWildcards Any>
-    ): Response<Unit>
+    ): CreateJobResponse
 
     // Nuevo: Endpoint para subir imágenes
     @Multipart
@@ -105,7 +106,7 @@ interface WordPressApiService {
         @Header("Authorization") token: String,
         @Query("page") page: Int = 1,
         @Query("per_page") perPage: Int = 20
-    ): PaginatedResponse<MyJobResponse>
+    ): MyJobsResponse
 
     @GET("agrochamba/v1/jobs/{id}/images")
     suspend fun getJobImages(@Path("id") id: Int): JobImagesResponse
@@ -185,7 +186,7 @@ interface WordPressApiService {
         @Header("Authorization") token: String,
         @Query("page") page: Int = 1,
         @Query("per_page") perPage: Int = 20
-    ): PaginatedResponse<PendingJobPost>
+    ): PendingJobsResponse
     
     @POST("agrochamba/v1/admin/jobs/{id}/approve")
     suspend fun approveJob(

@@ -3,108 +3,174 @@
  * Plugin Name: AgroChamba Core
  * Plugin URI: https://agrochamba.com
  * Description: Sistema completo de gestión de trabajos agrícolas con API REST personalizada
- * Version: 1.0.0
+ * Version: 2.0.0
  * Author: AgroChamba Team
+ * Author URI: https://agrochamba.com
  * License: GPL v2 or later
+ * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: agrochamba
- * 
- * =============================================================
- * SISTEMA CORE - CARGADOR PRINCIPAL
- * =============================================================
- * 
- * Este archivo carga todos los módulos del sistema AgroChamba
- * en el orden correcto para evitar conflictos.
+ * Domain Path: /languages
+ * Requires at least: 5.8
+ * Requires PHP: 7.4
+ *
+ * @package AgroChamba
  */
 
 // Prevenir acceso directo
 if (!defined('ABSPATH')) {
-    exit;
+    exit('Direct access forbidden.');
 }
 
-// Definir constantes del plugin
-if (!defined('AGROCHAMBA_VERSION')) {
-define('AGROCHAMBA_VERSION', '1.0.0');
-}
-if (!defined('AGROCHAMBA_PLUGIN_DIR')) {
-define('AGROCHAMBA_PLUGIN_DIR', plugin_dir_path(__FILE__));
-}
-if (!defined('AGROCHAMBA_PLUGIN_URL')) {
-define('AGROCHAMBA_PLUGIN_URL', plugin_dir_url(__FILE__));
-}
+// ==========================================
+// BOOTSTRAP
+// ==========================================
+require_once __DIR__ . '/config/bootstrap.php';
 
-/**
- * Cargar todos los módulos del sistema
- * Esta función se puede llamar múltiples veces de forma segura
- */
-function agrochamba_load_modules() {
-    // Evitar cargar dos veces
-    static $loaded = false;
-    if ($loaded) {
-        return;
+// ==========================================
+// CARGAR MÓDULOS
+// ==========================================
+if (!AGROCHAMBA_USE_MODULE_LOADER) {
+    function agrochamba_load_modules()
+    {
+        // Evitar cargar dos veces
+        static $loaded = false;
+        if ($loaded) {
+            return;
+        }
+        $loaded = true;
+
+        $modules_dir = AGROCHAMBA_PLUGIN_DIR . '/modules/';
+
+        // Lista de módulos en orden de carga
+        $modules = array(
+            '00-security-cors.php',           // Seguridad y CORS (PRIMERO)
+            '01-cpt-taxonomies.php',          // Custom Post Types y Taxonomías
+            // '02-filters-hooks.php',        // MOVIDO A: includes/hooks.php (Cargado por bootstrap)
+            '03-endpoints-auth.php',          // Autenticación y registro
+            '04-endpoints-user-profile.php',  // Perfil de usuario
+            '05-endpoints-company-profile.php', // Perfil de empresa
+            '06-endpoints-jobs.php',          // Gestión de trabajos
+            '07-endpoints-images.php',        // Gestión de imágenes
+            '08-endpoints-favorites.php',     // Favoritos y guardados
+            '09-facebook-integration.php',    // Integración con Facebook
+            '10-cache-system.php',            // Sistema de caché
+            '11-image-optimization.php',      // Optimización de imágenes
+            '12-regenerate-thumbnails.php',   // Regeneración de thumbnails
+        );
+
+        // Cargar cada módulo
+        foreach ($modules as $module) {
+            $file = $modules_dir . $module;
+            if (file_exists($file)) {
+                require_once $file;
+            } else {
+                error_log("AgroChamba: No se pudo cargar el módulo: {$module}");
+            }
+        }
+
+        // Hook para que otros plugins puedan añadir funcionalidad
+        do_action('agrochamba_modules_loaded');
     }
-    $loaded = true;
-    
-    // 0. Seguridad, CORS y Rate Limiting (debe cargarse PRIMERO)
-    require_once AGROCHAMBA_PLUGIN_DIR . 'modules/00-security-cors.php';
-    
-    // 1. Custom Post Types y Taxonomías (base del sistema)
-    require_once AGROCHAMBA_PLUGIN_DIR . 'modules/01-cpt-taxonomies.php';
-    
-    // 2. Filtros y hooks generales
-    require_once AGROCHAMBA_PLUGIN_DIR . 'modules/02-filters-hooks.php';
-    
-    // 3. Endpoints de autenticación y registro
-    require_once AGROCHAMBA_PLUGIN_DIR . 'modules/03-endpoints-auth.php';
-    
-    // 4. Endpoints de perfil de usuario
-    require_once AGROCHAMBA_PLUGIN_DIR . 'modules/04-endpoints-user-profile.php';
-    
-    // 5. Endpoints de perfil de empresa
-    require_once AGROCHAMBA_PLUGIN_DIR . 'modules/05-endpoints-company-profile.php';
-    
-    // 6. Endpoints de trabajos
-    require_once AGROCHAMBA_PLUGIN_DIR . 'modules/06-endpoints-jobs.php';
-    
-    // 7. Endpoints de imágenes
-    require_once AGROCHAMBA_PLUGIN_DIR . 'modules/07-endpoints-images.php';
-    
-    // 8. Endpoints de favoritos y guardados
-    require_once AGROCHAMBA_PLUGIN_DIR . 'modules/08-endpoints-favorites.php';
-    
-    // 9. Integración con Facebook
-    require_once AGROCHAMBA_PLUGIN_DIR . 'modules/09-facebook-integration.php';
-    
-    // 10. Sistema de caché (debe cargarse después de los endpoints)
-    require_once AGROCHAMBA_PLUGIN_DIR . 'modules/10-cache-system.php';
-    
-    // 11. Optimización de imágenes
-    require_once AGROCHAMBA_PLUGIN_DIR . 'modules/11-image-optimization.php';
-    
-    // 12. Regeneración de thumbnails
-    require_once AGROCHAMBA_PLUGIN_DIR . 'modules/12-regenerate-thumbnails.php';
+
+    // Cargar módulos
+    add_action('plugins_loaded', 'agrochamba_load_modules', 10);
+} else {
+    // Modo moderno: usar el cargador PSR-4 para inicializar todo el plugin
+    add_action('plugins_loaded', function () {
+        if (class_exists('AgroChamba\\Core\\ModuleLoader')) {
+            \AgroChamba\Core\ModuleLoader::init();
+            do_action('agrochamba_modules_loaded');
+        } else {
+            error_log('AgroChamba: ModuleLoader no encontrado. Verifique el autoloader.');
+        }
+    }, 10);
 }
 
-// Cargar módulos inmediatamente cuando el plugin se carga
-// Esto asegura que todos los hooks se registren antes de que WordPress los ejecute
-agrochamba_load_modules();
+// ==========================================
+// INIT HOOK
+// ==========================================
+add_action('init', function () {
+    // Asegurar que existe el rol employer
+    $role = get_role('employer');
+    if (!$role) {
+        add_role('employer', 'Empresa', array(
+            'read' => true,
+            'edit_posts' => true,
+            'edit_published_posts' => true,
+            'publish_posts' => true,
+            'delete_posts' => true,
+            'delete_published_posts' => true,
+            'upload_files' => true,
+        ));
+    } else {
+        // Asegurar capabilities para el rol employer
+        $capabilities = array('upload_files', 'edit_posts', 'publish_posts', 'delete_posts');
+        foreach ($capabilities as $cap) {
+            if (!$role->has_cap($cap)) {
+                $role->add_cap($cap);
+            }
+        }
+    }
+}, 1);
+
+// ==========================================
+// ACTIVACIÓN Y DESACTIVACIÓN
+// ==========================================
 
 /**
- * Activar el plugin - Flush rewrite rules
+ * Activar el plugin
  */
-function agrochamba_activate() {
-    // Cargar módulos primero
-    agrochamba_load_modules();
-    
+function agrochamba_activate()
+{
+    // Asegurar capabilities necesarias
+    $role = get_role('employer');
+    if ($role && !$role->has_cap('upload_files')) {
+        $role->add_cap('upload_files');
+    }
+
     // Flush rewrite rules
     flush_rewrite_rules();
 }
 register_activation_hook(__FILE__, 'agrochamba_activate');
 
 /**
- * Desactivar el plugin - Flush rewrite rules
+ * Desactivar el plugin
  */
-function agrochamba_deactivate() {
+function agrochamba_deactivate()
+{
     flush_rewrite_rules();
 }
 register_deactivation_hook(__FILE__, 'agrochamba_deactivate');
 
+// ==========================================
+// INFORMACIÓN DEL PLUGIN
+// ==========================================
+
+/**
+ * Añadir enlace a configuración en la página de plugins
+ */
+add_filter('plugin_action_links_' . plugin_basename(__FILE__), function ($links) {
+    $settings_link = '<a href="' . admin_url('options-general.php?page=agrochamba-facebook') . '">Configuración</a>';
+    array_unshift($links, $settings_link);
+    return $links;
+});
+
+/**
+ * Añadir información en el footer del admin
+ */
+add_filter('admin_footer_text', function ($text) {
+    // En algunos contextos (activación, CLI, AJAX temprano) get_current_screen puede no existir o devolver null
+    if (!function_exists('get_current_screen')) {
+        return $text;
+    }
+
+    $screen = get_current_screen();
+    if (!$screen || !isset($screen->id)) {
+        return $text;
+    }
+
+    if (strpos((string)$screen->id, 'agrochamba') !== false) {
+        return 'AgroChamba Core v' . AGROCHAMBA_VERSION . ' | Desarrollado con ❤️ por el equipo de AgroChamba';
+    }
+    return $text;
+});

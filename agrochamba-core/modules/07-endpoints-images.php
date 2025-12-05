@@ -12,6 +12,25 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+// =============================================================
+// SHIM DE COMPATIBILIDAD → Delegar a controlador namespaced
+// =============================================================
+if (!defined('AGROCHAMBA_IMAGES_CONTROLLER_NAMESPACE_INITIALIZED')) {
+    define('AGROCHAMBA_IMAGES_CONTROLLER_NAMESPACE_INITIALIZED', true);
+
+    if (class_exists('AgroChamba\\API\\Media\\ImagesController')) {
+        if (function_exists('error_log')) {
+            error_log('AgroChamba: Delegando endpoints de imágenes a AgroChamba\\API\\Media\\ImagesController (migración namespaces).');
+        }
+        \AgroChamba\API\Media\ImagesController::init();
+        return; // Evitar registrar endpoints legacy duplicados
+    } else {
+        if (function_exists('error_log')) {
+            error_log('AgroChamba: No se encontró AgroChamba\\API\\Media\\ImagesController. Usando implementación procedural legacy.');
+        }
+    }
+}
+
 // ==========================================
 // OBTENER IMÁGENES DE UN TRABAJO
 // ==========================================

@@ -15,6 +15,26 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+// =============================================================
+// SHIM DE COMPATIBILIDAD → Delegar a controlador namespaced
+// =============================================================
+if (!defined('AGROCHAMBA_JOBS_CONTROLLER_NAMESPACE_INITIALIZED')) {
+    define('AGROCHAMBA_JOBS_CONTROLLER_NAMESPACE_INITIALIZED', true);
+
+    // Si existe el controlador moderno, delegar y salir para evitar duplicidad
+    if (class_exists('AgroChamba\\API\\Jobs\\JobsController')) {
+        if (function_exists('error_log')) {
+            error_log('AgroChamba: Delegando endpoints de trabajos a AgroChamba\\API\\Jobs\\JobsController (migración namespaces).');
+        }
+        \AgroChamba\API\Jobs\JobsController::init();
+        return; // Evitar registrar endpoints legacy duplicados
+    } else {
+        if (function_exists('error_log')) {
+            error_log('AgroChamba: No se encontró AgroChamba\\API\\Jobs\\JobsController. Usando implementación procedural legacy.');
+        }
+    }
+}
+
 // ==========================================
 // 1. CREAR NUEVO TRABAJO (VERSIÓN CONSOLIDADA)
 // ==========================================
@@ -76,10 +96,35 @@ if (!function_exists('agrochamba_create_job')) {
             $post_data['post_excerpt'] = sanitize_textarea_field($params['excerpt']);
         }
 
-        // Si hay gallery_ids, establecer la primera como imagen destacada
-        if (!empty($params['gallery_ids']) && is_array($params['gallery_ids'])) {
+        // Procesar imágenes: si hay múltiples, agregar las demás al contenido
+        $gallery_ids = isset($params['gallery_ids']) && is_array($params['gallery_ids']) ? array_map('intval', $params['gallery_ids']) : array();
+        $additional_images_html = '';
+        
+        if (!empty($gallery_ids)) {
+            // Si hay UNA imagen, será la portada
+            // Si hay MÚLTIPLES imágenes, la primera será la portada y las demás se agregan al contenido
+            if (count($gallery_ids) > 1) {
+                // Obtener las imágenes adicionales (todas excepto la primera)
+                $additional_image_ids = array_slice($gallery_ids, 1);
+                
+                // Generar HTML para las imágenes adicionales
+                foreach ($additional_image_ids as $img_id) {
+                    $img_url = wp_get_attachment_image_url($img_id, 'large');
+                    if ($img_url) {
+                        $additional_images_html .= '<p><img src="' . esc_url($img_url) . '" alt="" class="aligncenter size-large" /></p>' . "\n";
+                    }
+                }
+                
+                // Agregar las imágenes al contenido existente
+                if (!empty($additional_images_html)) {
+                    $existing_content = isset($post_data['post_content']) ? $post_data['post_content'] : '';
+                    $post_data['post_content'] = $existing_content . "\n\n" . $additional_images_html;
+                }
+            }
+            
+            // Establecer la primera imagen como portada
             $post_data['meta_input'] = array(
-                '_thumbnail_id' => intval($params['gallery_ids'][0])
+                '_thumbnail_id' => intval($gallery_ids[0])
             );
         }
 
@@ -107,44 +152,54 @@ if (!function_exists('agrochamba_create_job')) {
         }
 
         // ==========================================
-        // VINCULAR EMPRESA AUTOMÁTICAMENTE
+        // VINCULAR EMPRESA AUTOMÁTICAMENTE (CPT Empresa)
         // ==========================================
-        $empresa_term_id = null;
+        $empresa_id = null;
 
-        // Si el usuario es empresa, vincular automáticamente
+        // Si el usuario es empresa, buscar su CPT Empresa
         if (in_array('employer', $user->roles) || in_array('administrator', $user->roles)) {
-            $company_name = $user->display_name;
+            $empresa_cpt = agrochamba_get_empresa_by_user_id($user_id);
             
-            if (!empty($company_name)) {
-                $empresa_term = get_term_by('name', $company_name, 'empresa');
-                
-                if (!$empresa_term) {
-                    $term_result = wp_insert_term(
-                        $company_name,
-                        'empresa',
-                        array(
-                            'description' => 'Empresa: ' . $company_name,
-                            'slug' => sanitize_title($company_name)
-                        )
-                    );
-                    
-                    if (!is_wp_error($term_result)) {
-                        $empresa_term_id = $term_result['term_id'];
-                    }
-                } else {
-                    $empresa_term_id = $empresa_term->term_id;
-                }
+            if ($empresa_cpt) {
+                $empresa_id = $empresa_cpt->ID;
+            } elseif (isset($params['empresa_id']) && !empty($params['empresa_id'])) {
+                $empresa_id = intval($params['empresa_id']);
             }
         } else {
-            // Si no es empresa, usar el empresa_id proporcionado
+            // Si no es employer, usar empresa_id proporcionado
             if (isset($params['empresa_id']) && !empty($params['empresa_id'])) {
-                $empresa_term_id = intval($params['empresa_id']);
+                $empresa_id = intval($params['empresa_id']);
             }
         }
 
-        // Asignar la empresa al trabajo
-        if ($empresa_term_id) {
-            wp_set_post_terms($post_id, array($empresa_term_id), 'empresa', false);
+        // Asignar empresa_id al trabajo (meta field)
+        if ($empresa_id) {
+            // Validar que la empresa existe y es del tipo correcto
+            $empresa_post = get_post($empresa_id);
+            if (!$empresa_post || $empresa_post->post_type !== 'empresa') {
+                // Si la empresa no existe o no es del tipo correcto, limpiar empresa_id
+                $empresa_id = null;
+            } else {
+                update_post_meta($post_id, 'empresa_id', $empresa_id);
+                
+                // También mantener compatibilidad con taxonomía empresa (legacy)
+                $empresa_term = get_term_by('name', $empresa_post->post_title, 'empresa');
+                if (!$empresa_term) {
+                    $term_result = wp_insert_term(
+                        $empresa_post->post_title,
+                        'empresa',
+                        array(
+                            'description' => 'Empresa: ' . $empresa_post->post_title,
+                            'slug' => sanitize_title($empresa_post->post_title)
+                        )
+                    );
+                    if (!is_wp_error($term_result)) {
+                        wp_set_post_terms($post_id, array($term_result['term_id']), 'empresa', false);
+                    }
+                } else {
+                    wp_set_post_terms($post_id, array($empresa_term->term_id), 'empresa', false);
+                }
+            }
         }
 
         // Asignar otras taxonomías
@@ -183,14 +238,19 @@ if (!function_exists('agrochamba_create_job')) {
             }
         }
 
-        // Imagen destacada (ya se estableció en meta_input, pero por si acaso)
+        // Imagen destacada (si se especifica directamente, tiene prioridad sobre gallery_ids)
         if (isset($params['featured_media']) && !empty($params['featured_media'])) {
             set_post_thumbnail($post_id, intval($params['featured_media']));
+        } elseif (!empty($gallery_ids)) {
+            // Si no hay featured_media pero hay gallery_ids, usar la primera
+            set_post_thumbnail($post_id, intval($gallery_ids[0]));
         }
 
-        // Galería de imágenes
-        if (isset($params['gallery_ids']) && is_array($params['gallery_ids'])) {
-            update_post_meta($post_id, 'gallery_ids', array_map('intval', $params['gallery_ids']));
+        // Guardar gallery_ids (solo la primera si hay múltiples, ya que las demás están en el contenido)
+        if (!empty($gallery_ids)) {
+            // Guardar solo la primera imagen en gallery_ids para mantener compatibilidad
+            // Las demás ya están embebidas en el contenido del post
+            update_post_meta($post_id, 'gallery_ids', array($gallery_ids[0]));
         }
 
         // Intentar publicar en Facebook solo si el trabajo está publicado
@@ -288,6 +348,37 @@ if (!function_exists('agrochamba_update_job')) {
             );
         }
 
+        // Procesar imágenes: si hay múltiples, agregar las demás al contenido
+        $gallery_ids = isset($params['gallery_ids']) && is_array($params['gallery_ids']) ? array_map('intval', $params['gallery_ids']) : array();
+        $additional_images_html = '';
+        
+        if (!empty($gallery_ids)) {
+            // Si hay UNA imagen, será la portada
+            // Si hay MÚLTIPLES imágenes, la primera será la portada y las demás se agregan al contenido
+            if (count($gallery_ids) > 1) {
+                // Obtener las imágenes adicionales (todas excepto la primera)
+                $additional_image_ids = array_slice($gallery_ids, 1);
+                
+                // Generar HTML para las imágenes adicionales
+                foreach ($additional_image_ids as $img_id) {
+                    $img_url = wp_get_attachment_image_url($img_id, 'large');
+                    if ($img_url) {
+                        // Verificar si la imagen ya está en el contenido para evitar duplicados
+                        $existing_content = isset($post_data['post_content']) ? $post_data['post_content'] : $post->post_content;
+                        if (strpos($existing_content, $img_url) === false) {
+                            $additional_images_html .= '<p><img src="' . esc_url($img_url) . '" alt="" class="aligncenter size-large" /></p>' . "\n";
+                        }
+                    }
+                }
+                
+                // Agregar las imágenes al contenido existente solo si hay nuevas imágenes
+                if (!empty($additional_images_html)) {
+                    $existing_content = isset($post_data['post_content']) ? $post_data['post_content'] : $post->post_content;
+                    $post_data['post_content'] = $existing_content . "\n\n" . $additional_images_html;
+                }
+            }
+        }
+
         // Actualizar el post
         $updated = wp_update_post($post_data);
 
@@ -333,7 +424,7 @@ if (!function_exists('agrochamba_update_job')) {
             'salario_min', 'salario_max', 'vacantes', 'fecha_inicio', 'fecha_fin',
             'duracion_dias', 'requisitos', 'beneficios', 'tipo_contrato', 'jornada',
             'contacto_whatsapp', 'contacto_email', 'google_maps_url', 'alojamiento', 'transporte',
-            'alimentacion', 'estado', 'experiencia', 'genero', 'edad_minima', 'edad_maxima'
+            'alimentacion', 'estado', 'experiencia', 'genero', 'edad_minima', 'edad_maxima', 'empresa_id'
         );
 
         foreach ($meta_fields as $field) {
@@ -343,31 +434,45 @@ if (!function_exists('agrochamba_update_job')) {
                 if (in_array($field, array('alojamiento', 'transporte', 'alimentacion'))) {
                     $value = filter_var($value, FILTER_VALIDATE_BOOLEAN);
                 }
-                // Sanitizar URL de Google Maps
+                // Sanitizar según el tipo de campo
                 if ($field === 'google_maps_url') {
                     $value = esc_url_raw($value);
+                } elseif ($field === 'empresa_id') {
+                    // Validar y sanitizar empresa_id
+                    $value = intval($value);
+                    if ($value > 0) {
+                        // Verificar que la empresa existe
+                        $empresa = get_post($value);
+                        if (!$empresa || $empresa->post_type !== 'empresa') {
+                            continue; // Saltar si la empresa no existe o no es del tipo correcto
+                        }
+                    } else {
+                        $value = 0; // Permitir eliminar la asociación estableciendo 0
+                    }
                 }
                 update_post_meta($post_id, $field, $value);
             }
         }
 
-        // Actualizar imagen destacada
+        // Actualizar imagen destacada (si se especifica directamente, tiene prioridad sobre gallery_ids)
         if (isset($params['featured_media'])) {
             if (!empty($params['featured_media'])) {
                 set_post_thumbnail($post_id, intval($params['featured_media']));
             } else {
                 delete_post_thumbnail($post_id);
             }
+        } elseif (!empty($gallery_ids)) {
+            // Si no hay featured_media pero hay gallery_ids, usar la primera
+            set_post_thumbnail($post_id, intval($gallery_ids[0]));
         }
 
-        // Actualizar galería de imágenes
+        // Guardar gallery_ids (solo la primera si hay múltiples, ya que las demás están en el contenido)
         if (isset($params['gallery_ids'])) {
             if (is_array($params['gallery_ids']) && !empty($params['gallery_ids'])) {
-                update_post_meta($post_id, 'gallery_ids', array_map('intval', $params['gallery_ids']));
-                // Si no hay featured_media pero hay gallery_ids, usar la primera
-                if (empty($params['featured_media'])) {
-                    set_post_thumbnail($post_id, intval($params['gallery_ids'][0]));
-                }
+                $gallery_ids = array_map('intval', $params['gallery_ids']);
+                // Guardar solo la primera imagen en gallery_ids para mantener compatibilidad
+                // Las demás ya están embebidas en el contenido del post
+                update_post_meta($post_id, 'gallery_ids', array($gallery_ids[0]));
             } else {
                 // Si gallery_ids está vacío, limpiar
                 update_post_meta($post_id, 'gallery_ids', array());

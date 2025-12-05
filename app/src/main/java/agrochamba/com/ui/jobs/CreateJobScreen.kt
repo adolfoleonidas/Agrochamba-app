@@ -16,10 +16,18 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowForwardIos
 import androidx.compose.material.icons.filled.Business
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -29,16 +37,18 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.zIndex
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import agrochamba.com.data.AuthManager
 import agrochamba.com.data.Category
 import coil.compose.AsyncImage
 
@@ -65,8 +75,10 @@ fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel 
     var alojamiento by remember { mutableStateOf(false) }
     var transporte by remember { mutableStateOf(false) }
     var alimentacion by remember { mutableStateOf(false) }
+    var publishToFacebook by remember { mutableStateOf(false) }
     
-    // Si el usuario es empresa, seleccionar automáticamente su empresa
+    var showMoreOptions by remember { mutableStateOf(false) }
+
     LaunchedEffect(uiState.userCompanyId, uiState.empresas) {
         if (uiState.userCompanyId != null && selectedEmpresa == null && uiState.empresas.isNotEmpty()) {
             selectedEmpresa = uiState.empresas.find { it.id == uiState.userCompanyId }
@@ -75,143 +87,350 @@ fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel 
 
     LaunchedEffect(uiState.postSuccess) {
         if (uiState.postSuccess) {
-            Toast.makeText(context, "¡Trabajo publicado con éxito!", Toast.LENGTH_LONG).show()
+            Toast.makeText(
+                context, 
+                "¡Trabajo creado con éxito! Está pendiente de revisión por un administrador.", 
+                Toast.LENGTH_LONG
+            ).show()
             navController.popBackStack()
         }
     }
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Publicar Nuevo Trabajo") },
-                navigationIcon = { IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.Default.ArrowBack, null) } })
+            TopAppBar(
+                title = { Text("Nuevo Anuncio") },
+                navigationIcon = { 
+                    IconButton(onClick = { navController.popBackStack() }) { 
+                        Icon(Icons.Default.ArrowBack, null) 
+                    }
+                }
+            )
+        },
+        bottomBar = {
+            BottomActionBar(
+                isLoading = uiState.isLoading,
+                loadingMessage = uiState.loadingMessage,
+                onPublish = {
+                    if (title.isBlank()) {
+                        Toast.makeText(context, "El título es obligatorio", Toast.LENGTH_SHORT).show()
+                        return@BottomActionBar
+                    }
+                    if (description.isBlank()) {
+                        Toast.makeText(context, "La descripción es obligatoria", Toast.LENGTH_SHORT).show()
+                        return@BottomActionBar
+                    }
+                    if (selectedUbicacion == null) {
+                        Toast.makeText(context, "La ubicación es obligatoria", Toast.LENGTH_SHORT).show()
+                        return@BottomActionBar
+                    }
+                    
+                    // Guardar en variable local para evitar problemas de smart cast
+                    val ubicacionId = selectedUbicacion!!.id
+                    
+                    // Si es empresa normal (no admin), usar automáticamente su empresa
+                    // Si es admin, puede seleccionar cualquier empresa
+                    val empresaIdToUse = if (AuthManager.isUserAdmin()) {
+                        selectedEmpresa?.id
+                    } else {
+                        uiState.userCompanyId ?: selectedEmpresa?.id
+                    }
+                    
+                    val jobData = mapOf(
+                        "title" to title.trim(),
+                        "content" to description.trim(),
+                        "salario_min" to (salarioMin.toIntOrNull() ?: 0),
+                        "salario_max" to (salarioMax.toIntOrNull() ?: 0),
+                        "vacantes" to (vacantes.toIntOrNull() ?: 1),
+                        "ubicacion_id" to ubicacionId,
+                        "empresa_id" to empresaIdToUse, // Usar automáticamente la empresa del usuario si no es admin
+                        "cultivo_id" to selectedCultivo?.id,
+                        "tipo_puesto_id" to selectedTipoPuesto?.id,
+                        "alojamiento" to alojamiento,
+                        "transporte" to transporte,
+                        "alimentacion" to alimentacion,
+                        "publish_to_facebook" to publishToFacebook
+                    )
+                    viewModel.createJob(jobData, context)
+                }
+            )
         }
-    ) {
+    ) { paddingValues ->
         if (uiState.isLoading && uiState.loadingMessage.startsWith("Cargando")) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-                Text(uiState.loadingMessage, modifier = Modifier.padding(top = 80.dp))
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator()
+                    Spacer(Modifier.height(16.dp))
+                    Text(uiState.loadingMessage)
+                }
             }
         } else {
             Column(
                 modifier = Modifier
-                    .padding(it)
-                    .padding(16.dp)
+                    .fillMaxSize()
+                    .padding(paddingValues)
                     .verticalScroll(rememberScrollState())
             ) {
-                Text("Imágenes del Anuncio (hasta 10)", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    text = "Mantén presionada una imagen y arrastra para reordenar. La primera es la destacada.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp)
+                // Sección de imágenes - estilo TikTok
+                ImageSection(
+                    images = uiState.selectedImages,
+                    onAddImage = { imagePickerLauncher.launch("image/*") },
+                    onRemoveImage = { viewModel.removeImage(it) },
+                    onReorderImages = { from, to -> viewModel.reorderImages(from, to) }
                 )
-                Spacer(Modifier.height(8.dp))
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    itemsIndexed(uiState.selectedImages) { index, uri ->
-                        ImagePreviewItem(
-                            uri = uri,
-                            onRemove = { viewModel.removeImage(uri) },
-                            isFeatured = index == 0,
-                            onMove = { fromIndex, toIndex ->
-                                viewModel.reorderImages(fromIndex, toIndex)
-                            },
-                            index = index
-                        )
-                    }
-                    if (uiState.selectedImages.size < 10) {
-                        item { ImagePickerBox(onClick = { imagePickerLauncher.launch("image/*") }) }
-                    }
-                }
+                
                 Spacer(Modifier.height(24.dp))
-
-                OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Título del Puesto") }, modifier = Modifier.fillMaxWidth())
-                Spacer(Modifier.height(16.dp))
-                OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("Descripción del Puesto") }, modifier = Modifier.fillMaxWidth().height(150.dp))
-                Spacer(Modifier.height(16.dp))
-
-                Row(Modifier.fillMaxWidth()) {
-                    OutlinedTextField(value = salarioMin, onValueChange = { salarioMin = it }, label = { Text("Salario Mín.") }, modifier = Modifier.weight(1f))
-                    Spacer(Modifier.width(8.dp))
-                    OutlinedTextField(value = salarioMax, onValueChange = { salarioMax = it }, label = { Text("Salario Máx.") }, modifier = Modifier.weight(1f))
+                
+                // Título con placeholder descriptivo
+                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    Text(
+                        text = "Agrega un título llamativo",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    TextField(
+                        value = title,
+                        onValueChange = { title = it },
+                        placeholder = {
+                            Text(
+                                "Ej: Se busca personal para cosecha de uva en Ica",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent
+                        ),
+                        textStyle = MaterialTheme.typography.bodyLarge
+                    )
                 }
-                Spacer(Modifier.height(16.dp))
-                OutlinedTextField(value = vacantes, onValueChange = { vacantes = it }, label = { Text("Nº de Vacantes") }, modifier = Modifier.fillMaxWidth())
-                Spacer(Modifier.height(16.dp))
-
-                CategoryDropdown(label = "Ubicación", items = uiState.ubicaciones, selectedItem = selectedUbicacion) { cat -> selectedUbicacion = cat }
+                
                 Spacer(Modifier.height(16.dp))
                 
-                // Si el usuario es empresa, mostrar su empresa y deshabilitar el dropdown
-                val currentEmpresa = selectedEmpresa
-                if (uiState.userCompanyId != null && currentEmpresa != null) {
-                    OutlinedTextField(
-                        value = currentEmpresa.name ?: "",
-                        onValueChange = {},
-                        readOnly = true,
-                        enabled = false,
-                        label = { Text("Empresa") },
-                        modifier = Modifier.fillMaxWidth(),
-                        trailingIcon = {
-                            Icon(
-                                Icons.Default.Business,
-                                contentDescription = "Empresa",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                // Descripción
+                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    TextField(
+                        value = description,
+                        onValueChange = { description = it },
+                        placeholder = {
+                            Text(
+                                "Una descripción detallada permite obtener más visitas. Incluye información sobre el trabajo, requisitos y beneficios.",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            )
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent
+                        ),
+                        textStyle = MaterialTheme.typography.bodyMedium
+                    )
+                }
+                
+                Spacer(Modifier.height(24.dp))
+                
+                // Ubicación - siempre visible (campo básico más importante)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                ) {
+                    CategoryDropdown(
+                        label = "Ubicación *",
+                        items = uiState.ubicaciones,
+                        selectedItem = selectedUbicacion
+                    ) { cat -> selectedUbicacion = cat }
+                }
+                
+                Spacer(Modifier.height(16.dp))
+                
+                // Botón para mostrar más detalles
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    ActionButton(
+                        text = if (showMoreOptions) "Ocultar Detalles" else "Más Detalles",
+                        icon = null,
+                        onClick = { showMoreOptions = !showMoreOptions }
+                    )
+                }
+                
+                Spacer(Modifier.height(16.dp))
+                
+                // Opciones avanzadas expandibles
+                if (showMoreOptions) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                            .background(
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                RoundedCornerShape(12.dp)
+                            )
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Text(
+                            "Información del Trabajo",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        
+                        // Salario Mín/Máx
+                        Row(Modifier.fillMaxWidth()) {
+                            OutlinedTextField(
+                                value = salarioMin,
+                                onValueChange = { salarioMin = it },
+                                label = { Text("Salario Mín.") },
+                                modifier = Modifier.weight(1f),
+                                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                                )
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            OutlinedTextField(
+                                value = salarioMax,
+                                onValueChange = { salarioMax = it },
+                                label = { Text("Salario Máx.") },
+                                modifier = Modifier.weight(1f),
+                                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                                )
                             )
                         }
-                    )
-                    Text(
-                        text = "Tu empresa se asigna automáticamente. Para cambiarla, actualiza tu nombre en el perfil.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-                } else {
-                    CategoryDropdown(label = "Empresa", items = uiState.empresas, selectedItem = selectedEmpresa) { cat -> selectedEmpresa = cat }
-                }
-                Spacer(Modifier.height(16.dp))
-                CategoryDropdown(label = "Cultivo", items = uiState.cultivos, selectedItem = selectedCultivo) { cat -> selectedCultivo = cat }
-                Spacer(Modifier.height(16.dp))
-                CategoryDropdown(label = "Tipo de Puesto", items = uiState.tiposPuesto, selectedItem = selectedTipoPuesto) { cat -> selectedTipoPuesto = cat }
-                Spacer(Modifier.height(24.dp))
-
-                Text("Beneficios Incluidos", style = MaterialTheme.typography.titleMedium)
-                BenefitSwitch(text = "Alojamiento", checked = alojamiento, onCheckedChange = { alojamiento = it })
-                BenefitSwitch(text = "Transporte", checked = transporte, onCheckedChange = { transporte = it })
-                BenefitSwitch(text = "Alimentación", checked = alimentacion, onCheckedChange = { alimentacion = it })
-
-                Spacer(Modifier.height(24.dp))
-
-                if (uiState.isLoading) {
-                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        CircularProgressIndicator()
-                        Spacer(Modifier.width(16.dp))
-                        Text(uiState.loadingMessage)
-                    }
-                } else {
-                    Button(onClick = { 
-                        val jobData = mapOf(
-                            "title" to title,
-                            "content" to description,
-                            "salario_min" to salarioMin,
-                            "salario_max" to salarioMax,
-                            "vacantes" to vacantes,
-                            "ubicacion_id" to (selectedUbicacion?.id ?: ""),
-                            "empresa_id" to (selectedEmpresa?.id ?: ""),
-                            "cultivo_id" to (selectedCultivo?.id ?: ""),
-                            "tipo_puesto_id" to (selectedTipoPuesto?.id ?: ""),
-                            "alojamiento" to alojamiento,
-                            "transporte" to transporte,
-                            "alimentacion" to alimentacion
+                        
+                        // Vacantes
+                        OutlinedTextField(
+                            value = vacantes,
+                            onValueChange = { vacantes = it },
+                            label = { Text("Nº de Vacantes") },
+                            modifier = Modifier.fillMaxWidth(),
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                            )
                         )
-                        viewModel.createJob(jobData, context)
-                     }, modifier = Modifier.fillMaxWidth().height(48.dp)) {
-                        Text("Publicar Trabajo")
+                        
+                        Divider()
+                        
+                        Text(
+                            "Categorías",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        
+                        // Mostrar selector de empresas solo para admins
+                        // Las empresas normales publican automáticamente con su empresa asociada
+                        val isAdmin = AuthManager.isUserAdmin()
+                        val currentEmpresa = selectedEmpresa
+                        
+                        if (uiState.userCompanyId != null && !isAdmin) {
+                            // Empresa normal: mostrar solo lectura con su empresa
+                            OutlinedTextField(
+                                value = currentEmpresa?.name ?: "Tu empresa",
+                                onValueChange = {},
+                                readOnly = true,
+                                enabled = false,
+                                label = { Text("Empresa") },
+                                modifier = Modifier.fillMaxWidth(),
+                                leadingIcon = { Icon(Icons.Default.Business, contentDescription = null) },
+                                colors = TextFieldDefaults.colors(
+                                    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                )
+                            )
+                        } else if (isAdmin) {
+                            // Admin: puede seleccionar cualquier empresa
+                            CategoryDropdown(
+                                label = "Empresa",
+                                items = uiState.empresas,
+                                selectedItem = selectedEmpresa
+                            ) { cat -> selectedEmpresa = cat }
+                        }
+                        
+                        CategoryDropdown(
+                            label = "Cultivo",
+                            items = uiState.cultivos,
+                            selectedItem = selectedCultivo
+                        ) { cat -> selectedCultivo = cat }
+                        
+                        CategoryDropdown(
+                            label = "Tipo de Puesto",
+                            items = uiState.tiposPuesto,
+                            selectedItem = selectedTipoPuesto
+                        ) { cat -> selectedTipoPuesto = cat }
+                        
+                        Divider()
+                        
+                        Text(
+                            "Beneficios Incluidos",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        
+                        BenefitSwitch(
+                            text = "Alojamiento",
+                            checked = alojamiento,
+                            onCheckedChange = { alojamiento = it }
+                        )
+                        BenefitSwitch(
+                            text = "Transporte",
+                            checked = transporte,
+                            onCheckedChange = { transporte = it }
+                        )
+                        BenefitSwitch(
+                            text = "Alimentación",
+                            checked = alimentacion,
+                            onCheckedChange = { alimentacion = it }
+                        )
                     }
                 }
-
+                
+                // Opciones adicionales
+                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    BenefitSwitch(
+                        text = "Publicar también en Facebook",
+                        checked = publishToFacebook,
+                        onCheckedChange = { publishToFacebook = it }
+                    )
+                    OptionRow(
+                        icon = Icons.Default.Public,
+                        text = "Todo el mundo puede ver esta publicación",
+                        onClick = { /* TODO: Configurar privacidad */ }
+                    )
+                    OptionRow(
+                        icon = Icons.Default.Settings,
+                        text = "Más opciones",
+                        onClick = { /* TODO: Mostrar más opciones */ }
+                    )
+                }
+                
+                Spacer(Modifier.height(80.dp)) // Espacio para la barra inferior
+                
                 uiState.error?.let { error ->
-                    Spacer(Modifier.height(16.dp))
-                    Text(error, color = MaterialTheme.colorScheme.error)
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer
+                        )
+                    ) {
+                        Text(
+                            error,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.padding(16.dp)
+                        )
+                    }
                 }
             }
         }
@@ -219,198 +438,258 @@ fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel 
 }
 
 @Composable
-private fun ImagePickerBox(onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .size(100.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(Icons.Default.AddPhotoAlternate, contentDescription = "Añadir imagen", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun ImageSection(
+    images: List<Uri>,
+    onAddImage: () -> Unit,
+    onRemoveImage: (Uri) -> Unit,
+    onReorderImages: (Int, Int) -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+        // Mostrar todas las imágenes seleccionadas en una fila compacta
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            // Mostrar todas las imágenes seleccionadas (pequeñas como TikTok)
+            itemsIndexed(images) { index, uri ->
+                TikTokImagePreview(
+                    uri = uri,
+                    isFeatured = index == 0,
+                    onRemove = { onRemoveImage(uri) },
+                    modifier = Modifier.size(70.dp)
+                )
+            }
+            
+            // Botón grande para agregar más imágenes (estilo TikTok)
+            if (images.size < 10) {
+                item {
+                    TikTokAddImageButton(
+                        onClick = onAddImage,
+                        modifier = Modifier.size(70.dp)
+                    )
+                }
+            }
+        }
     }
 }
 
 @Composable
-private fun ImagePreviewItem(
+private fun TikTokImagePreview(
     uri: Uri,
-    onRemove: () -> Unit,
     isFeatured: Boolean,
-    onMove: (Int, Int) -> Unit,
-    index: Int
+    onRemove: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    val density = LocalDensity.current
-    var offsetX by remember { mutableStateOf(0f) }
-    var offsetY by remember { mutableStateOf(0f) }
-    var isDragging by remember { mutableStateOf(false) }
-    var showFullImage by remember { mutableStateOf(false) }
-    
-    Box(
-        modifier = Modifier
-            .size(100.dp)
-            .then(
-                if (isFeatured) {
-                    Modifier.border(
-                        width = 3.dp,
-                        color = MaterialTheme.colorScheme.primary,
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                } else {
-                    Modifier
-                }
-            )
-            .then(
-                if (isDragging) {
-                    Modifier
-                        .offset(x = offsetX.dp, y = offsetY.dp)
-                        .alpha(0.8f)
-                        .zIndex(1f)
-                } else {
-                    Modifier
-                }
-            )
-            .pointerInput(uri) {
-                detectDragGesturesAfterLongPress(
-                    onDragStart = {
-                        isDragging = true
-                    },
-                    onDrag = { change, dragAmount ->
-                        change.consume()
-                        offsetX += dragAmount.x
-                        offsetY += dragAmount.y
-                    },
-                    onDragEnd = {
-                        isDragging = false
-                        val itemWidthPx = with(density) { 108.dp.toPx() }
-                        val dragDistance = offsetX
-                        val indexChange = (dragDistance / itemWidthPx).toInt()
-                        val newIndex = (index + indexChange).coerceIn(0, 9)
-                        if (newIndex != index && newIndex >= 0) {
-                            onMove(index, newIndex)
-                        }
-                        offsetX = 0f
-                        offsetY = 0f
-                    }
-                )
-            }
-    ) {
+    Box(modifier = modifier) {
         AsyncImage(
             model = uri,
-            contentDescription = "Vista previa de imagen. Mantén presionado y arrastra para reordenar. Toca para ver en tamaño completo.",
+            contentDescription = if (isFeatured) "Imagen destacada" else "Imagen",
             modifier = Modifier
                 .fillMaxSize()
-                .clip(RoundedCornerShape(if (isFeatured) 9.dp else 12.dp))
-                .clickable { showFullImage = true },
+                .clip(RoundedCornerShape(6.dp))
+                .border(
+                    width = if (isFeatured) 2.dp else 0.dp,
+                    color = if (isFeatured) MaterialTheme.colorScheme.primary else Color.Transparent,
+                    shape = RoundedCornerShape(6.dp)
+                ),
             contentScale = ContentScale.Crop
         )
         
-        // Botón para eliminar
+        // Botón de eliminar pequeño en la esquina superior derecha
         IconButton(
             onClick = onRemove,
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(4.dp)
+                .size(20.dp)
                 .background(Color.Black.copy(alpha = 0.7f), CircleShape)
+                .padding(2.dp)
         ) {
             Icon(
                 Icons.Default.Close,
-                contentDescription = "Eliminar imagen",
+                contentDescription = "Eliminar",
                 tint = Color.White,
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(12.dp)
             )
         }
         
-        // Indicador de imagen destacada
+        // Badge "Portada" solo en la primera imagen
         if (isFeatured) {
-            Row(
+            Text(
+                text = "Portada",
+                style = MaterialTheme.typography.labelSmall,
+                fontSize = 9.sp,
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(4.dp)
                     .background(
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.9f),
-                        RoundedCornerShape(4.dp)
+                        Color.Black.copy(alpha = 0.7f),
+                        RoundedCornerShape(bottomStart = 6.dp, bottomEnd = 6.dp)
                     )
-                    .padding(horizontal = 6.dp, vertical = 2.dp),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    Icons.Default.Star,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(12.dp)
-                )
-                Spacer(Modifier.width(2.dp))
-                Text(
-                    "Destacada",
-                    color = Color.White,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            )
         }
-        
-        // Indicador de número de posición
-        Text(
-            text = "${index + 1}",
-            color = Color.White,
-            fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(4.dp)
-                .background(Color.Black.copy(alpha = 0.6f), CircleShape)
-                .padding(horizontal = 6.dp, vertical = 2.dp)
-        )
     }
-    
-    // Diálogo para ver imagen en tamaño completo
-    if (showFullImage) {
-        AlertDialog(
-            onDismissRequest = { showFullImage = false },
-            title = { Text("Imagen ${index + 1}") },
-            text = {
-                AsyncImage(
-                    model = uri,
-                    contentDescription = "Imagen completa",
-                    modifier = Modifier.fillMaxWidth(),
-                    contentScale = ContentScale.Fit
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = { showFullImage = false }) {
-                    Text("Cerrar")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = onRemove) {
-                    Text("Eliminar", color = MaterialTheme.colorScheme.error)
-            }
+}
+
+@Composable
+private fun TikTokAddImageButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(6.dp))
+            .border(
+                1.5.dp,
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                RoundedCornerShape(6.dp)
+            )
+            .clickable(onClick = onClick)
+            .background(
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f),
+                RoundedCornerShape(6.dp)
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                Icons.Default.Add,
+                contentDescription = "Agregar imagen",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(28.dp)
+            )
         }
+    }
+}
+
+@Composable
+private fun androidx.compose.foundation.layout.RowScope.ActionButton(
+    text: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector?,
+    onClick: () -> Unit
+) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = Modifier.weight(1f),
+        colors = ButtonDefaults.outlinedButtonColors(
+            contentColor = MaterialTheme.colorScheme.onSurface
+        )
+    ) {
+        icon?.let {
+            Icon(it, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(4.dp))
+        }
+        Text(text, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+@Composable
+private fun OptionRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    text: String,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            icon,
+            contentDescription = null,
+            modifier = Modifier.size(20.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.width(12.dp))
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(1f)
+        )
+        Icon(
+            Icons.Default.ArrowForwardIos,
+            contentDescription = null,
+            modifier = Modifier.size(16.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
         )
     }
 }
 
+@Composable
+private fun BottomActionBar(
+    isLoading: Boolean,
+    loadingMessage: String,
+    onPublish: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shadowElevation = 8.dp,
+        color = MaterialTheme.colorScheme.surface
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Botón Borradores (deshabilitado por ahora)
+            OutlinedButton(
+                onClick = { /* TODO: Guardar borrador */ },
+                modifier = Modifier.weight(1f),
+                enabled = false
+            ) {
+                Icon(Icons.Default.Folder, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Borradores")
+            }
+            
+            // Botón Publicar
+            Button(
+                onClick = onPublish,
+                modifier = Modifier.weight(1f),
+                enabled = !isLoading,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary
+                )
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(loadingMessage.take(20))
+                } else {
+                    Icon(Icons.Default.Star, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Publicar")
+                }
+            }
+        }
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CategoryDropdown(
     label: String, 
     items: List<Category>, 
-    selectedItem: Category? = null,
+    selectedItem: Category?,
     onItemSelected: (Category) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
-    var selectedText by remember { mutableStateOf(selectedItem?.name ?: "") }
-
-    LaunchedEffect(selectedItem) {
-        selectedText = selectedItem?.name ?: ""
-    }
 
     ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = !expanded }) {
         OutlinedTextField(
-            value = selectedText.ifEmpty { "Seleccionar $label" },
+            value = selectedItem?.name ?: "",
             onValueChange = {},
             readOnly = true,
             label = { Text(label) },
@@ -419,11 +698,13 @@ private fun CategoryDropdown(
         )
         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             items.forEach { item ->
-                DropdownMenuItem(text = { Text(item.name) }, onClick = {
-                    selectedText = item.name
-                    onItemSelected(item)
-                    expanded = false
-                })
+                DropdownMenuItem(
+                    text = { Text(item.name) },
+                    onClick = {
+                        onItemSelected(item)
+                        expanded = false
+                    }
+                )
             }
         }
     }
@@ -431,7 +712,13 @@ private fun CategoryDropdown(
 
 @Composable
 private fun BenefitSwitch(text: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .clickable { onCheckedChange(!checked) },
+        verticalAlignment = Alignment.CenterVertically
+    ) {
         Text(text, modifier = Modifier.weight(1f))
         Switch(checked = checked, onCheckedChange = onCheckedChange)
     }

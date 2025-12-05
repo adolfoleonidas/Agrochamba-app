@@ -8,7 +8,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -17,30 +16,29 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AddPhotoAlternate
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowForwardIos
+import androidx.compose.material.icons.filled.Business
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import agrochamba.com.data.AppDataHolder
+import agrochamba.com.data.AuthManager
 import agrochamba.com.data.Category
 import agrochamba.com.data.JobPost
 import agrochamba.com.utils.htmlToString
@@ -64,7 +62,7 @@ fun EditJobScreen(
         onResult = { uris -> viewModel.onImagesSelected(uris) }
     )
 
-    // Obtener taxonomías del job (puede venir de embedded o directamente del MyJobResponse si se convirtió)
+    // Obtener taxonomías del job
     val terms = job.embedded?.terms?.flatten() ?: emptyList()
     val initialUbicacionTerm = terms.find { it.taxonomy == "ubicacion" }
     val initialEmpresaTerm = terms.find { it.taxonomy == "empresa" }
@@ -77,13 +75,11 @@ fun EditJobScreen(
     var salarioMax by remember { mutableStateOf(job.meta?.salarioMax ?: "") }
     var vacantes by remember { mutableStateOf(job.meta?.vacantes ?: "") }
     
-    // Inicializar con null, se actualizará cuando se carguen las categorías
     var selectedUbicacion by remember { mutableStateOf<Category?>(null) }
     var selectedEmpresa by remember { mutableStateOf<Category?>(null) }
     var selectedCultivo by remember { mutableStateOf<Category?>(null) }
     var selectedTipoPuesto by remember { mutableStateOf<Category?>(null) }
     
-    // Actualizar las selecciones cuando se carguen las categorías y haya términos iniciales
     LaunchedEffect(uiState.ubicaciones, initialUbicacionTerm) {
         if (uiState.ubicaciones.isNotEmpty() && initialUbicacionTerm != null && selectedUbicacion == null) {
             selectedUbicacion = uiState.ubicaciones.find { it.id == initialUbicacionTerm.id }
@@ -107,9 +103,14 @@ fun EditJobScreen(
             selectedTipoPuesto = uiState.tiposPuesto.find { it.id == initialTipoPuestoTerm.id }
         }
     }
+    
     var alojamiento by remember { mutableStateOf(job.meta?.alojamiento ?: false) }
     var transporte by remember { mutableStateOf(job.meta?.transporte ?: false) }
     var alimentacion by remember { mutableStateOf(job.meta?.alimentacion ?: false) }
+    // Inicializar el switch basado en si el trabajo ya tiene un facebook_post_id
+    var publishToFacebook by remember { mutableStateOf(!job.meta?.facebookPostId.isNullOrBlank()) }
+    
+    var showMoreOptions by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.updateSuccess) {
         if (uiState.updateSuccess) {
@@ -128,234 +129,712 @@ fun EditJobScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Editar Trabajo") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, null)
+                title = { Text("Editar Anuncio") },
+                navigationIcon = { 
+                    IconButton(onClick = { navController.popBackStack() }) { 
+                        Icon(Icons.Default.ArrowBack, null) 
                     }
                 }
             )
+        },
+        bottomBar = {
+            EditBottomActionBar(
+                isLoading = uiState.isLoading,
+                loadingMessage = uiState.loadingMessage,
+                onSave = {
+                    if (title.isBlank()) {
+                        Toast.makeText(context, "El título es obligatorio", Toast.LENGTH_SHORT).show()
+                        return@EditBottomActionBar
+                    }
+                    if (description.isBlank()) {
+                        Toast.makeText(context, "La descripción es obligatoria", Toast.LENGTH_SHORT).show()
+                        return@EditBottomActionBar
+                    }
+                    if (selectedUbicacion == null) {
+                        Toast.makeText(context, "La ubicación es obligatoria", Toast.LENGTH_SHORT).show()
+                        return@EditBottomActionBar
+                    }
+                    
+                    // Guardar en variable local para evitar problemas de smart cast
+                    val ubicacionId = selectedUbicacion!!.id
+                    
+                    // Si es empresa normal (no admin), usar automáticamente su empresa
+                    // Si es admin, puede seleccionar cualquier empresa
+                    val empresaIdToUse = if (AuthManager.isUserAdmin()) {
+                        selectedEmpresa?.id
+                    } else {
+                        uiState.userCompanyId ?: selectedEmpresa?.id
+                    }
+                    
+                    val jobData = mutableMapOf<String, Any>(
+                        "title" to title.trim(),
+                        "content" to description.trim(),
+                        "salario_min" to (salarioMin.toIntOrNull() ?: 0),
+                        "salario_max" to (salarioMax.toIntOrNull() ?: 0),
+                        "vacantes" to (vacantes.toIntOrNull() ?: 1),
+                        "ubicacion_id" to ubicacionId, // Obligatorio
+                        "alojamiento" to alojamiento,
+                        "transporte" to transporte,
+                        "alimentacion" to alimentacion,
+                        "publish_to_facebook" to publishToFacebook
+                    )
+                    // Agregar IDs solo si no son null (opcionales)
+                    empresaIdToUse?.let { jobData["empresa_id"] = it } // Usar empresa automática si no es admin
+                    selectedCultivo?.id?.let { jobData["cultivo_id"] = it }
+                    selectedTipoPuesto?.id?.let { jobData["tipo_puesto_id"] = it }
+                    viewModel.updateJob(jobData, context)
+                },
+                onDelete = {
+                    viewModel.deleteJob(context)
+                }
+            )
         }
-    ) {
+    ) { paddingValues ->
         if (uiState.isLoading && uiState.loadingMessage.startsWith("Cargando")) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-                Text(uiState.loadingMessage, modifier = Modifier.padding(top = 80.dp))
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator()
+                    Spacer(Modifier.height(16.dp))
+                    Text(uiState.loadingMessage)
+                }
             }
         } else {
             Column(
                 modifier = Modifier
-                    .padding(it)
-                    .padding(16.dp)
+                    .fillMaxSize()
+                    .padding(paddingValues)
                     .verticalScroll(rememberScrollState())
             ) {
-                Text("Imágenes del Anuncio (hasta 10)", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    text = "Mantén presionada una imagen y arrastra para reordenar. La primera es la destacada.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp)
+                // Sección de imágenes - estilo TikTok (combinando existentes y nuevas)
+                EditImageSection(
+                    existingImageUrls = uiState.existingImageUrls,
+                    existingImageIds = uiState.existingImageIds,
+                    newImages = uiState.selectedImages,
+                    imagesLoaded = uiState.imagesLoaded,
+                    isLoading = uiState.isLoading,
+                    onAddImage = { imagePickerLauncher.launch("image/*") },
+                    onRemoveExisting = { viewModel.removeExistingImage(it) },
+                    onRemoveNew = { viewModel.removeImage(it) },
+                    onReorderExisting = { from, to -> viewModel.reorderExistingImages(from, to) },
+                    onReorderNew = { from, to -> viewModel.reorderImages(from, to) }
                 )
-                Spacer(Modifier.height(8.dp))
                 
-                // Mostrar indicador de carga si las imágenes aún se están cargando
-                if (!uiState.imagesLoaded && uiState.isLoading) {
-                    Box(
+                Spacer(Modifier.height(24.dp))
+                
+                // Título con placeholder descriptivo
+                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    Text(
+                        text = "Título del anuncio",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    TextField(
+                        value = title,
+                        onValueChange = { title = it },
+                        placeholder = {
+                            Text(
+                                "Ej: Se busca personal para cosecha de uva en Ica",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent
+                        ),
+                        textStyle = MaterialTheme.typography.bodyLarge
+                    )
+                }
+                
+                Spacer(Modifier.height(16.dp))
+                
+                // Descripción
+                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    TextField(
+                        value = description,
+                        onValueChange = { description = it },
+                        placeholder = {
+                            Text(
+                                "Una descripción detallada permite obtener más visitas. Incluye información sobre el trabajo, requisitos y beneficios.",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            )
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(100.dp),
-                        contentAlignment = Alignment.Center
+                            .height(200.dp),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent
+                        ),
+                        textStyle = MaterialTheme.typography.bodyMedium
+                    )
+                }
+                
+                Spacer(Modifier.height(24.dp))
+                
+                // Ubicación - siempre visible (campo básico más importante)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                ) {
+                    CategoryDropdown(
+                        label = "Ubicación *",
+                        items = uiState.ubicaciones,
+                        selectedItem = selectedUbicacion
+                    ) { cat -> selectedUbicacion = cat }
+                }
+                
+                Spacer(Modifier.height(16.dp))
+                
+                // Botón para mostrar más detalles
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    ActionButton(
+                        text = if (showMoreOptions) "Ocultar Detalles" else "Más Detalles",
+                        icon = null,
+                        onClick = { showMoreOptions = !showMoreOptions }
+                    )
+                }
+                
+                Spacer(Modifier.height(16.dp))
+                
+                // Opciones avanzadas expandibles
+                if (showMoreOptions) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                            .background(
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                RoundedCornerShape(12.dp)
+                            )
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        CircularProgressIndicator(modifier = Modifier.size(40.dp))
-                    }
-                } else {
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        // Mostrar imágenes existentes primero - usar key para evitar que desaparezcan
-                        itemsIndexed(
-                            items = uiState.existingImageUrls,
-                            key = { index, url -> "existing_${uiState.existingImageIds.getOrNull(index)}_$url" }
-                        ) { index, imageUrl ->
-                            ExistingImagePreviewItem(
-                                imageUrl = imageUrl,
-                                onRemove = { viewModel.removeExistingImage(imageUrl) },
-                                isFeatured = index == 0 && uiState.selectedImages.isEmpty(),
-                                onMove = { fromIndex, toIndex -> 
-                                    // Reordenar dentro de existentes
-                                    if (fromIndex < uiState.existingImageUrls.size && toIndex < uiState.existingImageUrls.size) {
-                                        viewModel.reorderExistingImages(fromIndex, toIndex)
-                                    }
-                                },
-                                index = index
+                        Text(
+                            "Información del Trabajo",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        
+                        // Salario Mín/Máx
+                        Row(Modifier.fillMaxWidth()) {
+                            OutlinedTextField(
+                                value = salarioMin,
+                                onValueChange = { salarioMin = it },
+                                label = { Text("Salario Mín.") },
+                                modifier = Modifier.weight(1f),
+                                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                                )
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            OutlinedTextField(
+                                value = salarioMax,
+                                onValueChange = { salarioMax = it },
+                                label = { Text("Salario Máx.") },
+                                modifier = Modifier.weight(1f),
+                                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                                )
                             )
                         }
-                        // Mostrar nuevas imágenes seleccionadas
-                        itemsIndexed(
-                            items = uiState.selectedImages,
-                            key = { index, uri -> "new_${uri}_$index" }
-                        ) { index, uri ->
-                            val totalIndex = uiState.existingImageUrls.size + index
-                            ImagePreviewItem(
-                                uri = uri,
-                                onRemove = { viewModel.removeImage(uri) },
-                                isFeatured = totalIndex == 0,
-                                onMove = { fromIndex, toIndex -> 
-                                    // Reordenar dentro de nuevas imágenes
-                                    val existingCount = uiState.existingImageUrls.size
-                                    val fromRelative = fromIndex - existingCount
-                                    val toRelative = toIndex - existingCount
-                                    if (fromRelative >= 0 && toRelative >= 0 && 
-                                        fromRelative < uiState.selectedImages.size && 
-                                        toRelative < uiState.selectedImages.size) {
-                                        viewModel.reorderImages(fromRelative, toRelative)
-                                    }
-                                },
-                                index = totalIndex
+                        
+                        // Vacantes
+                        OutlinedTextField(
+                            value = vacantes,
+                            onValueChange = { vacantes = it },
+                            label = { Text("Nº de Vacantes") },
+                            modifier = Modifier.fillMaxWidth(),
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
                             )
+                        )
+                        
+                        Divider()
+                        
+                        Text(
+                            "Categorías",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        
+                        // Mostrar selector de empresas solo para admins
+                        // Las empresas normales solo pueden editar trabajos de su propia empresa
+                        val isAdmin = AuthManager.isUserAdmin()
+                        val currentEmpresa = selectedEmpresa
+                        
+                        if (uiState.userCompanyId != null && !isAdmin) {
+                            // Empresa normal: mostrar solo lectura con su empresa
+                            OutlinedTextField(
+                                value = currentEmpresa?.name ?: "Tu empresa",
+                                onValueChange = {},
+                                readOnly = true,
+                                enabled = false,
+                                label = { Text("Empresa") },
+                                modifier = Modifier.fillMaxWidth(),
+                                leadingIcon = { Icon(Icons.Default.Business, contentDescription = null) },
+                                colors = TextFieldDefaults.colors(
+                                    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                )
+                            )
+                        } else if (isAdmin) {
+                            // Admin: puede seleccionar cualquier empresa
+                            CategoryDropdown(
+                                label = "Empresa",
+                                items = uiState.empresas,
+                                selectedItem = selectedEmpresa
+                            ) { cat -> selectedEmpresa = cat }
                         }
-                        val totalImages = uiState.existingImageUrls.size + uiState.selectedImages.size
-                        if (totalImages < 10) {
-                            item { ImagePickerBox(onClick = { imagePickerLauncher.launch("image/*") }) }
-                        }
+                        
+                        CategoryDropdown(
+                            label = "Cultivo",
+                            items = uiState.cultivos,
+                            selectedItem = selectedCultivo
+                        ) { cat -> selectedCultivo = cat }
+                        
+                        CategoryDropdown(
+                            label = "Tipo de Puesto",
+                            items = uiState.tiposPuesto,
+                            selectedItem = selectedTipoPuesto
+                        ) { cat -> selectedTipoPuesto = cat }
+                        
+                        Divider()
+                        
+                        Text(
+                            "Beneficios Incluidos",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        
+                        BenefitSwitch(
+                            text = "Alojamiento",
+                            checked = alojamiento,
+                            onCheckedChange = { alojamiento = it }
+                        )
+                        BenefitSwitch(
+                            text = "Transporte",
+                            checked = transporte,
+                            onCheckedChange = { transporte = it }
+                        )
+                        BenefitSwitch(
+                            text = "Alimentación",
+                            checked = alimentacion,
+                            onCheckedChange = { alimentacion = it }
+                        )
                     }
                 }
-                Spacer(Modifier.height(24.dp))
+                
+                // Opciones adicionales
+                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    BenefitSwitch(
+                        text = "Publicar también en Facebook",
+                        checked = publishToFacebook,
+                        onCheckedChange = { publishToFacebook = it }
+                    )
+                    OptionRow(
+                        icon = Icons.Default.Public,
+                        text = "Todo el mundo puede ver esta publicación",
+                        onClick = { /* TODO: Configurar privacidad */ }
+                    )
+                    OptionRow(
+                        icon = Icons.Default.Settings,
+                        text = "Más opciones",
+                        onClick = { /* TODO: Mostrar más opciones */ }
+                    )
+                }
+                
+                Spacer(Modifier.height(80.dp)) // Espacio para la barra inferior
+                
+                uiState.error?.let { error ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer
+                        )
+                    ) {
+                        Text(
+                            error,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.padding(16.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
 
-                OutlinedTextField(
-                    value = title,
-                    onValueChange = { title = it },
-                    label = { Text("Título del Puesto") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(Modifier.height(16.dp))
-                OutlinedTextField(
-                    value = description,
-                    onValueChange = { description = it },
-                    label = { Text("Descripción del Puesto") },
-                    modifier = Modifier.fillMaxWidth().height(150.dp)
-                )
-                Spacer(Modifier.height(16.dp))
+@Composable
+private fun EditImageSection(
+    existingImageUrls: List<String>,
+    existingImageIds: List<Int>,
+    newImages: List<Uri>,
+    imagesLoaded: Boolean,
+    isLoading: Boolean,
+    onAddImage: () -> Unit,
+    onRemoveExisting: (String) -> Unit,
+    onRemoveNew: (Uri) -> Unit,
+    onReorderExisting: (Int, Int) -> Unit,
+    onReorderNew: (Int, Int) -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+        if (!imagesLoaded && isLoading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(70.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(40.dp))
+                    Text(
+                        "Cargando imágenes...",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        } else {
+            val totalImages = existingImageUrls.size + newImages.size
+            
+            if (totalImages == 0 && imagesLoaded) {
+                // Mostrar mensaje cuando no hay imágenes pero ya se cargaron
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            "No hay imágenes en este trabajo",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            "Agrega imágenes para mejorar tu anuncio",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                    }
+                }
+            }
+            
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                // Mostrar imágenes existentes primero
+                itemsIndexed(existingImageUrls) { index, imageUrl ->
+                    EditTikTokImagePreview(
+                        imageUrl = imageUrl,
+                        isFeatured = index == 0 && newImages.isEmpty(),
+                        onRemove = { onRemoveExisting(imageUrl) },
+                        modifier = Modifier.size(70.dp)
+                    )
+                }
+                
+                // Mostrar nuevas imágenes seleccionadas
+                itemsIndexed(newImages) { index, uri ->
+                    val totalIndex = existingImageUrls.size + index
+                    TikTokImagePreview(
+                        uri = uri,
+                        isFeatured = totalIndex == 0,
+                        onRemove = { onRemoveNew(uri) },
+                        modifier = Modifier.size(70.dp)
+                    )
+                }
+                
+                // Botón para agregar más imágenes (siempre visible si hay menos de 10)
+                if (totalImages < 10) {
+                    item {
+                        TikTokAddImageButton(
+                            onClick = onAddImage,
+                            modifier = Modifier.size(70.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
 
-                Row(Modifier.fillMaxWidth()) {
-                    OutlinedTextField(
-                        value = salarioMin,
-                        onValueChange = { salarioMin = it },
-                        label = { Text("Salario Mín.") },
-                        modifier = Modifier.weight(1f)
+@Composable
+private fun EditTikTokImagePreview(
+    imageUrl: String,
+    isFeatured: Boolean,
+    onRemove: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    Box(modifier = modifier) {
+        AsyncImage(
+            model = ImageRequest.Builder(context)
+                .data(imageUrl)
+                .crossfade(true)
+                .build(),
+            contentDescription = if (isFeatured) "Imagen destacada" else "Imagen",
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(RoundedCornerShape(6.dp))
+                .border(
+                    width = if (isFeatured) 2.dp else 0.dp,
+                    color = if (isFeatured) MaterialTheme.colorScheme.primary else Color.Transparent,
+                    shape = RoundedCornerShape(6.dp)
+                ),
+            contentScale = ContentScale.Crop
+        )
+        
+        // Botón de eliminar
+        IconButton(
+            onClick = onRemove,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .size(20.dp)
+                .background(Color.Black.copy(alpha = 0.7f), CircleShape)
+                .padding(2.dp)
+        ) {
+            Icon(
+                Icons.Default.Close,
+                contentDescription = "Eliminar",
+                tint = Color.White,
+                modifier = Modifier.size(12.dp)
+            )
+        }
+        
+        // Badge "Portada"
+        if (isFeatured) {
+            Text(
+                text = "Portada",
+                style = MaterialTheme.typography.labelSmall,
+                fontSize = 9.sp,
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .background(
+                        Color.Black.copy(alpha = 0.7f),
+                        RoundedCornerShape(bottomStart = 6.dp, bottomEnd = 6.dp)
+                    )
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun TikTokImagePreview(
+    uri: Uri,
+    isFeatured: Boolean,
+    onRemove: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(modifier = modifier) {
+        AsyncImage(
+            model = uri,
+            contentDescription = if (isFeatured) "Imagen destacada" else "Imagen",
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(RoundedCornerShape(6.dp))
+                .border(
+                    width = if (isFeatured) 2.dp else 0.dp,
+                    color = if (isFeatured) MaterialTheme.colorScheme.primary else Color.Transparent,
+                    shape = RoundedCornerShape(6.dp)
+                ),
+            contentScale = ContentScale.Crop
+        )
+        
+        IconButton(
+            onClick = onRemove,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .size(20.dp)
+                .background(Color.Black.copy(alpha = 0.7f), CircleShape)
+                .padding(2.dp)
+        ) {
+            Icon(
+                Icons.Default.Close,
+                contentDescription = "Eliminar",
+                tint = Color.White,
+                modifier = Modifier.size(12.dp)
+            )
+        }
+        
+        if (isFeatured) {
+            Text(
+                text = "Portada",
+                style = MaterialTheme.typography.labelSmall,
+                fontSize = 9.sp,
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .background(
+                        Color.Black.copy(alpha = 0.7f),
+                        RoundedCornerShape(bottomStart = 6.dp, bottomEnd = 6.dp)
+                    )
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun TikTokAddImageButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(6.dp))
+            .border(
+                1.5.dp,
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                RoundedCornerShape(6.dp)
+            )
+            .clickable(onClick = onClick)
+            .background(
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f),
+                RoundedCornerShape(6.dp)
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            Icons.Default.Add,
+            contentDescription = "Agregar imagen",
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(28.dp)
+        )
+    }
+}
+
+@Composable
+private fun RowScope.ActionButton(
+    text: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector?,
+    onClick: () -> Unit
+) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = Modifier.weight(1f),
+        colors = ButtonDefaults.outlinedButtonColors(
+            contentColor = MaterialTheme.colorScheme.onSurface
+        )
+    ) {
+        icon?.let {
+            Icon(it, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(4.dp))
+        }
+        Text(text, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+@Composable
+private fun OptionRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    text: String,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            icon,
+            contentDescription = null,
+            modifier = Modifier.size(20.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.width(12.dp))
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(1f)
+        )
+        Icon(
+            Icons.Default.ArrowForwardIos,
+            contentDescription = null,
+            modifier = Modifier.size(16.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+        )
+    }
+}
+
+@Composable
+private fun EditBottomActionBar(
+    isLoading: Boolean,
+    loadingMessage: String,
+    onSave: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shadowElevation = 8.dp,
+        color = MaterialTheme.colorScheme.surface
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Botón Eliminar
+            Button(
+                onClick = onDelete,
+                modifier = Modifier.weight(0.4f),
+                enabled = !isLoading,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer
+                )
+            ) {
+                Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+            }
+            
+            // Botón Guardar
+            Button(
+                onClick = onSave,
+                modifier = Modifier.weight(1f),
+                enabled = !isLoading,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary
+                )
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        strokeWidth = 2.dp
                     )
                     Spacer(Modifier.width(8.dp))
-                    OutlinedTextField(
-                        value = salarioMax,
-                        onValueChange = { salarioMax = it },
-                        label = { Text("Salario Máx.") },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                Spacer(Modifier.height(16.dp))
-                OutlinedTextField(
-                    value = vacantes,
-                    onValueChange = { vacantes = it },
-                    label = { Text("Nº de Vacantes") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(Modifier.height(16.dp))
-
-                CategoryDropdown(
-                    label = "Ubicación",
-                    items = uiState.ubicaciones,
-                    selectedItem = selectedUbicacion
-                ) { cat -> selectedUbicacion = cat }
-                Spacer(Modifier.height(16.dp))
-                CategoryDropdown(
-                    label = "Empresa",
-                    items = uiState.empresas,
-                    selectedItem = selectedEmpresa
-                ) { cat -> selectedEmpresa = cat }
-                Spacer(Modifier.height(16.dp))
-                CategoryDropdown(
-                    label = "Cultivo",
-                    items = uiState.cultivos,
-                    selectedItem = selectedCultivo
-                ) { cat -> selectedCultivo = cat }
-                Spacer(Modifier.height(16.dp))
-                CategoryDropdown(
-                    label = "Tipo de Puesto",
-                    items = uiState.tiposPuesto,
-                    selectedItem = selectedTipoPuesto
-                ) { cat -> selectedTipoPuesto = cat }
-                Spacer(Modifier.height(24.dp))
-
-                Text("Beneficios Incluidos", style = MaterialTheme.typography.titleMedium)
-                BenefitSwitch(
-                    text = "Alojamiento",
-                    checked = alojamiento,
-                    onCheckedChange = { alojamiento = it }
-                )
-                BenefitSwitch(
-                    text = "Transporte",
-                    checked = transporte,
-                    onCheckedChange = { transporte = it }
-                )
-                BenefitSwitch(
-                    text = "Alimentación",
-                    checked = alimentacion,
-                    onCheckedChange = { alimentacion = it }
-                )
-
-                Spacer(Modifier.height(24.dp))
-
-                if (uiState.isLoading) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        CircularProgressIndicator()
-                        Spacer(Modifier.width(16.dp))
-                        Text(uiState.loadingMessage)
-                    }
+                    Text(loadingMessage.take(20))
                 } else {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Button(
-                            onClick = {
-                                val jobData = mapOf(
-                                    "title" to title,
-                                    "content" to description,
-                                    "salario_min" to salarioMin,
-                                    "salario_max" to salarioMax,
-                                    "vacantes" to vacantes,
-                                    "ubicacion_id" to (selectedUbicacion?.id ?: ""),
-                                    "empresa_id" to (selectedEmpresa?.id ?: ""),
-                                    "cultivo_id" to (selectedCultivo?.id ?: ""),
-                                    "tipo_puesto_id" to (selectedTipoPuesto?.id ?: ""),
-                                    "alojamiento" to alojamiento,
-                                    "transporte" to transporte,
-                                    "alimentacion" to alimentacion
-                                )
-                                viewModel.updateJob(jobData, context)
-                            },
-                            modifier = Modifier.weight(1f).height(48.dp)
-                        ) {
-                            Text("Guardar Cambios")
-                        }
-                        Button(
-                            onClick = {
-                                viewModel.deleteJob(context)
-                            },
-                            modifier = Modifier.height(48.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.errorContainer,
-                                contentColor = MaterialTheme.colorScheme.onErrorContainer
-                            )
-                        ) {
-                            Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
-                        }
-                    }
-                }
-
-                uiState.error?.let { error ->
-                    Spacer(Modifier.height(16.dp))
-                    Text(error, color = MaterialTheme.colorScheme.error)
+                    Icon(Icons.Default.Star, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Guardar")
                 }
             }
         }
@@ -365,21 +844,16 @@ fun EditJobScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CategoryDropdown(
-    label: String,
-    items: List<Category>,
+    label: String, 
+    items: List<Category>, 
     selectedItem: Category?,
     onItemSelected: (Category) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
-    var selectedText by remember { mutableStateOf(selectedItem?.name ?: "Seleccionar $label") }
-
-    LaunchedEffect(selectedItem) {
-        selectedText = selectedItem?.name ?: "Seleccionar $label"
-    }
 
     ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = !expanded }) {
         OutlinedTextField(
-            value = selectedText.ifEmpty { "Seleccionar $label" },
+            value = selectedItem?.name ?: "",
             onValueChange = {},
             readOnly = true,
             label = { Text(label) },
@@ -391,7 +865,6 @@ private fun CategoryDropdown(
                 DropdownMenuItem(
                     text = { Text(item.name) },
                     onClick = {
-                        selectedText = item.name
                         onItemSelected(item)
                         expanded = false
                     }
@@ -404,366 +877,13 @@ private fun CategoryDropdown(
 @Composable
 private fun BenefitSwitch(text: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .clickable { onCheckedChange(!checked) },
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(text, modifier = Modifier.weight(1f))
         Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
-
-@Composable
-private fun ImagePreviewItem(
-    uri: Uri,
-    onRemove: () -> Unit,
-    isFeatured: Boolean,
-    onMove: (Int, Int) -> Unit,
-    index: Int
-) {
-    val density = LocalDensity.current
-    var offsetX by remember { mutableStateOf(0f) }
-    var offsetY by remember { mutableStateOf(0f) }
-    var isDragging by remember { mutableStateOf(false) }
-    var showFullImage by remember { mutableStateOf(false) }
-    
-    Box(
-        modifier = Modifier
-            .size(100.dp)
-            .then(
-                if (isFeatured) {
-                    Modifier.border(
-                        width = 3.dp,
-                        color = MaterialTheme.colorScheme.primary,
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                } else {
-                    Modifier
-                }
-            )
-            .then(
-                if (isDragging) {
-                    Modifier
-                        .offset(x = offsetX.dp, y = offsetY.dp)
-                        .alpha(0.8f)
-                        .zIndex(1f)
-                } else {
-                    Modifier
-                }
-            )
-            .pointerInput(uri) {
-                detectDragGesturesAfterLongPress(
-                    onDragStart = {
-                        isDragging = true
-                    },
-                    onDrag = { change, dragAmount ->
-                        change.consume()
-                        offsetX += dragAmount.x
-                        offsetY += dragAmount.y
-                    },
-                    onDragEnd = {
-                        isDragging = false
-                        val itemWidthPx = with(density) { 108.dp.toPx() }
-                        val dragDistance = offsetX
-                        val indexChange = (dragDistance / itemWidthPx).toInt()
-                        val newIndex = (index + indexChange).coerceIn(0, 9)
-                        if (newIndex != index && newIndex >= 0) {
-                            onMove(index, newIndex)
-                        }
-                        offsetX = 0f
-                        offsetY = 0f
-                    }
-                )
-            }
-    ) {
-        AsyncImage(
-            model = uri,
-            contentDescription = "Vista previa de imagen. Mantén presionado y arrastra para reordenar. Toca para ver en tamaño completo.",
-            modifier = Modifier
-                .fillMaxSize()
-                .clip(RoundedCornerShape(if (isFeatured) 9.dp else 12.dp))
-                .clickable { showFullImage = true },
-            contentScale = ContentScale.Crop
-        )
-        
-        // Botón para eliminar
-        IconButton(
-            onClick = onRemove,
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(4.dp)
-                .background(Color.Black.copy(alpha = 0.7f), CircleShape)
-        ) {
-            Icon(
-                Icons.Default.Close,
-                contentDescription = "Eliminar imagen",
-                tint = Color.White,
-                modifier = Modifier.size(18.dp)
-            )
-        }
-        
-        // Indicador de imagen destacada
-        if (isFeatured) {
-            Row(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(4.dp)
-                    .background(
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.9f),
-                        RoundedCornerShape(4.dp)
-                    )
-                    .padding(horizontal = 6.dp, vertical = 2.dp),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    Icons.Default.Star,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(12.dp)
-                )
-                Spacer(Modifier.width(2.dp))
-                Text(
-                    "Destacada",
-                    color = Color.White,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
-        
-        // Indicador de número de posición
-        Text(
-            text = "${index + 1}",
-            color = Color.White,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(4.dp)
-                .background(Color.Black.copy(alpha = 0.6f), CircleShape)
-                .padding(horizontal = 6.dp, vertical = 2.dp)
-        )
-    }
-    
-    // Diálogo para ver imagen en tamaño completo
-    if (showFullImage) {
-        AlertDialog(
-            onDismissRequest = { showFullImage = false },
-            title = { Text("Imagen ${index + 1}") },
-            text = {
-                AsyncImage(
-                    model = uri,
-                    contentDescription = "Imagen completa",
-                    modifier = Modifier.fillMaxWidth(),
-                    contentScale = ContentScale.Fit
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = { showFullImage = false }) {
-                    Text("Cerrar")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = onRemove) {
-                    Text("Eliminar", color = MaterialTheme.colorScheme.error)
-                }
-            }
-        )
-    }
-}
-
-@Composable
-private fun ExistingImagePreviewItem(
-    imageUrl: String,
-    onRemove: () -> Unit,
-    isFeatured: Boolean,
-    onMove: (Int, Int) -> Unit,
-    index: Int
-) {
-    val density = LocalDensity.current
-    var offsetX by remember { mutableStateOf(0f) }
-    var offsetY by remember { mutableStateOf(0f) }
-    var isDragging by remember { mutableStateOf(false) }
-    
-    Box(
-        modifier = Modifier
-            .size(100.dp)
-            .then(
-                if (isFeatured) {
-                    Modifier.border(
-                        width = 3.dp,
-                        color = MaterialTheme.colorScheme.primary,
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                } else {
-                    Modifier
-                }
-            )
-            .then(
-                if (isDragging) {
-                    Modifier
-                        .offset(x = offsetX.dp, y = offsetY.dp)
-                        .alpha(0.8f)
-                } else {
-                    Modifier
-                }
-            )
-            .pointerInput(imageUrl) {
-                detectDragGesturesAfterLongPress(
-                    onDragStart = {
-                        isDragging = true
-                    },
-                    onDrag = { change, dragAmount ->
-                        change.consume()
-                        offsetX += dragAmount.x
-                        offsetY += dragAmount.y
-                    },
-                    onDragEnd = {
-                        isDragging = false
-                        val itemWidthPx = with(density) { 108.dp.toPx() }
-                        val dragDistance = offsetX
-                        val indexChange = (dragDistance / itemWidthPx).toInt()
-                        val newIndex = (index + indexChange).coerceIn(0, 9)
-                        if (newIndex != index && newIndex >= 0) {
-                            onMove(index, newIndex)
-                        }
-                        offsetX = 0f
-                        offsetY = 0f
-                    }
-                )
-            }
-    ) {
-        val context = LocalContext.current
-        var showFullImage by remember { mutableStateOf(false) }
-        
-        AsyncImage(
-            model = ImageRequest.Builder(context)
-                .data(imageUrl)
-                .crossfade(true)
-                .build(),
-            contentDescription = "Vista previa de imagen existente. Mantén presionado y arrastra para reordenar. Toca para ver en tamaño completo.",
-            modifier = Modifier
-                .fillMaxSize()
-                .clip(RoundedCornerShape(if (isFeatured) 9.dp else 12.dp))
-                .clickable { showFullImage = true },
-            contentScale = ContentScale.Crop
-        )
-        
-        // Botón para eliminar
-        IconButton(
-            onClick = onRemove,
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(4.dp)
-                .background(Color.Black.copy(alpha = 0.7f), CircleShape)
-        ) {
-            Icon(
-                Icons.Default.Close,
-                contentDescription = "Eliminar imagen",
-                tint = Color.White,
-                modifier = Modifier.size(18.dp)
-            )
-        }
-        
-        // Indicador de imagen destacada
-        if (isFeatured) {
-            Row(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(4.dp)
-                    .background(
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.9f),
-                        RoundedCornerShape(4.dp)
-                    )
-                    .padding(horizontal = 6.dp, vertical = 2.dp),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    Icons.Default.Star,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(12.dp)
-                )
-                Spacer(Modifier.width(2.dp))
-                Text(
-                    "Destacada",
-                    color = Color.White,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
-        
-        // Indicador de número de posición
-        Text(
-            text = "${index + 1}",
-            color = Color.White,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(4.dp)
-                .background(Color.Black.copy(alpha = 0.6f), CircleShape)
-                .padding(horizontal = 6.dp, vertical = 2.dp)
-        )
-        
-        // Diálogo para ver imagen en tamaño completo
-        if (showFullImage) {
-            AlertDialog(
-                onDismissRequest = { showFullImage = false },
-                title = { Text("Imagen ${index + 1}") },
-                text = {
-                    AsyncImage(
-                        model = ImageRequest.Builder(context)
-                            .data(imageUrl)
-                            .build(),
-                        contentDescription = "Imagen completa",
-                        modifier = Modifier.fillMaxWidth(),
-                        contentScale = ContentScale.Fit
-                    )
-                },
-                confirmButton = {
-                    TextButton(onClick = { showFullImage = false }) {
-                        Text("Cerrar")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = onRemove) {
-                        Text("Eliminar", color = MaterialTheme.colorScheme.error)
-                    }
-                }
-            )
-        }
-    }
-}
-
-@Composable
-private fun ImagePickerBox(onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .size(100.dp)
-            .border(2.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Icon(
-                Icons.Default.AddPhotoAlternate,
-                contentDescription = "Agregar imagen",
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(32.dp)
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "Agregar",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.primary
-            )
-        }
-    }
-}
-

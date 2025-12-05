@@ -24,12 +24,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import androidx.hilt.navigation.compose.hiltViewModel
 import agrochamba.com.R
 import agrochamba.com.Screen
 
 @Composable
-fun LoginScreen(navController: NavController, loginViewModel: LoginViewModel = viewModel()) {
-    val uiState = loginViewModel.uiState
+fun LoginScreen(navController: NavController, loginViewModel: LoginViewModel = hiltViewModel()) {
+    val uiState by loginViewModel.uiState.collectAsState()
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
@@ -81,7 +82,8 @@ fun LoginScreen(navController: NavController, loginViewModel: LoginViewModel = v
                 onValueChange = { username = it },
                 label = { Text("Usuario o Correo Electrónico") },
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text)
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -127,9 +129,9 @@ fun LoginScreen(navController: NavController, loginViewModel: LoginViewModel = v
                 }
             }
 
-            if (uiState.error != null) {
+            uiState.error?.let { err ->
                 Spacer(modifier = Modifier.height(16.dp))
-                Text(text = uiState.error, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
+                Text(text = err, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
             }
 
             Spacer(modifier = Modifier.height(24.dp))

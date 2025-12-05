@@ -15,6 +15,25 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+// Shim de compatibilidad: delegar a clase namespaced si está disponible
+if (!defined('AGROCHAMBA_CACHE_SERVICE_NAMESPACE_INITIALIZED')) {
+    define('AGROCHAMBA_CACHE_SERVICE_NAMESPACE_INITIALIZED', true);
+    if (class_exists('AgroChamba\\Services\\CacheService')) {
+        if (function_exists('error_log')) {
+            error_log('AgroChamba: Cargando sistema de caché mediante AgroChamba\\Services\\CacheService (migración namespaces).');
+        }
+        \AgroChamba\Services\CacheService::init();
+        // Mantener compatibilidad: las funciones legacy podrían seguir siendo llamadas
+        // pero evitamos redefinirlas aquí si la clase ya está disponible. Retornamos
+        // para prevenir duplicación de lógica procedural.
+        return;
+    } else {
+        if (function_exists('error_log')) {
+            error_log('AgroChamba: No se encontró AgroChamba\\Services\\CacheService. Usando implementación procedural legacy.');
+        }
+    }
+}
+
 // ==========================================
 // 1. CONSTANTES DE CACHÉ
 // ==========================================

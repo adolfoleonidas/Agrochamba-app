@@ -35,15 +35,30 @@ class ModerationViewModel : ViewModel() {
             try {
                 val authHeader = "Bearer $token"
                 val response = WordPressApi.retrofitService.getPendingJobs(authHeader, page = 1, perPage = 100)
-                val jobs = response.data
+                val jobs = response.jobs
+                android.util.Log.d("ModerationViewModel", "Trabajos pendientes cargados: ${jobs.size}")
                 _uiState.value = _uiState.value.copy(
                     pendingJobs = jobs,
                     isLoading = false
                 )
-            } catch (e: Exception) {
+            } catch (e: retrofit2.HttpException) {
+                val errorMessage = try {
+                    val errorBody = e.response()?.errorBody()?.string()
+                    android.util.Log.e("ModerationViewModel", "Error HTTP: ${e.code()}, Body: $errorBody")
+                    errorBody ?: "Error ${e.code()}: ${e.message()}"
+                } catch (ex: Exception) {
+                    android.util.Log.e("ModerationViewModel", "Error al parsear error: ${ex.message}")
+                    "Error al cargar trabajos pendientes: ${e.message}"
+                }
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    error = e.message ?: "Error al cargar trabajos pendientes"
+                    error = errorMessage
+                )
+            } catch (e: Exception) {
+                android.util.Log.e("ModerationViewModel", "Error al cargar trabajos pendientes: ${e.message}", e)
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    error = "Error al cargar trabajos pendientes: ${e.message}"
                 )
             }
         }
@@ -59,18 +74,22 @@ class ModerationViewModel : ViewModel() {
                 val response = WordPressApi.retrofitService.approveJob(authHeader, jobId)
                 
                 if (response.isSuccessful) {
+                    android.util.Log.d("ModerationViewModel", "Trabajo $jobId aprobado correctamente")
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         successMessage = "Trabajo aprobado correctamente",
                         pendingJobs = _uiState.value.pendingJobs.filter { it.id != jobId }
                     )
                 } else {
+                    val errorBody = response.errorBody()?.string()
+                    android.util.Log.e("ModerationViewModel", "Error al aprobar trabajo: ${response.code()}, Body: $errorBody")
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        error = "Error al aprobar el trabajo"
+                        error = "Error al aprobar el trabajo (${response.code()})"
                     )
                 }
             } catch (e: Exception) {
+                android.util.Log.e("ModerationViewModel", "Error al aprobar trabajo: ${e.message}", e)
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     error = e.message ?: "Error al aprobar el trabajo"
@@ -86,22 +105,26 @@ class ModerationViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 val authHeader = "Bearer $token"
-                val body = if (reason != null) mapOf("reason" to reason) else null
+                val body = if (reason != null && reason.isNotBlank()) mapOf("reason" to reason) else null
                 val response = WordPressApi.retrofitService.rejectJob(authHeader, jobId, body)
                 
                 if (response.isSuccessful) {
+                    android.util.Log.d("ModerationViewModel", "Trabajo $jobId rechazado correctamente")
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         successMessage = "Trabajo rechazado correctamente",
                         pendingJobs = _uiState.value.pendingJobs.filter { it.id != jobId }
                     )
                 } else {
+                    val errorBody = response.errorBody()?.string()
+                    android.util.Log.e("ModerationViewModel", "Error al rechazar trabajo: ${response.code()}, Body: $errorBody")
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        error = "Error al rechazar el trabajo"
+                        error = "Error al rechazar el trabajo (${response.code()})"
                     )
                 }
             } catch (e: Exception) {
+                android.util.Log.e("ModerationViewModel", "Error al rechazar trabajo: ${e.message}", e)
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     error = e.message ?: "Error al rechazar el trabajo"

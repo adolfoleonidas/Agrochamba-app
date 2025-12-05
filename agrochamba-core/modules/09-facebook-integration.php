@@ -17,15 +17,32 @@ if (!defined('ABSPATH')) {
 // ==========================================
 if (!function_exists('agrochamba_post_to_facebook')) {
     function agrochamba_post_to_facebook($post_id, $job_data) {
+        error_log('AgroChamba Facebook: Iniciando publicación para post ID: ' . $post_id);
+        
         $facebook_enabled = get_option('agrochamba_facebook_enabled', false);
         if (!$facebook_enabled) {
+            error_log('AgroChamba Facebook Error: La publicación está deshabilitada');
             return new WP_Error('facebook_disabled', 'La publicación en Facebook está deshabilitada.');
         }
 
+        // Verificar si se usa n8n o método directo
+        $use_n8n = get_option('agrochamba_use_n8n', false);
+        $n8n_webhook_url = get_option('agrochamba_n8n_webhook_url', '');
+
+        if ($use_n8n && !empty($n8n_webhook_url)) {
+            // Usar n8n para publicar
+            return agrochamba_post_to_facebook_via_n8n($post_id, $job_data, $n8n_webhook_url);
+        }
+
+        // Método directo (legacy)
         $page_access_token = get_option('agrochamba_facebook_page_token', '');
         $page_id = get_option('agrochamba_facebook_page_id', '');
 
+        error_log('AgroChamba Facebook Debug - Page ID: ' . ($page_id ?: 'VACÍO'));
+        error_log('AgroChamba Facebook Debug - Page Token: ' . ($page_access_token ? 'EXISTE (' . strlen($page_access_token) . ' caracteres)' : 'VACÍO'));
+
         if (empty($page_access_token) || empty($page_id)) {
+            error_log('AgroChamba Facebook Error: Configuración incompleta. Token: ' . (empty($page_access_token) ? 'FALTA' : 'OK') . ', Page ID: ' . (empty($page_id) ? 'FALTA' : 'OK'));
             return new WP_Error('facebook_config', 'Configuración de Facebook incompleta. Verifica el Page Access Token y Page ID.');
         }
 
@@ -69,15 +86,23 @@ if (!function_exists('agrochamba_post_to_facebook')) {
         $response_code = wp_remote_retrieve_response_code($response);
         $response_body = json_decode(wp_remote_retrieve_body($response), true);
 
+        error_log('AgroChamba Facebook Response Code: ' . $response_code);
+        error_log('AgroChamba Facebook Response Body: ' . json_encode($response_body));
+
         if ($response_code !== 200) {
             $error_message = isset($response_body['error']['message']) 
                 ? $response_body['error']['message'] 
                 : 'Error desconocido al publicar en Facebook';
+            error_log('AgroChamba Facebook Error: ' . $error_message);
+            error_log('AgroChamba Facebook Error Details: ' . json_encode($response_body));
             return new WP_Error('facebook_api_error', $error_message, $response_body);
         }
 
         if (isset($response_body['id'])) {
             update_post_meta($post_id, 'facebook_post_id', $response_body['id']);
+            error_log('AgroChamba Facebook Success: Post publicado con ID: ' . $response_body['id']);
+        } else {
+            error_log('AgroChamba Facebook Warning: Respuesta exitosa pero sin ID de Facebook');
         }
 
         return array(
@@ -85,6 +110,85 @@ if (!function_exists('agrochamba_post_to_facebook')) {
             'facebook_post_id' => isset($response_body['id']) ? $response_body['id'] : null,
             'message' => 'Trabajo publicado en Facebook correctamente.',
         );
+    }
+}
+
+// ==========================================
+// 1.1. PUBLICAR TRABAJO EN FACEBOOK VÍA N8N
+// ==========================================
+if (!function_exists('agrochamba_post_to_facebook_via_n8n')) {
+    function agrochamba_post_to_facebook_via_n8n($post_id, $job_data, $webhook_url) {
+        error_log('AgroChamba n8n: Enviando webhook para post ID: ' . $post_id);
+        
+        // Construir mensaje para Facebook
+        $message = agrochamba_build_facebook_message($post_id, $job_data);
+        
+        // Obtener URL de imagen
+        $image_url = null;
+        if (isset($job_data['featured_media']) && !empty($job_data['featured_media'])) {
+            $image_url = wp_get_attachment_image_url($job_data['featured_media'], 'large');
+        } elseif (has_post_thumbnail($post_id)) {
+            $image_url = get_the_post_thumbnail_url($post_id, 'large');
+        }
+        
+        // Obtener URL del trabajo
+        $job_url = get_permalink($post_id);
+        
+        // Preparar payload para n8n
+        $payload = array(
+            'post_id' => $post_id,
+            'title' => get_the_title($post_id),
+            'message' => $message,
+            'link' => $job_url,
+            'image_url' => $image_url,
+            'timestamp' => current_time('mysql'),
+            'site_url' => get_site_url(),
+        );
+        
+        // Enviar webhook a n8n
+        $response = wp_remote_post($webhook_url, array(
+            'method' => 'POST',
+            'timeout' => 30,
+            'headers' => array(
+                'Content-Type' => 'application/json',
+            ),
+            'body' => json_encode($payload),
+        ));
+        
+        if (is_wp_error($response)) {
+            error_log('AgroChamba n8n Error: ' . $response->get_error_message());
+            return new WP_Error('n8n_request_error', 'Error al conectar con n8n: ' . $response->get_error_message());
+        }
+        
+        $response_code = wp_remote_retrieve_response_code($response);
+        $response_body = json_decode(wp_remote_retrieve_body($response), true);
+        
+        error_log('AgroChamba n8n Response Code: ' . $response_code);
+        error_log('AgroChamba n8n Response Body: ' . json_encode($response_body));
+        
+        if ($response_code >= 200 && $response_code < 300) {
+            // n8n puede devolver el facebook_post_id en la respuesta
+            $facebook_post_id = isset($response_body['facebook_post_id']) ? $response_body['facebook_post_id'] : null;
+            
+            if ($facebook_post_id) {
+                update_post_meta($post_id, 'facebook_post_id', $facebook_post_id);
+                error_log('AgroChamba n8n Success: Post publicado con ID: ' . $facebook_post_id);
+            } else {
+                error_log('AgroChamba n8n Success: Webhook enviado correctamente (ID de Facebook pendiente)');
+            }
+            
+            return array(
+                'success' => true,
+                'facebook_post_id' => $facebook_post_id,
+                'message' => 'Trabajo enviado a n8n para publicación en Facebook.',
+            );
+        } else {
+            $error_message = isset($response_body['error']) 
+                ? (is_array($response_body['error']) ? json_encode($response_body['error']) : $response_body['error'])
+                : 'Error desconocido al enviar a n8n';
+            error_log('AgroChamba n8n Error: ' . $error_message);
+            return new WP_Error('n8n_api_error', $error_message, $response_body);
+        }
     }
 }
 
@@ -213,6 +317,8 @@ if (!function_exists('agrochamba_facebook_settings_page')) {
             check_admin_referer('agrochamba_facebook_settings');
             
             update_option('agrochamba_facebook_enabled', isset($_POST['facebook_enabled']));
+            update_option('agrochamba_use_n8n', isset($_POST['use_n8n']));
+            update_option('agrochamba_n8n_webhook_url', sanitize_text_field($_POST['n8n_webhook_url']));
             update_option('agrochamba_facebook_page_token', sanitize_text_field($_POST['facebook_page_token']));
             update_option('agrochamba_facebook_page_id', sanitize_text_field($_POST['facebook_page_id']));
             
@@ -220,6 +326,8 @@ if (!function_exists('agrochamba_facebook_settings_page')) {
         }
         
         $facebook_enabled = get_option('agrochamba_facebook_enabled', false);
+        $use_n8n = get_option('agrochamba_use_n8n', false);
+        $n8n_webhook_url = get_option('agrochamba_n8n_webhook_url', '');
         $page_token = get_option('agrochamba_facebook_page_token', '');
         $page_id = get_option('agrochamba_facebook_page_id', '');
         ?>
@@ -241,12 +349,35 @@ if (!function_exists('agrochamba_facebook_settings_page')) {
                         </td>
                     </tr>
                     <tr>
+                        <th scope="row">Método de publicación</th>
+                        <td>
+                            <label>
+                                <input type="checkbox" name="use_n8n" value="1" <?php checked($use_n8n, true); ?>>
+                                Usar n8n para automatización (recomendado)
+                            </label>
+                            <p class="description">
+                                Si está marcado, WordPress enviará un webhook a n8n que se encargará de publicar en Facebook.<br>
+                                Si no está marcado, WordPress publicará directamente usando las credenciales de Facebook.
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">URL del Webhook de n8n</th>
+                        <td>
+                            <input type="url" name="n8n_webhook_url" value="<?php echo esc_attr($n8n_webhook_url); ?>" class="regular-text" placeholder="https://tu-n8n.com/webhook/facebook" />
+                            <p class="description">
+                                URL del webhook de n8n que recibirá los datos del trabajo para publicar en Facebook.<br>
+                                Solo necesario si "Usar n8n" está habilitado. Ver documentación en <code>docs/N8N_SETUP.md</code>
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
                         <th scope="row">Page Access Token</th>
                         <td>
                             <input type="text" name="facebook_page_token" value="<?php echo esc_attr($page_token); ?>" class="regular-text" />
                             <p class="description">
                                 Token de acceso de larga duración de tu página de Facebook.<br>
-                                Puedes obtenerlo desde: <a href="https://developers.facebook.com/tools/explorer/" target="_blank">Graph API Explorer</a>
+                                Solo necesario si NO usas n8n. Puedes obtenerlo desde: <a href="https://developers.facebook.com/tools/explorer/" target="_blank">Graph API Explorer</a>
                             </p>
                         </td>
                     </tr>
@@ -255,7 +386,8 @@ if (!function_exists('agrochamba_facebook_settings_page')) {
                         <td>
                             <input type="text" name="facebook_page_id" value="<?php echo esc_attr($page_id); ?>" class="regular-text" />
                             <p class="description">
-                                ID de tu página de Facebook (puedes encontrarlo en la configuración de tu página).
+                                ID de tu página de Facebook (puedes encontrarlo en la configuración de tu página).<br>
+                                Solo necesario si NO usas n8n.
                             </p>
                         </td>
                     </tr>

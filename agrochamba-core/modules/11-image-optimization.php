@@ -14,6 +14,24 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+// Shim de compatibilidad: delegar a clase namespaced si está disponible
+if (!defined('AGROCHAMBA_IMAGE_OPTIMIZER_NAMESPACE_INITIALIZED')) {
+    define('AGROCHAMBA_IMAGE_OPTIMIZER_NAMESPACE_INITIALIZED', true);
+    if (class_exists('AgroChamba\\Media\\ImageOptimizer')) {
+        // Registrar en log para trazar la migración (opcional)
+        if (function_exists('error_log')) {
+            error_log('AgroChamba: Cargando optimización de imágenes mediante AgroChamba\\Media\\ImageOptimizer (migración namespaces).');
+        }
+        \AgroChamba\Media\ImageOptimizer::init();
+        // Evitar definir nuevamente hooks procedurales de este módulo
+        return;
+    } else {
+        if (function_exists('error_log')) {
+            error_log('AgroChamba: No se encontró AgroChamba\\Media\\ImageOptimizer. Usando implementación procedural legacy.');
+        }
+    }
+}
+
 // ==========================================
 // 1. REGISTRAR TAMAÑOS DE IMAGEN PERSONALIZADOS
 // ==========================================
@@ -56,6 +74,10 @@ if (!function_exists('agrochamba_add_custom_image_sizes_to_media')) {
 // ==========================================
 // 3. COMPRESIÓN AUTOMÁTICA DE IMÁGENES AL SUBIR
 // ==========================================
+// IMPORTANTE: Esta función está desactivada porque causaba bucles infinitos
+// La compresión ahora se maneja en la clase ImageOptimizer con mejor manejo de hooks
+// Si necesitas compresión, usa el filtro 'agrochamba_image_compression_quality'
+/*
 if (!function_exists('agrochamba_compress_image_on_upload')) {
     function agrochamba_compress_image_on_upload($metadata, $attachment_id, $context) {
         // Solo procesar si es una imagen y es una nueva subida
@@ -85,17 +107,15 @@ if (!function_exists('agrochamba_compress_image_on_upload')) {
             $image_editor->set_quality($quality);
             $saved = $image_editor->save($file_path);
             
-            if (!is_wp_error($saved)) {
-                // Actualizar metadata si se guardó correctamente
-                $metadata = wp_generate_attachment_metadata($attachment_id, $file_path);
-                wp_update_attachment_metadata($attachment_id, $metadata);
-            }
+            // NO regenerar metadata aquí para evitar bucles infinitos
+            // WordPress ya generó los thumbnails, solo comprimimos el archivo original
         }
         
         return $metadata;
     }
     add_filter('wp_generate_attachment_metadata', 'agrochamba_compress_image_on_upload', 10, 3);
 }
+*/
 
 // ==========================================
 // 4. FORZAR REGENERACIÓN DE THUMBNAILS PARA TAMAÑOS PERSONALIZADOS

@@ -20,8 +20,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import android.widget.Toast
 import agrochamba.com.Screen
 import agrochamba.com.data.AppDataHolder
 import agrochamba.com.data.JobPost
@@ -34,11 +36,18 @@ import agrochamba.com.utils.htmlToString
 @Composable
 fun MyJobsScreen(navController: NavController, viewModel: ProfileViewModel = viewModel()) {
     val uiState = viewModel.uiState
+    val context = LocalContext.current
     var searchQuery by remember { mutableStateOf("") }
 
     // Cargar trabajos al iniciar la pantalla
     LaunchedEffect(Unit) {
         viewModel.loadMyJobs()
+    }
+
+    // Mostrar mensaje de éxito cuando se elimina un trabajo
+    LaunchedEffect(uiState.myJobs.size) {
+        // Si la lista se redujo, significa que se eliminó un trabajo
+        // (esto se maneja mejor con un estado específico, pero por ahora funciona)
     }
 
     val filteredJobs = if (searchQuery.isBlank()) {
@@ -161,6 +170,7 @@ fun MyJobsScreen(navController: NavController, viewModel: ProfileViewModel = vie
                             },
                             onDelete = {
                                 viewModel.deleteJob(job.id)
+                                Toast.makeText(context, "Trabajo eliminado correctamente", Toast.LENGTH_SHORT).show()
                             },
                             modifier = Modifier.fillMaxWidth()
                         )

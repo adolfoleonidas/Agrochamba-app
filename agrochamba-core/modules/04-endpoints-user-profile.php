@@ -16,6 +16,38 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+// =============================================================
+// SHIM DE COMPATIBILIDAD → Delegar a controladores con namespace
+// =============================================================
+if (!defined('AGROCHAMBA_PROFILE_NAMESPACE_INITIALIZED')) {
+    define('AGROCHAMBA_PROFILE_NAMESPACE_INITIALIZED', true);
+
+    $delegated = false;
+    if (class_exists('AgroChamba\\API\\Profile\\UserProfile')) {
+        if (function_exists('error_log')) {
+            error_log('AgroChamba: Delegando /me/profile a AgroChamba\\API\\Profile\\UserProfile (migración namespaces).');
+        }
+        \AgroChamba\API\Profile\UserProfile::init();
+        $delegated = true;
+    }
+    if (class_exists('AgroChamba\\API\\Profile\\ProfilePhoto')) {
+        if (function_exists('error_log')) {
+            error_log('AgroChamba: Delegando /me/profile/photo a AgroChamba\\API\\Profile\\ProfilePhoto (migración namespaces).');
+        }
+        \AgroChamba\API\Profile\ProfilePhoto::init();
+        $delegated = true;
+    }
+
+    // Si delegamos al menos un controlador, evitamos registrar endpoints legacy
+    if ($delegated) {
+        return;
+    } else {
+        if (function_exists('error_log')) {
+            error_log('AgroChamba: No se encontraron controladores de Perfil con namespace. Usando implementación legacy.');
+        }
+    }
+}
+
 // ==========================================
 // 1. OBTENER PERFIL DEL USUARIO ACTUAL
 // ==========================================

@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -24,21 +25,18 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import androidx.hilt.navigation.compose.hiltViewModel
 import agrochamba.com.Screen
 
 @Composable
-fun CompanyRegisterScreen(navController: NavController, viewModel: CompanyRegisterViewModel = viewModel()) {
-    val uiState = viewModel.uiState
+fun CompanyRegisterScreen(navController: NavController, viewModel: CompanyRegisterViewModel = hiltViewModel()) {
+    val uiState by viewModel.uiState.collectAsState()
     var username by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var ruc by remember { mutableStateOf("") }
     var razonSocial by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
-
-    LaunchedEffect(uiState.registrationSuccess) {
-        // La navegación ahora la controla el componente AppEntry
-    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Box(

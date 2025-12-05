@@ -63,6 +63,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.collectAsState
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -79,7 +82,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import agrochamba.com.data.Category
 import agrochamba.com.data.JobPost
-import agrochamba.com.data.WordPressApi
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import kotlinx.coroutines.delay
@@ -88,6 +90,7 @@ import java.util.Locale
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
 import agrochamba.com.R
+import java.util.Date
 
 fun getEmojiForCrop(cropName: String): String {
     return when {
@@ -156,15 +159,15 @@ fun formatDate(dateString: String?): String {
 fun JobsScreen(jobsViewModel: JobsViewModel = viewModel()) {
     val uiState = jobsViewModel.uiState
 
-    if (uiState.selectedJob == null) {
-        JobsListWithSearchScreen(jobsViewModel)
-    } else {
-        JobDetailScreen(
-            job = uiState.selectedJob,
-            mediaItems = uiState.selectedJobMedia, // Pasamos la lista de imágenes
-            onNavigateUp = { jobsViewModel.onDetailScreenNavigated() },
-            navController = null // No tenemos navController aquí, pero JobDetailScreen lo maneja opcionalmente
-        )
+        if (uiState.selectedJob == null) {
+            JobsListWithSearchScreen(jobsViewModel)
+        } else {
+            JobDetailScreen(
+                job = uiState.selectedJob,
+            mediaItems = uiState.selectedJobMedia,
+                onNavigateUp = { jobsViewModel.onDetailScreenNavigated() },
+            navController = null
+            )
     }
 }
 
@@ -192,6 +195,7 @@ fun JobsListWithSearchScreen(jobsViewModel: JobsViewModel) {
         }
     }
 }
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -479,6 +483,13 @@ fun JobsListScreen(
     }
 }
 
+// Data class para información de la etiqueta
+data class BadgeInfo(
+    val text: String,
+    val backgroundColor: Color,
+    val textColor: Color
+)
+
 @Composable
 fun JobCard(job: JobPost, onClick: () -> Unit, viewModel: JobsViewModel) {
     val terms = job.embedded?.terms?.flatten() ?: emptyList()
@@ -541,6 +552,52 @@ fun JobCard(job: JobPost, onClick: () -> Unit, viewModel: JobsViewModel) {
         }
     }
     
+    // Determinar etiqueta a mostrar (prioridad: Destacado > Nuevo > Urgente > Con beneficios > Buen salario)
+    val jobBadge = remember(job.date, job.meta, beneficios) {
+        // 1. Destacado (si está marcado como sticky - por ahora no hay campo, pero se puede agregar)
+        // Por ahora lo omitimos hasta que el backend lo implemente
+        // if (job.meta?.isFeatured == true) return@remember BadgeInfo("Destacado", Color(0xFFFFE0B2), Color(0xFFE65100))
+        
+        // 2. Nuevo - trabajos publicados en las últimas 48 horas
+        val jobDate = job.date?.let { 
+            try {
+                java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.getDefault()).parse(it)
+                    ?: java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).parse(it)
+            } catch (e: Exception) {
+                null
+            }
+        }
+        val hoursSincePublication = jobDate?.let {
+            val now = System.currentTimeMillis()
+            val jobTime = it.time
+            (now - jobTime) / (1000 * 60 * 60) // Convertir a horas
+        } ?: Long.MAX_VALUE
+        
+        if (hoursSincePublication <= 48) {
+            return@remember BadgeInfo("Nuevo", Color(0xFFE3F2FD), Color(0xFF1976D2))
+        }
+        
+        // 3. Urgente - si tiene muchas vacantes (más de 5) o salario muy alto
+        val vacantes = job.meta?.vacantes?.toIntOrNull() ?: 0
+        val salarioMin = job.meta?.salarioMin?.toIntOrNull() ?: 0
+        if (vacantes >= 5 || salarioMin >= 3000) {
+            return@remember BadgeInfo("Urgente", Color(0xFFFFEBEE), Color(0xFFD32F2F))
+        }
+        
+        // 4. Con beneficios - si tiene alojamiento, transporte o alimentación
+        if (beneficios.isNotEmpty()) {
+            return@remember BadgeInfo("Con beneficios", Color(0xFFE8F5E9), Color(0xFF2E7D32))
+        }
+        
+        // 5. Buen salario - si el salario mínimo es mayor a 2000 soles
+        if (salarioMin >= 2000) {
+            return@remember BadgeInfo("Buen salario", Color(0xFFFFF9C4), Color(0xFFF57F17))
+        }
+        
+        // Sin etiqueta
+        null
+    }
+    
     // Determinar si tiene imagen válida
     val hasImage = !imageUrl.isNullOrBlank()
 
@@ -596,55 +653,26 @@ fun JobCard(job: JobPost, onClick: () -> Unit, viewModel: JobsViewModel) {
                         )
                     }
                     
-                    // Tag "Destacado" en la esquina superior derecha
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(8.dp)
-                            .background(
-                                Color(0xFFFFE0B2),
-                                RoundedCornerShape(12.dp)
-                            )
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                    ) {
-                        Text(
-                            text = "Destacado",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFFE65100)
-                        )
-                    }
-                    
-                    // Iconos de favorito/guardar en la esquina superior izquierda
-                    Row(
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        IconButton(
-                            onClick = { viewModel.toggleFavorite(job.id) },
-                            modifier = Modifier.size(32.dp)
+                    // Etiqueta dinámica en la esquina superior derecha
+                    jobBadge?.let { badge ->
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(8.dp)
+                                .background(
+                                    badge.backgroundColor,
+                                    RoundedCornerShape(12.dp)
+                                )
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
                         ) {
-                            Icon(
-                                if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                                contentDescription = "Favorito",
-                                modifier = Modifier.size(18.dp),
-                                tint = if (isFavorite) Color(0xFFE91E63) else Color.White.copy(alpha = 0.8f)
+                            Text(
+                                text = badge.text,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = badge.textColor
                             )
                         }
-                        IconButton(
-                            onClick = { viewModel.toggleSaved(job.id) },
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(
-                                if (isSaved) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                                contentDescription = "Guardar",
-                                modifier = Modifier.size(18.dp),
-                                tint = if (isSaved) Color(0xFF2196F3) else Color.White.copy(alpha = 0.8f)
-                        )
                     }
-                }
             }
             
             // Contenido de texto abajo
@@ -796,13 +824,49 @@ fun JobCard(job: JobPost, onClick: () -> Unit, viewModel: JobsViewModel) {
                     
                     Spacer(modifier = Modifier.weight(1f))
                     
-                    // Fila inferior: fecha
-                    if (publicationDate.isNotBlank()) {
-                        Text(
-                            text = publicationDate,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFF9E9E9E)
-                        )
+                    // Fila inferior: fecha e iconos
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (publicationDate.isNotBlank()) {
+                            Text(
+                                text = publicationDate,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFF9E9E9E)
+                            )
+                        } else {
+                            Spacer(modifier = Modifier.width(1.dp))
+                        }
+                        
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            IconButton(
+                                onClick = { viewModel.toggleFavorite(job.id) },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                    contentDescription = "Favorito",
+                                    modifier = Modifier.size(18.dp),
+                                    tint = if (isFavorite) Color(0xFFE91E63) else Color(0xFF757575)
+                                )
+                            }
+                            IconButton(
+                                onClick = { viewModel.toggleSaved(job.id) },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    if (isSaved) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                                    contentDescription = "Guardar",
+                                    modifier = Modifier.size(18.dp),
+                                    tint = if (isSaved) Color(0xFF2196F3) else Color(0xFF757575)
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -813,7 +877,7 @@ fun JobCard(job: JobPost, onClick: () -> Unit, viewModel: JobsViewModel) {
                     .fillMaxSize()
                     .padding(12.dp)
             ) {
-                // Título y tag destacado
+                // Título y etiqueta dinámica
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -829,20 +893,22 @@ fun JobCard(job: JobPost, onClick: () -> Unit, viewModel: JobsViewModel) {
                         modifier = Modifier.weight(1f)
                     )
                     
-                    Box(
-                        modifier = Modifier
-                            .background(
-                                Color(0xFFFFE0B2),
-                                RoundedCornerShape(12.dp)
+                    jobBadge?.let { badge ->
+                        Box(
+                            modifier = Modifier
+                                .background(
+                                    badge.backgroundColor,
+                                    RoundedCornerShape(12.dp)
+                                )
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = badge.text,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = badge.textColor
                             )
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                    ) {
-                        Text(
-                            text = "Destacado",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFFE65100)
-                        )
+                        }
                     }
                 }
                 
@@ -995,33 +1061,33 @@ fun JobCard(job: JobPost, onClick: () -> Unit, viewModel: JobsViewModel) {
                         Spacer(modifier = Modifier.width(1.dp))
                     }
                     
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(
-                            onClick = { viewModel.toggleFavorite(job.id) },
-                            modifier = Modifier.size(32.dp)
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                                contentDescription = "Favorito",
-                                modifier = Modifier.size(18.dp),
-                                tint = if (isFavorite) Color(0xFFE91E63) else Color(0xFF9E9E9E)
-                            )
+                            IconButton(
+                                onClick = { viewModel.toggleFavorite(job.id) },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                    contentDescription = "Favorito",
+                                    modifier = Modifier.size(18.dp),
+                                    tint = if (isFavorite) Color(0xFFE91E63) else Color(0xFF757575)
+                                )
+                            }
+                            IconButton(
+                                onClick = { viewModel.toggleSaved(job.id) },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    if (isSaved) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                                    contentDescription = "Guardar",
+                                    modifier = Modifier.size(18.dp),
+                                    tint = if (isSaved) Color(0xFF2196F3) else Color(0xFF757575)
+                                )
+                            }
                         }
-                        IconButton(
-                            onClick = { viewModel.toggleSaved(job.id) },
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(
-                                if (isSaved) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                                contentDescription = "Guardar",
-                                modifier = Modifier.size(18.dp),
-                                tint = if (isSaved) Color(0xFF2196F3) else Color(0xFF9E9E9E)
-                            )
-                        }
-                    }
                 }
             }
         }

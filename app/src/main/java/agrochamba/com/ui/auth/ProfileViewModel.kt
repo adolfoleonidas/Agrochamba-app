@@ -29,7 +29,9 @@ data class ProfileScreenState(
     val favorites: List<JobPost> = emptyList(),
     val saved: List<JobPost> = emptyList(),
     val isLoadingFavorites: Boolean = false,
-    val isLoadingSaved: Boolean = false
+    val isLoadingSaved: Boolean = false,
+    // Flag para indicar que una eliminación fue exitosa (utilizado por la UI para disparar efectos)
+    val deleteSuccess: Boolean = false
 )
 
 class ProfileViewModel : ViewModel() {
@@ -84,17 +86,30 @@ class ProfileViewModel : ViewModel() {
                 val authHeader = "Bearer $token"
 
                 val response = WordPressApi.retrofitService.getMyJobs(authHeader, page = 1, perPage = 100)
-                val jobs = response.data
+                val jobs = response.jobs
+                android.util.Log.d("ProfileViewModel", "Jobs cargados: ${jobs.size}")
                 uiState = uiState.copy(isLoading = false, myJobs = jobs)
 
+            } catch (e: retrofit2.HttpException) {
+                val errorMessage = try {
+                    val errorBody = e.response()?.errorBody()?.string()
+                    android.util.Log.e("ProfileViewModel", "Error HTTP: ${e.code()}, Body: $errorBody")
+                    errorBody ?: "Error ${e.code()}: ${e.message()}"
+                } catch (ex: Exception) {
+                    android.util.Log.e("ProfileViewModel", "Error al parsear error: ${ex.message}")
+                    "Error al cargar tus anuncios: ${e.message}"
+                }
+                uiState = uiState.copy(isLoading = false, error = errorMessage)
             } catch (e: Exception) {
-                uiState = uiState.copy(isLoading = false, error = "No se pudieron cargar tus anuncios.")
+                android.util.Log.e("ProfileViewModel", "Error al cargar trabajos: ${e.message}", e)
+                uiState = uiState.copy(isLoading = false, error = "No se pudieron cargar tus anuncios: ${e.message}")
             }
         }
     }
 
     fun deleteJob(jobId: Int) {
         viewModelScope.launch {
+            uiState = uiState.copy(isLoading = true, error = null)
             try {
                 val token = AuthManager.token ?: throw Exception("No estás autenticado.")
                 val authHeader = "Bearer $token"
@@ -103,12 +118,27 @@ class ProfileViewModel : ViewModel() {
 
                 if (response.isSuccessful) {
                     // Recargar la lista de trabajos después de eliminar
+                    uiState = uiState.copy(deleteSuccess = true, isLoading = false)
                     loadMyJobs()
+                    // Resetear el flag después de un momento
+                    kotlinx.coroutines.delay(100)
+                    uiState = uiState.copy(deleteSuccess = false)
                 } else {
-                    uiState = uiState.copy(error = "Error al eliminar el trabajo: ${response.code()}")
+                    val errorMessage = try {
+                        val errorBody = response.errorBody()?.string()
+                        if (!errorBody.isNullOrBlank()) {
+                            // Intentar extraer mensaje del error
+                            errorBody
+                        } else {
+                            "Error al eliminar el trabajo (${response.code()})"
+                        }
+                    } catch (e: Exception) {
+                        "Error al eliminar el trabajo (${response.code()})"
+                    }
+                    uiState = uiState.copy(isLoading = false, error = errorMessage)
                 }
             } catch (e: Exception) {
-                uiState = uiState.copy(error = "Error al eliminar el trabajo: ${e.message}")
+                uiState = uiState.copy(isLoading = false, error = "Error al eliminar el trabajo: ${e.message}")
             }
         }
     }

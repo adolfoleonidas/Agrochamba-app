@@ -6,14 +6,15 @@ data class CompanyProfileResponse(
     @Json(name = "user_id") val userId: Int,
     @Json(name = "company_name") val companyName: String,
     @Json(name = "profile_photo_url") val profilePhotoUrl: String?,
+    @Json(name = "logo_url") val logoUrl: String?,
     val description: String?,
-    val address: String?,
-    val phone: String?,
-    val website: String?,
-    val facebook: String?,
-    val instagram: String?,
-    val linkedin: String?,
-    val twitter: String?,
+    @Json(name = "company_address") val address: String?,
+    @Json(name = "company_phone") val phone: String?,
+    @Json(name = "company_website") val website: String?,
+    @Json(name = "company_facebook") val facebook: String?,
+    @Json(name = "company_instagram") val instagram: String?,
+    @Json(name = "company_linkedin") val linkedin: String?,
+    @Json(name = "company_twitter") val twitter: String?,
     val email: String?
 )
 

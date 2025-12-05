@@ -5,7 +5,9 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import dagger.hilt.android.AndroidEntryPoint
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -25,7 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.viewinterop.AndroidView
-import agrochamba.com.BuildConfig
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -46,10 +48,12 @@ import agrochamba.com.ui.auth.RegisterScreen
 import agrochamba.com.ui.jobs.CompanyProfileScreen
 import agrochamba.com.ui.jobs.CreateJobScreen
 import agrochamba.com.ui.jobs.EditJobScreen
+import agrochamba.com.ui.jobs.FavoritesScreen
 import agrochamba.com.ui.jobs.JobDetailScreen
 import agrochamba.com.ui.jobs.JobsScreen
 import agrochamba.com.ui.jobs.ModerationScreen
 import agrochamba.com.ui.jobs.MyJobsScreen
+import agrochamba.com.ui.jobs.SavedScreen
 import agrochamba.com.ui.theme.AgrochambaTheme
 
 sealed class Screen(val route: String, val label: String? = null, val icon: ImageVector? = null) {
@@ -72,10 +76,13 @@ sealed class Screen(val route: String, val label: String? = null, val icon: Imag
     object EditJob : Screen("edit_job")
     object CompanyProfile : Screen("company_profile/{companyName}")
     object Moderation : Screen("moderation")
+    object Favorites : Screen("favorites")
+    object Saved : Screen("saved")
 }
 
 val bottomBarItems = listOf(Screen.Jobs, Screen.Routes, Screen.Dates, Screen.Rooms, Screen.Profile)
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -93,9 +100,31 @@ fun AppEntry() {
     val isInitializing = AuthManager.isInitializing
     val isLoggedIn = AuthManager.isLoggedIn
 
+    // Logs de diagnóstico visibles en Logcat
+    LaunchedEffect(isInitializing, isLoggedIn) {
+        android.util.Log.d(
+            "AppEntry",
+            "state => isInitializing=${isInitializing}, isLoggedIn=${isLoggedIn}, token=${AuthManager.token}, displayName=${AuthManager.userDisplayName}"
+        )
+    }
+
+    // UI de diagnóstico (visible para el usuario) mientras inicializa
     if (isInitializing) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                CircularProgressIndicator()
+                Text(
+                    text = "Inicializando sesión…",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(top = 12.dp)
+                )
+                // Información adicional para depuración
+                Text(
+                    text = "Esperando AuthManager",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     } else if (isLoggedIn) {
         MainAppScreen()
@@ -163,12 +192,12 @@ fun MainAppScreen() {
     ) { innerPadding ->
         NavHost(navController, startDestination = Screen.Jobs.route, Modifier.padding(innerPadding)) {
             composable(Screen.Jobs.route) { JobsScreen() }
-            composable(Screen.Routes.route) { WebViewScreen(url = BuildConfig.WEB_ROUTES_URL) }
-            composable(Screen.Dates.route) { WebViewScreen(url = BuildConfig.WEB_DATES_URL) }
-            composable(Screen.Rooms.route) { WebViewScreen(url = BuildConfig.WEB_ROOMS_URL) }
+            composable(Screen.Routes.route) { WebViewScreen(url = "https://agrobus.agrochamba.com/") }
+            composable(Screen.Dates.route) { WebViewScreen(url = "https://agrochamba.com/wp-content/fechas.html") }
+            composable(Screen.Rooms.route) { WebViewScreen(url = "https://cuartos.agrochamba.com/") }
             composable(Screen.Profile.route) { ProfileScreen(navController) } 
             composable(Screen.CreateJob.route) { CreateJobScreen(navController) } 
-            composable(Screen.PrivacyPolicy.route) { WebViewScreen(url = BuildConfig.PRIVACY_URL) }
+            composable(Screen.PrivacyPolicy.route) { WebViewScreen(url = "https://agrochamba.com/politica-de-privacidad/") }
             
             composable(Screen.MyJobDetail.route) {
                 AppDataHolder.selectedJob?.let { job ->
@@ -204,6 +233,12 @@ fun MainAppScreen() {
             composable(Screen.Moderation.route) {
                 ModerationScreen(navController = navController)
             }
+            composable(Screen.Favorites.route) {
+                FavoritesScreen(navController = navController)
+            }
+            composable(Screen.Saved.route) {
+                SavedScreen(navController = navController)
+            }
         }
     }
 }
@@ -213,14 +248,7 @@ fun WebViewScreen(url: String) {
     AndroidView(factory = {
         WebView(it).apply {
             webViewClient = WebViewClient()
-            // Endurecimiento de WebView
             settings.javaScriptEnabled = true
-            settings.domStorageEnabled = true
-            settings.allowFileAccess = false
-            settings.allowContentAccess = false
-            settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW
-            try { WebView.setWebContentsDebuggingEnabled(false) } catch (_: Throwable) {}
-            try { settings.safeBrowsingEnabled = true } catch (_: Throwable) {}
             loadUrl(url)
         }
     })

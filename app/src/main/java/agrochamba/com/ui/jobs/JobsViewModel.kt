@@ -11,7 +11,12 @@ import agrochamba.com.data.Category
 import agrochamba.com.data.JobPost
 import agrochamba.com.data.MediaItem
 import agrochamba.com.data.WordPressApi
+import agrochamba.com.util.Result
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import retrofit2.HttpException
 
@@ -38,13 +43,14 @@ data class JobsScreenState(
     val errorMessage: String? = null
 )
 
-class JobsViewModel : ViewModel() {
+@HiltViewModel
+class JobsViewModel @Inject constructor() : androidx.lifecycle.ViewModel() {
 
     var uiState by mutableStateOf(JobsScreenState())
         private set
 
     init {
-        loadInitialData()
+            loadInitialData()
     }
 
     private fun loadInitialData() {
@@ -403,4 +409,5 @@ class JobsViewModel : ViewModel() {
             }
         }
     }
+
 }

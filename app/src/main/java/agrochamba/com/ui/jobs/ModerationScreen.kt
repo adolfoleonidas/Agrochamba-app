@@ -229,7 +229,7 @@ fun PendingJobCard(
             }
 
             // Ubicación, cultivo, etc.
-            job.ubicacion?.let { ubicacion ->
+            job.ubicacionName?.let { ubicacion ->
                 Text(
                     text = "📍 $ubicacion",
                     style = MaterialTheme.typography.bodySmall,
@@ -237,7 +237,7 @@ fun PendingJobCard(
                 )
             }
 
-            job.cultivo?.let { cultivo ->
+            job.cultivoName?.let { cultivo ->
                 Text(
                     text = "🌾 $cultivo",
                     style = MaterialTheme.typography.bodySmall,

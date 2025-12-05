@@ -78,6 +78,109 @@ if (!function_exists('agrochamba_registrar_cpt_trabajos')) {
 }
 
 // ==========================================
+// 1.1. CUSTOM POST TYPE: EMPRESAS
+// ==========================================
+// Solo registrar el CPT legacy si la clase moderna NO está disponible
+// Si la clase moderna está disponible, ella se encargará del registro del CPT
+if (!function_exists('agrochamba_registrar_cpt_empresas') && !class_exists('AgroChamba\\PostTypes\\EmpresaPostType')) {
+    function agrochamba_registrar_cpt_empresas() {
+        $labels = array(
+            'name'                  => 'Empresas',
+            'singular_name'         => 'Empresa',
+            'menu_name'             => 'Empresas',
+            'all_items'             => 'Todas las Empresas',
+            'add_new'               => 'Agregar Nueva',
+            'add_new_item'          => 'Agregar Nueva Empresa',
+            'edit_item'             => 'Editar Empresa',
+            'new_item'              => 'Nueva Empresa',
+            'view_item'             => 'Ver Empresa',
+            'view_items'            => 'Ver Empresas',
+            'search_items'          => 'Buscar Empresas',
+            'not_found'             => 'No se encontraron empresas',
+            'not_found_in_trash'    => 'No hay empresas en la papelera',
+            'featured_image'        => 'Logo de la Empresa',
+            'set_featured_image'    => 'Establecer logo',
+            'remove_featured_image' => 'Eliminar logo',
+            'use_featured_image'    => 'Usar como logo',
+            'archives'              => 'Archivo de Empresas',
+            'insert_into_item'      => 'Insertar en empresa',
+            'uploaded_to_this_item' => 'Subido a esta empresa',
+            'filter_items_list'     => 'Filtrar lista de empresas',
+            'items_list_navigation' => 'Navegación de empresas',
+            'items_list'            => 'Lista de empresas',
+        );
+
+        $args = array(
+            'labels'              => $labels,
+            'description'         => 'Información extendida de empresas agrícolas',
+            'public'              => true,
+            'publicly_queryable'  => true,
+            'show_ui'             => true,
+            'show_in_menu'        => true,
+            'show_in_nav_menus'   => true,
+            'show_in_admin_bar'   => true,
+            'show_in_rest'        => true,
+            'rest_base'           => 'empresas',
+            'menu_position'       => 4,
+            'menu_icon'           => 'dashicons-building',
+            'capability_type'     => 'post',
+            'hierarchical'        => false,
+            'supports'            => array('title', 'editor', 'thumbnail', 'excerpt', 'author', 'revisions', 'custom-fields'),
+            'has_archive'         => true,
+            'rewrite'             => array(
+                'slug'       => 'empresas',
+                'with_front' => false,
+            ),
+            'query_var'           => true,
+            'can_export'          => true,
+            'delete_with_user'    => false,
+        );
+
+        register_post_type('empresa', $args);
+    }
+    add_action('init', 'agrochamba_registrar_cpt_empresas', 0);
+}
+
+// Cargar template personalizado para single empresa
+if (!function_exists('agrochamba_load_empresa_template')) {
+    function agrochamba_load_empresa_template($template) {
+        if (is_singular('empresa')) {
+            $custom_template = AGROCHAMBA_TEMPLATES_DIR . '/empresa-perfil.php';
+            if (file_exists($custom_template)) {
+                return $custom_template;
+            }
+        }
+        return $template;
+    }
+    add_filter('single_template', 'agrochamba_load_empresa_template');
+}
+
+// Si el código moderno está disponible, también cargarlo para tener los meta boxes completos
+// IMPORTANTE: No usar 'plugins_loaded' aquí porque este módulo se carga DURANTE 'plugins_loaded'
+// Usar 'init' con prioridad temprana para asegurar que se ejecute después de que WordPress esté listo
+if (class_exists('AgroChamba\\PostTypes\\EmpresaPostType')) {
+    add_action('init', function() {
+        if (class_exists('AgroChamba\\PostTypes\\EmpresaPostType')) {
+            \AgroChamba\PostTypes\EmpresaPostType::register();
+        }
+    }, 5);
+}
+
+// Cargar template personalizado para single trabajo
+if (!function_exists('agrochamba_load_trabajo_template')) {
+    function agrochamba_load_trabajo_template($template) {
+        if (is_singular('trabajo')) {
+            $custom_template = AGROCHAMBA_TEMPLATES_DIR . '/single-trabajo.php';
+            if (file_exists($custom_template)) {
+                return $custom_template;
+            }
+        }
+        return $template;
+    }
+    add_filter('single_template', 'agrochamba_load_trabajo_template');
+}
+
+// ==========================================
 // 2. TAXONOMÍAS PERSONALIZADAS
 // ==========================================
 if (!function_exists('agrochamba_registrar_taxonomias')) {
@@ -215,6 +318,7 @@ if (!function_exists('agrochamba_registrar_meta_fields')) {
             'edad_minima' => array('type' => 'number', 'description' => 'Edad mínima requerida'),
             'edad_maxima' => array('type' => 'number', 'description' => 'Edad máxima requerida'),
             'gallery_ids' => array('type' => 'array', 'description' => 'IDs de imágenes de la galería'),
+            'empresa_id' => array('type' => 'integer', 'description' => 'ID del CPT Empresa asociado'),
         );
 
         foreach ($meta_fields as $field_name => $field_config) {
@@ -228,6 +332,7 @@ if (!function_exists('agrochamba_registrar_meta_fields')) {
         }
     }
     add_action('init', 'agrochamba_registrar_meta_fields');
+}
 
 // ==========================================
 // 7. ASEGURAR QUE FEATURED MEDIA SE INCLUYA EN _EMBEDDED
@@ -447,8 +552,71 @@ if (!function_exists('agrochamba_add_meta_boxes')) {
             'side',
             'default'
         );
+        
+        add_meta_box(
+            'agrochamba_job_empresa',
+            '<span class="dashicons dashicons-building" style="vertical-align: middle;"></span> Empresa',
+            'agrochamba_job_empresa_meta_box',
+            'trabajo',
+            'side',
+            'high'
+        );
     }
     add_action('add_meta_boxes', 'agrochamba_add_meta_boxes');
+}
+
+// Meta box: Empresa (CPT)
+if (!function_exists('agrochamba_job_empresa_meta_box')) {
+    function agrochamba_job_empresa_meta_box($post) {
+        wp_nonce_field('agrochamba_save_meta_boxes', 'agrochamba_meta_box_nonce');
+        
+        $empresa_id = get_post_meta($post->ID, 'empresa_id', true);
+        
+        // Obtener todas las empresas publicadas
+        $empresas = get_posts([
+            'post_type' => 'empresa',
+            'post_status' => 'publish',
+            'posts_per_page' => -1,
+            'orderby' => 'title',
+            'order' => 'ASC',
+        ]);
+        
+        ?>
+        <p>
+            <label for="empresa_id">
+                <strong>Empresa:</strong>
+            </label>
+        </p>
+        <select name="empresa_id" id="empresa_id" style="width: 100%;">
+            <option value="">-- Seleccionar Empresa --</option>
+            <?php foreach ($empresas as $empresa): ?>
+                <option value="<?php echo esc_attr($empresa->ID); ?>" <?php selected($empresa_id, $empresa->ID); ?>>
+                    <?php echo esc_html($empresa->post_title); ?>
+                </option>
+            <?php endforeach; ?>
+        </select>
+        <?php if ($empresa_id): ?>
+            <?php $empresa = get_post($empresa_id); ?>
+            <?php if ($empresa): ?>
+                <p style="margin-top: 10px;">
+                    <a href="<?php echo esc_url(get_edit_post_link($empresa_id)); ?>" target="_blank">
+                        Editar empresa →
+                    </a>
+                </p>
+                <?php
+                $ofertas_count = agrochamba_get_empresa_ofertas_count($empresa_id);
+                ?>
+                <p style="margin-top: 5px; color: #646970;">
+                    <small>Ofertas activas: <strong><?php echo esc_html($ofertas_count); ?></strong></small>
+                </p>
+            <?php endif; ?>
+        <?php else: ?>
+            <p style="margin-top: 10px; color: #d63638;">
+                <small>⚠️ Esta oferta no está asociada a ninguna empresa.</small>
+            </p>
+        <?php endif; ?>
+        <?php
+    }
 }
 
 // Agregar estilos CSS personalizados para los meta boxes
@@ -1055,19 +1223,29 @@ if (!function_exists('agrochamba_save_meta_boxes')) {
             'salario_min', 'salario_max', 'vacantes', 'fecha_inicio', 'fecha_fin',
             'duracion_dias', 'tipo_contrato', 'jornada', 'requisitos', 'beneficios',
             'experiencia', 'genero', 'edad_minima', 'edad_maxima', 'estado',
-            'contacto_whatsapp', 'contacto_email', 'google_maps_url'
+            'contacto_whatsapp', 'contacto_email', 'google_maps_url', 'empresa_id'
         );
         
         foreach ($fields as $field) {
             if (isset($_POST[$field])) {
-                // Sanitizar URL de Google Maps
+                // Sanitizar según el tipo de campo
                 if ($field === 'google_maps_url') {
                     update_post_meta($post_id, $field, esc_url_raw($_POST[$field]));
+                } elseif ($field === 'empresa_id') {
+                    $empresa_id = intval($_POST[$field]);
+                    if ($empresa_id > 0) {
+                        update_post_meta($post_id, $field, $empresa_id);
+                    } else {
+                        delete_post_meta($post_id, $field);
+                    }
                 } else {
                     update_post_meta($post_id, $field, sanitize_text_field($_POST[$field]));
                 }
             } else {
-                delete_post_meta($post_id, $field);
+                // Solo eliminar si no es empresa_id (puede estar vacío intencionalmente)
+                if ($field !== 'empresa_id') {
+                    delete_post_meta($post_id, $field);
+                }
             }
         }
         

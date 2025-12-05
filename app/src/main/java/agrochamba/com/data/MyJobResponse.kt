@@ -27,7 +27,8 @@ data class MyJobResponse(
     val vacantes: String?,
     val alojamiento: Boolean?,
     val transporte: Boolean?,
-    val alimentacion: Boolean?
+    val alimentacion: Boolean?,
+    @Json(name = "facebook_post_id") val facebookPostId: String? // ID del post en Facebook si fue publicado
 )
 
 data class TaxonomyData(
@@ -114,7 +115,8 @@ fun MyJobResponse.toJobPost(): JobPost {
             alimentacion = alimentacion,
             requisitos = null,
             beneficios = null,
-            galleryIds = galleryIds
+            galleryIds = galleryIds,
+            facebookPostId = facebookPostId
         ),
         embedded = agrochamba.com.data.Embedded(
             featuredMedia = featuredMedia,
