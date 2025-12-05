@@ -67,4 +67,3 @@ Ver `agrochamba-core/README.txt` para documentación completa.
 ## 📝 Licencia
 
 GPL v2 or later
-
