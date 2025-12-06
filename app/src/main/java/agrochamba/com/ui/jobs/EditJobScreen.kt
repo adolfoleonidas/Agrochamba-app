@@ -42,6 +42,9 @@ import agrochamba.com.data.AuthManager
 import agrochamba.com.data.Category
 import agrochamba.com.data.JobPost
 import agrochamba.com.utils.htmlToString
+import agrochamba.com.utils.htmlToMarkdown
+import agrochamba.com.utils.textToHtml
+import agrochamba.com.ui.common.RichTextEditor
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 
@@ -51,6 +54,7 @@ fun EditJobScreen(
     job: JobPost,
     navController: NavController,
     viewModel: EditJobViewModel = androidx.lifecycle.viewmodel.compose.viewModel(
+        key = "edit_job_${job.id}", // Clave única por trabajo para evitar reutilización
         factory = EditJobViewModelFactory(job)
     )
 ) {
@@ -70,7 +74,7 @@ fun EditJobScreen(
     val initialTipoPuestoTerm = terms.find { it.taxonomy == "tipo_puesto" }
 
     var title by remember { mutableStateOf(job.title?.rendered?.htmlToString() ?: "") }
-    var description by remember { mutableStateOf(job.content?.rendered?.htmlToString() ?: "") }
+    var description by remember { mutableStateOf(job.content?.rendered?.htmlToMarkdown() ?: "") }
     var salarioMin by remember { mutableStateOf(job.meta?.salarioMin ?: "") }
     var salarioMax by remember { mutableStateOf(job.meta?.salarioMax ?: "") }
     var vacantes by remember { mutableStateOf(job.meta?.vacantes ?: "") }
@@ -111,6 +115,20 @@ fun EditJobScreen(
     var publishToFacebook by remember { mutableStateOf(!job.meta?.facebookPostId.isNullOrBlank()) }
     
     var showMoreOptions by remember { mutableStateOf(false) }
+
+    // Recargar imágenes cuando cambia el trabajo - asegurar que se ejecute siempre
+    LaunchedEffect(job.id) {
+        android.util.Log.d("EditJobScreen", "LaunchedEffect ejecutado para job.id: ${job.id}")
+        // Pequeño delay para asegurar que el ViewModel esté listo
+        kotlinx.coroutines.delay(100)
+        viewModel.reloadImages()
+    }
+    
+    // También resetear cuando cambia el job para asegurar estado limpio
+    LaunchedEffect(job.id) {
+        // Resetear estado local si es necesario
+        android.util.Log.d("EditJobScreen", "Reseteando estado para nuevo trabajo: ${job.id}")
+    }
 
     LaunchedEffect(uiState.updateSuccess) {
         if (uiState.updateSuccess) {
@@ -168,7 +186,7 @@ fun EditJobScreen(
                     
                     val jobData = mutableMapOf<String, Any>(
                         "title" to title.trim(),
-                        "content" to description.trim(),
+                        "content" to description.textToHtml(),
                         "salario_min" to (salarioMin.toIntOrNull() ?: 0),
                         "salario_max" to (salarioMax.toIntOrNull() ?: 0),
                         "vacantes" to (vacantes.toIntOrNull() ?: 1),
@@ -206,6 +224,11 @@ fun EditJobScreen(
                     .verticalScroll(rememberScrollState())
             ) {
                 // Sección de imágenes - estilo TikTok (combinando existentes y nuevas)
+                // Debug: Log del estado de imágenes
+                LaunchedEffect(uiState.existingImageUrls.size, uiState.imagesLoaded) {
+                    android.util.Log.d("EditJobScreen", "Estado imágenes - URLs: ${uiState.existingImageUrls.size}, Loaded: ${uiState.imagesLoaded}, Job ID: ${job.id}")
+                }
+                
                 EditImageSection(
                     existingImageUrls = uiState.existingImageUrls,
                     existingImageIds = uiState.existingImageIds,
@@ -252,23 +275,19 @@ fun EditJobScreen(
                 
                 // Descripción
                 Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                    TextField(
+                    Text(
+                        "Descripción del Trabajo",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    RichTextEditor(
                         value = description,
                         onValueChange = { description = it },
-                        placeholder = {
-                            Text(
-                                "Una descripción detallada permite obtener más visitas. Incluye información sobre el trabajo, requisitos y beneficios.",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                            )
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(200.dp),
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent
-                        ),
-                        textStyle = MaterialTheme.typography.bodyMedium
+                        placeholder = "Una descripción detallada permite obtener más visitas. Incluye información sobre el trabajo, requisitos y beneficios.\n\nUsa los botones de formato para resaltar texto importante.",
+                        maxLines = 15,
+                        enabled = !uiState.isLoading
                     )
                 }
                 

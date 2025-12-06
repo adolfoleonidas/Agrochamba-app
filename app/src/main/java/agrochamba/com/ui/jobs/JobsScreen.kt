@@ -1,5 +1,7 @@
 package agrochamba.com.ui.jobs
 
+import agrochamba.com.utils.htmlToString
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -523,7 +525,7 @@ fun JobCard(job: JobPost, onClick: () -> Unit, viewModel: JobsViewModel) {
     val isSaved = savedStatusMap[job.id] ?: false
     
     // Usamos el excerpt para la descripción corta
-    val shortDescription = remember(job.excerpt) {
+    val shortDescription: String? = remember(job.excerpt) {
         job.excerpt?.rendered?.htmlToString()
     }
     

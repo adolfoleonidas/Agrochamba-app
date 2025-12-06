@@ -85,6 +85,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import agrochamba.com.data.JobPost
 import agrochamba.com.data.MediaItem
+import agrochamba.com.ui.common.FormattedText
 import agrochamba.com.utils.htmlToString
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -340,14 +341,17 @@ private fun JobDetailContent(
             job.content?.rendered?.let {
                 SimpleSectionTitle("Descripción del Trabajo")
                 Spacer(Modifier.height(14.dp))
-                Text(
-                    it.htmlToString(),
-                    style = MaterialTheme.typography.bodyLarge,
+                if (it.trim().isNotBlank()) {
+                    FormattedText(
+                        text = it,
+                        style = MaterialTheme.typography.bodyLarge.copy(
                     lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * 1.6,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.Normal
+                            color = MaterialTheme.colorScheme.onSurface
+                        ),
+                        modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.height(28.dp))
+                }
             }
             
             // --- REQUISITOS ---

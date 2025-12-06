@@ -25,6 +25,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import agrochamba.com.data.JobPost
 import agrochamba.com.data.PendingJobPost
+import agrochamba.com.utils.htmlToString
 
 // Extensiones para obtener valores de salario desde meta o campos directos
 private val PendingJobPost.salarioMinValue: String?
@@ -262,13 +263,15 @@ fun PendingJobCard(
 
             // Descripción (primeros 150 caracteres)
             job.content?.rendered?.let { content ->
-                val cleanContent = android.text.Html.fromHtml(content, android.text.Html.FROM_HTML_MODE_LEGACY).toString()
+                val cleanContent = content.htmlToString().trim()
+                if (cleanContent.isNotBlank()) {
                 Text(
                     text = if (cleanContent.length > 150) cleanContent.take(150) + "..." else cleanContent,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(vertical = 8.dp)
                 )
+                }
             }
 
             Divider(modifier = Modifier.padding(vertical = 8.dp))

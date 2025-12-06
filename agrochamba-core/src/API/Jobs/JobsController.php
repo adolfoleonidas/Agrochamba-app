@@ -210,10 +210,48 @@ class JobsController {
         }
 
         // Preparar datos del post
+        $post_content = isset($params['content']) ? wp_kses_post($params['content']) : '';
+        
+        // Embebir imágenes de la galería en el contenido HTML para SEO y visibilidad
+        if (!empty($params['gallery_ids']) && is_array($params['gallery_ids'])) {
+            $gallery_ids = array_map('intval', $params['gallery_ids']);
+            $images_html = '';
+            $job_title = sanitize_text_field($params['title']);
+            
+            foreach ($gallery_ids as $img_id) {
+                $img_url = wp_get_attachment_image_url($img_id, 'large');
+                $img_full_url = wp_get_attachment_image_url($img_id, 'full');
+                $img_alt = get_post_meta($img_id, '_wp_attachment_image_alt', true);
+                
+                // Si no hay alt text, usar el título del trabajo
+                if (empty($img_alt)) {
+                    $img_alt = $job_title;
+                }
+                
+                if ($img_url) {
+                    // Crear HTML de imagen con atributos SEO-friendly
+                    $images_html .= '<figure class="wp-block-image size-large">' . "\n";
+                    $images_html .= '<img src="' . esc_url($img_url) . '" alt="' . esc_attr($img_alt) . '" class="wp-image-' . $img_id . ' aligncenter size-large" />' . "\n";
+                    $images_html .= '</figure>' . "\n\n";
+                }
+            }
+            
+            // Agregar las imágenes al contenido (después del texto descriptivo)
+            if (!empty($images_html)) {
+                // Verificar si las imágenes ya están en el contenido para evitar duplicados
+                $first_img_id = $gallery_ids[0];
+                $img_url_check = wp_get_attachment_image_url($first_img_id, 'large');
+                
+                if ($img_url_check && strpos($post_content, $img_url_check) === false) {
+                    $post_content .= "\n\n" . $images_html;
+                }
+            }
+        }
+        
         $post_data = array(
             'post_type'    => 'trabajo',
             'post_title'   => sanitize_text_field($params['title']),
-            'post_content' => isset($params['content']) ? wp_kses_post($params['content']) : '',
+            'post_content' => $post_content,
             'post_status'  => $post_status,
             'post_author'  => $user_id,
         );
@@ -420,6 +458,7 @@ class JobsController {
 
         // Preparar datos del post
         $post_data = array('ID' => $post_id);
+        $post_content = isset($params['content']) ? wp_kses_post($params['content']) : $post->post_content;
 
         if (isset($params['title'])) {
             if (strlen($params['title']) > 200) {
@@ -432,8 +471,53 @@ class JobsController {
             if (strlen($params['content']) > 10000) {
                 return new WP_Error('rest_invalid_param', 'El contenido no puede exceder 10000 caracteres.', array('status' => 400));
             }
-            $post_data['post_content'] = wp_kses_post($params['content']);
+            $post_content = wp_kses_post($params['content']);
         }
+
+        // Embebir imágenes de la galería en el contenido HTML para SEO y visibilidad
+        if (isset($params['gallery_ids']) && is_array($params['gallery_ids']) && !empty($params['gallery_ids'])) {
+            $gallery_ids = array_map('intval', $params['gallery_ids']);
+            $images_html = '';
+            $job_title = isset($params['title']) ? sanitize_text_field($params['title']) : $post->post_title;
+            
+            // Remover imágenes existentes del contenido antes de agregar las nuevas
+            // Esto evita duplicados cuando se actualiza
+            foreach ($gallery_ids as $img_id) {
+                $img_url = wp_get_attachment_image_url($img_id, 'large');
+                if ($img_url) {
+                    // Remover cualquier referencia previa a esta imagen
+                    $post_content = preg_replace('/<figure[^>]*>.*?wp-image-' . $img_id . '.*?<\/figure>/s', '', $post_content);
+                    $post_content = preg_replace('/<img[^>]*wp-image-' . $img_id . '[^>]*>/', '', $post_content);
+                }
+            }
+            
+            // Agregar todas las imágenes al contenido
+            foreach ($gallery_ids as $img_id) {
+                $img_url = wp_get_attachment_image_url($img_id, 'large');
+                $img_alt = get_post_meta($img_id, '_wp_attachment_image_alt', true);
+                
+                // Si no hay alt text, usar el título del trabajo
+                if (empty($img_alt)) {
+                    $img_alt = $job_title;
+                }
+                
+                if ($img_url) {
+                    // Crear HTML de imagen con atributos SEO-friendly
+                    $images_html .= '<figure class="wp-block-image size-large">' . "\n";
+                    $images_html .= '<img src="' . esc_url($img_url) . '" alt="' . esc_attr($img_alt) . '" class="wp-image-' . $img_id . ' aligncenter size-large" />' . "\n";
+                    $images_html .= '</figure>' . "\n\n";
+                }
+            }
+            
+            // Agregar las imágenes al contenido (después del texto descriptivo)
+            if (!empty($images_html)) {
+                // Limpiar espacios múltiples y agregar imágenes
+                $post_content = trim($post_content);
+                $post_content .= "\n\n" . trim($images_html);
+            }
+        }
+        
+        $post_data['post_content'] = $post_content;
 
         if (isset($params['excerpt'])) {
             $post_data['post_excerpt'] = sanitize_textarea_field($params['excerpt']);

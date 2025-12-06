@@ -48,14 +48,25 @@ class EditJobViewModel(private val job: JobPost) : ViewModel() {
         loadFormData()
         loadExistingImages()
     }
+    
+    /**
+     * Recarga las imágenes cuando cambia el trabajo
+     */
+    fun reloadImages() {
+        // Resetear el estado de imágenes antes de cargar nuevas
+        uiState = uiState.copy(
+            existingImageUrls = emptyList(),
+            existingImageIds = emptyList(),
+            imagesLoaded = false,
+            selectedImages = emptyList(),
+            featuredImageIndex = 0
+        )
+        loadExistingImages()
+    }
 
     private fun loadFormData() {
         viewModelScope.launch {
-            // Preservar las imágenes existentes al actualizar el estado
-            val currentImageUrls = uiState.existingImageUrls
-            val currentImageIds = uiState.existingImageIds
-            val currentImagesLoaded = uiState.imagesLoaded
-            
+            // NO preservar imágenes aquí - loadExistingImages() las carga por separado
             uiState = uiState.copy(isLoading = true, error = null)
             try {
                 val ubicacionesDeferred = async { WordPressApi.retrofitService.getUbicaciones() }
@@ -69,120 +80,136 @@ class EditJobViewModel(private val job: JobPost) : ViewModel() {
                     cultivos = cultivosDeferred.await(),
                     tiposPuesto = tiposPuestoDeferred.await(),
                     userCompanyId = AuthManager.userCompanyId,
-                    isLoading = false,
-                    // Preservar las imágenes existentes
-                    existingImageUrls = currentImageUrls,
-                    existingImageIds = currentImageIds,
-                    imagesLoaded = currentImagesLoaded
+                    isLoading = false
+                    // NO preservar imágenes aquí - se cargan por separado en loadExistingImages()
                 )
             } catch (e: Exception) {
                 uiState = uiState.copy(
                     isLoading = false, 
-                    error = "No se pudieron cargar los datos del formulario.",
-                    // Preservar las imágenes existentes incluso en caso de error
-                    existingImageUrls = currentImageUrls,
-                    existingImageIds = currentImageIds,
-                    imagesLoaded = currentImagesLoaded
+                    error = "No se pudieron cargar los datos del formulario."
+                    // NO preservar imágenes aquí - se cargan por separado
                 )
             }
         }
     }
 
-    private fun loadExistingImages() {
+    fun loadExistingImages() {
         viewModelScope.launch {
             try {
                 android.util.Log.d("EditJobViewModel", "Cargando imágenes existentes para trabajo ID: ${job.id}")
                 
+                // Resetear estado de carga primero
+                uiState = uiState.copy(
+                    imagesLoaded = false,
+                    existingImageUrls = emptyList(),
+                    existingImageIds = emptyList()
+                )
+                
                 val token = AuthManager.token
                 val authHeader = token?.let { "Bearer $it" }
                 
-                // Estrategia 1: Usar gallery_ids directamente del job.meta (más confiable)
+                val finalUrls = mutableListOf<String>()
+                val finalIds = mutableListOf<Int>()
+                
+                // PRIORIDAD 1: Verificar featured_media desde embedded (siempre disponible)
+                val featuredMediaFromEmbedded = job.embedded?.featuredMedia?.firstOrNull()
+                val featuredMediaUrl = featuredMediaFromEmbedded?.getImageUrl()
+                val featuredMediaId = featuredMediaFromEmbedded?.id
+                
+                if (featuredMediaUrl != null && featuredMediaId != null) {
+                    finalUrls.add(featuredMediaUrl)
+                    finalIds.add(featuredMediaId)
+                    android.util.Log.d("EditJobViewModel", "Agregada imagen destacada desde embedded: ID=$featuredMediaId")
+                }
+                
+                // PRIORIDAD 2: Usar gallery_ids del job.meta
                 val galleryIds = job.meta?.galleryIds
-                val (imageUrls, imageIds) = if (!galleryIds.isNullOrEmpty()) {
+                if (!galleryIds.isNullOrEmpty()) {
                     android.util.Log.d("EditJobViewModel", "Cargando desde gallery_ids: $galleryIds")
                     try {
                         // Cargar URLs de las imágenes usando los IDs
-                        val imagesWithIds = galleryIds.mapNotNull { id ->
-                            try {
-                                val media = WordPressApi.retrofitService.getMediaById(id)
-                                val url = media.getImageUrl()
-                                if (url != null) {
-                                    android.util.Log.d("EditJobViewModel", "Imagen cargada: ID=$id, URL=$url")
-                                    Pair(url, id)
-                                } else {
-                                    android.util.Log.w("EditJobViewModel", "No se pudo obtener URL para ID $id")
-                                    null
+                        galleryIds.forEach { id ->
+                            // Evitar duplicados (si ya está en featured_media)
+                            if (!finalIds.contains(id)) {
+                                try {
+                                    val media = WordPressApi.retrofitService.getMediaById(id)
+                                    val url = media.getImageUrl()
+                                    if (url != null && !finalUrls.contains(url)) {
+                                        finalUrls.add(url)
+                                        finalIds.add(id)
+                                        android.util.Log.d("EditJobViewModel", "Imagen cargada desde gallery_ids: ID=$id, URL=$url")
+                                    }
+                                } catch (e: Exception) {
+                                    android.util.Log.w("EditJobViewModel", "Error cargando media ID $id: ${e.message}")
                                 }
-                            } catch (e: Exception) {
-                                android.util.Log.w("EditJobViewModel", "Error cargando media ID $id: ${e.message}")
-                                null
                             }
                         }
-                        android.util.Log.d("EditJobViewModel", "Imágenes cargadas desde gallery_ids: ${imagesWithIds.size}")
-                        Pair(imagesWithIds.map { it.first }, imagesWithIds.map { it.second })
                     } catch (e: Exception) {
                         android.util.Log.w("EditJobViewModel", "Error procesando gallery_ids: ${e.message}")
-                        Pair(emptyList(), emptyList())
-                    }
-                } else {
-                    // Estrategia 2: Intentar con getJobImages (requiere autenticación)
-                    try {
-                        if (authHeader != null) {
-                            // Nota: getJobImages puede requerir autenticación, pero actualmente no la tiene
-                            // Intentamos de todas formas
-                            val response = WordPressApi.retrofitService.getJobImages(job.id)
-                            val urls = response.images.mapNotNull { it.getDetailUrl() }
-                            val ids = response.images.mapNotNull { it.id }
-                            android.util.Log.d("EditJobViewModel", "Imágenes cargadas desde getJobImages: ${urls.size}")
-                            Pair(urls, ids)
-                        } else {
-                            throw Exception("No hay token de autenticación")
-                        }
-                    } catch (e: Exception) {
-                        android.util.Log.w("EditJobViewModel", "Error en getJobImages: ${e.message}")
-                        // Estrategia 3: Intentar con getMediaForPost
-                        try {
-                            android.util.Log.d("EditJobViewModel", "Intentando cargar desde getMediaForPost")
-                            val media = WordPressApi.retrofitService.getMediaForPost(job.id)
-                            val urls = media.mapNotNull { it.getImageUrl() }
-                            val ids = media.mapNotNull { it.id }
-                            android.util.Log.d("EditJobViewModel", "Imágenes cargadas desde getMediaForPost: ${urls.size}")
-                            Pair(urls, ids)
-                        } catch (e: Exception) {
-                            android.util.Log.w("EditJobViewModel", "Error en getMediaForPost: ${e.message}")
-                            // Estrategia 4: Usar embedded como último recurso
-                            val embeddedUrls = job.embedded?.featuredMedia?.mapNotNull { it.getImageUrl() } ?: emptyList()
-                            val embeddedIds = job.embedded?.featuredMedia?.mapNotNull { it.id } ?: emptyList()
-                            android.util.Log.d("EditJobViewModel", "Imágenes cargadas desde embedded: ${embeddedUrls.size}")
-                            Pair(embeddedUrls, embeddedIds)
-                        }
                     }
                 }
                 
-                // Agregar featured_media_url si existe y no está ya en la lista
-                val featuredMediaUrl = job.embedded?.featuredMedia?.firstOrNull()?.getImageUrl()
-                val featuredMediaId = job.embedded?.featuredMedia?.firstOrNull()?.id
-                
-                val finalUrls = imageUrls.toMutableList()
-                val finalIds = imageIds.toMutableList()
-                
-                // Si hay featured_media_url y no está en la lista, agregarlo al inicio
-                if (featuredMediaUrl != null && featuredMediaId != null && 
-                    !finalUrls.contains(featuredMediaUrl) && !finalIds.contains(featuredMediaId)) {
-                    finalUrls.add(0, featuredMediaUrl)
-                    finalIds.add(0, featuredMediaId)
-                    android.util.Log.d("EditJobViewModel", "Agregada imagen destacada al inicio")
+                // PRIORIDAD 3: Si aún no hay imágenes, intentar otras estrategias
+                if (finalUrls.isEmpty()) {
+                    android.util.Log.d("EditJobViewModel", "No se encontraron imágenes en gallery_ids, intentando otras estrategias...")
+                    
+                    // Estrategia A: Intentar con getJobImages
+                    try {
+                        if (authHeader != null) {
+                            val response = WordPressApi.retrofitService.getJobImages(job.id)
+                            response.images.forEach { image ->
+                                val url = image.getDetailUrl()
+                                val id = image.id
+                                if (url != null && id != null && !finalUrls.contains(url) && !finalIds.contains(id)) {
+                                    finalUrls.add(url)
+                                    finalIds.add(id)
+                                }
+                            }
+                            android.util.Log.d("EditJobViewModel", "Imágenes cargadas desde getJobImages: ${finalUrls.size}")
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.w("EditJobViewModel", "Error en getJobImages: ${e.message}")
+                    }
+                    
+                    // Estrategia B: Intentar con getMediaForPost
+                    if (finalUrls.isEmpty()) {
+                        try {
+                            android.util.Log.d("EditJobViewModel", "Intentando cargar desde getMediaForPost")
+                            val media = WordPressApi.retrofitService.getMediaForPost(job.id)
+                            media.forEach { mediaItem ->
+                                val url = mediaItem.getImageUrl()
+                                val id = mediaItem.id
+                                if (url != null && id != null && !finalUrls.contains(url) && !finalIds.contains(id)) {
+                                    finalUrls.add(url)
+                                    finalIds.add(id)
+                                }
+                            }
+                            android.util.Log.d("EditJobViewModel", "Imágenes cargadas desde getMediaForPost: ${finalUrls.size}")
+                        } catch (e: Exception) {
+                            android.util.Log.w("EditJobViewModel", "Error en getMediaForPost: ${e.message}")
+                        }
+                    }
+                    
+                    // Estrategia C: Usar todas las imágenes de embedded (no solo la primera)
+                    if (finalUrls.isEmpty()) {
+                        val embeddedUrls = job.embedded?.featuredMedia?.mapNotNull { it.getImageUrl() } ?: emptyList()
+                        val embeddedIds = job.embedded?.featuredMedia?.mapNotNull { it.id } ?: emptyList()
+                        finalUrls.addAll(embeddedUrls)
+                        finalIds.addAll(embeddedIds)
+                        android.util.Log.d("EditJobViewModel", "Imágenes cargadas desde embedded (todas): ${finalUrls.size}")
+                    }
                 }
                 
                 android.util.Log.d("EditJobViewModel", "Finalizando carga: ${finalUrls.size} URLs, ${finalIds.size} IDs")
                 
+                // Actualizar estado de forma atómica
                 uiState = uiState.copy(
-                    existingImageUrls = finalUrls,
-                    existingImageIds = finalIds,
+                    existingImageUrls = finalUrls.toList(), // Crear nueva lista para evitar referencias
+                    existingImageIds = finalIds.toList(), // Crear nueva lista para evitar referencias
                     imagesLoaded = true
                 )
                 
-                android.util.Log.d("EditJobViewModel", "Estado actualizado. existingImageUrls.size = ${uiState.existingImageUrls.size}")
+                android.util.Log.d("EditJobViewModel", "Estado actualizado. existingImageUrls.size = ${uiState.existingImageUrls.size}, imagesLoaded = ${uiState.imagesLoaded}")
             } catch (e: Exception) {
                 android.util.Log.e("EditJobViewModel", "Error general cargando imágenes: ${e.message}", e)
                 // Si hay error, intentar al menos con embedded

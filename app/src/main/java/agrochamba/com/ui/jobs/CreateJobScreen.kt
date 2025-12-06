@@ -50,6 +50,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import agrochamba.com.data.AuthManager
 import agrochamba.com.data.Category
+import agrochamba.com.ui.common.RichTextEditor
+import agrochamba.com.utils.textToHtml
 import coil.compose.AsyncImage
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -138,7 +140,7 @@ fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel 
                     
                     val jobData = mapOf(
                         "title" to title.trim(),
-                        "content" to description.trim(),
+                        "content" to description.textToHtml(),
                         "salario_min" to (salarioMin.toIntOrNull() ?: 0),
                         "salario_max" to (salarioMax.toIntOrNull() ?: 0),
                         "vacantes" to (vacantes.toIntOrNull() ?: 1),
@@ -212,23 +214,19 @@ fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel 
                 
                 // Descripción
                 Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                    TextField(
+                    Text(
+                        "Descripción del Trabajo",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    RichTextEditor(
                         value = description,
                         onValueChange = { description = it },
-                        placeholder = {
-                            Text(
-                                "Una descripción detallada permite obtener más visitas. Incluye información sobre el trabajo, requisitos y beneficios.",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                            )
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(200.dp),
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent
-                        ),
-                        textStyle = MaterialTheme.typography.bodyMedium
+                        placeholder = "Una descripción detallada permite obtener más visitas. Incluye información sobre el trabajo, requisitos y beneficios.\n\nUsa los botones de formato para resaltar texto importante.",
+                        maxLines = 15,
+                        enabled = !uiState.isLoading
                     )
                 }
                 
