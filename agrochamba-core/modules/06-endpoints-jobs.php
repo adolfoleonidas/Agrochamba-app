@@ -246,18 +246,20 @@ if (!function_exists('agrochamba_create_job')) {
             set_post_thumbnail($post_id, intval($gallery_ids[0]));
         }
 
-        // Guardar gallery_ids (solo la primera si hay múltiples, ya que las demás están en el contenido)
+        // Guardar gallery_ids (todas las imágenes)
         if (!empty($gallery_ids)) {
-            // Guardar solo la primera imagen en gallery_ids para mantener compatibilidad
-            // Las demás ya están embebidas en el contenido del post
-            update_post_meta($post_id, 'gallery_ids', array($gallery_ids[0]));
+            update_post_meta($post_id, 'gallery_ids', array_map('intval', $gallery_ids));
         }
 
-        // Intentar publicar en Facebook solo si el trabajo está publicado
+        // Publicar en Facebook SOLO si el usuario lo solicitó explícitamente
         $facebook_result = null;
-        if ($post_status === 'publish' && function_exists('agrochamba_post_to_facebook')) {
+        $publish_to_facebook = isset($params['publish_to_facebook']) && filter_var($params['publish_to_facebook'], FILTER_VALIDATE_BOOLEAN);
+        
+        if ($publish_to_facebook && function_exists('agrochamba_post_to_facebook')) {
+            // Preparar datos para Facebook incluyendo todas las imágenes
             $job_data_for_facebook = array_merge($params, array(
                 'featured_media' => isset($params['featured_media']) ? $params['featured_media'] : get_post_thumbnail_id($post_id),
+                'gallery_ids' => !empty($gallery_ids) ? $gallery_ids : array(),
             ));
             $facebook_result = agrochamba_post_to_facebook($post_id, $job_data_for_facebook);
         }

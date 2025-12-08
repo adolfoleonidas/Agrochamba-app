@@ -48,11 +48,41 @@ if (!function_exists('agrochamba_post_to_facebook')) {
 
         $message = agrochamba_build_facebook_message($post_id, $job_data);
 
-        $image_url = null;
+        // Obtener todas las imágenes (featured + gallery)
+        $image_urls = array();
+        
+        // Imagen destacada (prioridad)
         if (isset($job_data['featured_media']) && !empty($job_data['featured_media'])) {
-            $image_url = wp_get_attachment_image_url($job_data['featured_media'], 'large');
+            $featured_url = wp_get_attachment_image_url($job_data['featured_media'], 'large');
+            if ($featured_url) {
+                $image_urls[] = $featured_url;
+            }
         } elseif (has_post_thumbnail($post_id)) {
-            $image_url = get_the_post_thumbnail_url($post_id, 'large');
+            $featured_url = get_the_post_thumbnail_url($post_id, 'large');
+            if ($featured_url) {
+                $image_urls[] = $featured_url;
+            }
+        }
+        
+        // Imágenes de la galería (si no están ya incluidas)
+        if (isset($job_data['gallery_ids']) && is_array($job_data['gallery_ids']) && !empty($job_data['gallery_ids'])) {
+            foreach ($job_data['gallery_ids'] as $gallery_id) {
+                $gallery_url = wp_get_attachment_image_url(intval($gallery_id), 'large');
+                if ($gallery_url && !in_array($gallery_url, $image_urls)) {
+                    $image_urls[] = $gallery_url;
+                }
+            }
+        } else {
+            // Fallback: obtener gallery_ids del post meta
+            $gallery_ids = get_post_meta($post_id, 'gallery_ids', true);
+            if (is_array($gallery_ids) && !empty($gallery_ids)) {
+                foreach ($gallery_ids as $gallery_id) {
+                    $gallery_url = wp_get_attachment_image_url(intval($gallery_id), 'large');
+                    if ($gallery_url && !in_array($gallery_url, $image_urls)) {
+                        $image_urls[] = $gallery_url;
+                    }
+                }
+            }
         }
 
         $job_url = get_permalink($post_id);
@@ -62,8 +92,9 @@ if (!function_exists('agrochamba_post_to_facebook')) {
             'link' => $job_url,
         );
 
-        if ($image_url) {
-            $post_data['picture'] = $image_url;
+        // Usar la primera imagen (Facebook solo permite una imagen en el feed)
+        if (!empty($image_urls)) {
+            $post_data['picture'] = $image_urls[0];
         }
 
         $graph_url = "https://graph.facebook.com/v18.0/{$page_id}/feed";
@@ -123,12 +154,41 @@ if (!function_exists('agrochamba_post_to_facebook_via_n8n')) {
         // Construir mensaje para Facebook
         $message = agrochamba_build_facebook_message($post_id, $job_data);
         
-        // Obtener URL de imagen
-        $image_url = null;
+        // Obtener todas las imágenes (featured + gallery)
+        $image_urls = array();
+        
+        // Imagen destacada (prioridad)
         if (isset($job_data['featured_media']) && !empty($job_data['featured_media'])) {
-            $image_url = wp_get_attachment_image_url($job_data['featured_media'], 'large');
+            $featured_url = wp_get_attachment_image_url($job_data['featured_media'], 'large');
+            if ($featured_url) {
+                $image_urls[] = $featured_url;
+            }
         } elseif (has_post_thumbnail($post_id)) {
-            $image_url = get_the_post_thumbnail_url($post_id, 'large');
+            $featured_url = get_the_post_thumbnail_url($post_id, 'large');
+            if ($featured_url) {
+                $image_urls[] = $featured_url;
+            }
+        }
+        
+        // Imágenes de la galería (si no están ya incluidas)
+        if (isset($job_data['gallery_ids']) && is_array($job_data['gallery_ids']) && !empty($job_data['gallery_ids'])) {
+            foreach ($job_data['gallery_ids'] as $gallery_id) {
+                $gallery_url = wp_get_attachment_image_url(intval($gallery_id), 'large');
+                if ($gallery_url && !in_array($gallery_url, $image_urls)) {
+                    $image_urls[] = $gallery_url;
+                }
+            }
+        } else {
+            // Fallback: obtener gallery_ids del post meta
+            $gallery_ids = get_post_meta($post_id, 'gallery_ids', true);
+            if (is_array($gallery_ids) && !empty($gallery_ids)) {
+                foreach ($gallery_ids as $gallery_id) {
+                    $gallery_url = wp_get_attachment_image_url(intval($gallery_id), 'large');
+                    if ($gallery_url && !in_array($gallery_url, $image_urls)) {
+                        $image_urls[] = $gallery_url;
+                    }
+                }
+            }
         }
         
         // Obtener URL del trabajo
@@ -140,7 +200,8 @@ if (!function_exists('agrochamba_post_to_facebook_via_n8n')) {
             'title' => get_the_title($post_id),
             'message' => $message,
             'link' => $job_url,
-            'image_url' => $image_url,
+            'image_url' => !empty($image_urls) ? $image_urls[0] : null, // Primera imagen para compatibilidad
+            'image_urls' => $image_urls, // Todas las imágenes para n8n
             'timestamp' => current_time('mysql'),
             'site_url' => get_site_url(),
         );
@@ -200,8 +261,30 @@ if (!function_exists('agrochamba_build_facebook_message')) {
         $title = get_the_title($post_id);
         $content = get_post_field('post_content', $post_id);
         
+        // Preservar formato: convertir HTML a texto plano manteniendo saltos de línea
+        // Primero convertir <br>, <p>, <div> a saltos de línea
+        $content = preg_replace('/<br\s*\/?>/i', "\n", $content);
+        $content = preg_replace('/<\/p>/i', "\n\n", $content);
+        $content = preg_replace('/<\/div>/i', "\n", $content);
+        $content = preg_replace('/<li>/i', "• ", $content);
+        $content = preg_replace('/<\/li>/i', "\n", $content);
+        
+        // Remover otros tags HTML pero mantener el texto
         $content = wp_strip_all_tags($content);
-        $content = wp_trim_words($content, 50, '...');
+        
+        // Limpiar espacios múltiples y saltos de línea excesivos
+        $content = preg_replace('/\n{3,}/', "\n\n", $content);
+        $content = trim($content);
+        
+        // Si el contenido es muy largo, truncar pero mantener formato
+        if (strlen($content) > 500) {
+            $content = substr($content, 0, 500);
+            $last_newline = strrpos($content, "\n");
+            if ($last_newline !== false && $last_newline > 400) {
+                $content = substr($content, 0, $last_newline);
+            }
+            $content .= '...';
+        }
         
         $ubicaciones = wp_get_post_terms($post_id, 'ubicacion', array('fields' => 'names'));
         $ubicacion = !empty($ubicaciones) ? $ubicaciones[0] : '';
@@ -248,6 +331,10 @@ if (!function_exists('agrochamba_build_facebook_message')) {
 // ==========================================
 // 3. HOOK PARA PUBLICAR AUTOMÁTICAMENTE
 // ==========================================
+// DESHABILITADO: Ya no publicamos automáticamente en Facebook.
+// La publicación solo ocurre cuando el usuario lo solicita explícitamente mediante publish_to_facebook.
+// Este hook causaba que los trabajos se publicaran sin el consentimiento del usuario.
+/*
 if (!function_exists('agrochamba_auto_post_to_facebook')) {
     function agrochamba_auto_post_to_facebook($post_id, $post, $update) {
         if ($update) {
@@ -277,6 +364,7 @@ if (!function_exists('agrochamba_auto_post_to_facebook')) {
     }
     add_action('wp_insert_post', 'agrochamba_auto_post_to_facebook', 10, 3);
 }
+*/
 
 // ==========================================
 // 4. EJECUTAR PUBLICACIÓN EN FACEBOOK

@@ -56,7 +56,7 @@ import coil.compose.AsyncImage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel = viewModel()) {
+fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel = viewModel(key = "create_job")) {
     val uiState = viewModel.uiState
     val context = LocalContext.current
 
@@ -65,6 +65,7 @@ fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel 
         onResult = { uris -> viewModel.onImagesSelected(uris) }
     )
 
+    // Usar key para asegurar que el estado se reinicialice cada vez que se navega a esta pantalla
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var salarioMin by remember { mutableStateOf("") }
@@ -77,24 +78,34 @@ fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel 
     var alojamiento by remember { mutableStateOf(false) }
     var transporte by remember { mutableStateOf(false) }
     var alimentacion by remember { mutableStateOf(false) }
+    // IMPORTANTE: Siempre inicializar en false para que el usuario tenga control explícito
     var publishToFacebook by remember { mutableStateOf(false) }
     
     var showMoreOptions by remember { mutableStateOf(false) }
-
-    LaunchedEffect(uiState.userCompanyId, uiState.empresas) {
-        if (uiState.userCompanyId != null && selectedEmpresa == null && uiState.empresas.isNotEmpty()) {
-            selectedEmpresa = uiState.empresas.find { it.id == uiState.userCompanyId }
-        }
+    
+    // Reiniciar el estado cuando se navega a esta pantalla
+    LaunchedEffect(Unit) {
+        // Asegurar que el estado se reinicialice cuando se entra a la pantalla
+        publishToFacebook = false
     }
-
+    
+    // Reiniciar el estado cuando se crea un trabajo exitosamente
     LaunchedEffect(uiState.postSuccess) {
         if (uiState.postSuccess) {
+            // Reiniciar el estado antes de navegar
+            publishToFacebook = false
             Toast.makeText(
                 context, 
                 "¡Trabajo creado con éxito! Está pendiente de revisión por un administrador.", 
                 Toast.LENGTH_LONG
             ).show()
             navController.popBackStack()
+        }
+    }
+
+    LaunchedEffect(uiState.userCompanyId, uiState.empresas) {
+        if (uiState.userCompanyId != null && selectedEmpresa == null && uiState.empresas.isNotEmpty()) {
+            selectedEmpresa = uiState.empresas.find { it.id == uiState.userCompanyId }
         }
     }
 

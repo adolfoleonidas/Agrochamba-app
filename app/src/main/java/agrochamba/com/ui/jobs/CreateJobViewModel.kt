@@ -201,11 +201,9 @@ class CreateJobViewModel @Inject constructor() : androidx.lifecycle.ViewModel() 
                     if (transporte) put("transporte", true)
                     if (alimentacion) put("alimentacion", true)
 
-                    // Publicar en Facebook
+                    // Publicar en Facebook - SIEMPRE enviar el flag (true o false) para que el backend respete la decisión del usuario
                     val publishToFacebook = jobData["publish_to_facebook"] as? Boolean ?: false
-                    if (publishToFacebook) {
-                        put("publish_to_facebook", true)
-                    }
+                    put("publish_to_facebook", publishToFacebook)
 
                     // Galería de imágenes
                     if (galleryIds.isNotEmpty()) {

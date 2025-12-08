@@ -377,7 +377,7 @@ class JobsController {
             update_post_meta($post_id, 'gallery_ids', array_map('intval', $params['gallery_ids']));
         }
 
-        // Intentar publicar en Facebook
+        // Publicar en Facebook SOLO si el usuario lo solicitó explícitamente
         $facebook_result = null;
         $publish_to_facebook = isset($params['publish_to_facebook']) && filter_var($params['publish_to_facebook'], FILTER_VALIDATE_BOOLEAN);
         
@@ -386,27 +386,29 @@ class JobsController {
         error_log('AgroChamba Facebook Debug - post_status: ' . $post_status);
         error_log('AgroChamba Facebook Debug - function exists: ' . (function_exists('agrochamba_post_to_facebook') ? 'yes' : 'no'));
         
-        // Publicar en Facebook si:
-        // 1. El usuario lo solicitó explícitamente (publish_to_facebook = true), O
-        // 2. El trabajo está publicado y la función existe (comportamiento por defecto para admins)
-        if ($publish_to_facebook || ($post_status === 'publish' && function_exists('agrochamba_post_to_facebook'))) {
-            if (function_exists('agrochamba_post_to_facebook')) {
-                error_log('AgroChamba Facebook Debug - Intentando publicar en Facebook...');
-                $job_data_for_facebook = array_merge($params, array(
-                    'featured_media' => isset($params['featured_media']) ? $params['featured_media'] : get_post_thumbnail_id($post_id),
-                ));
-                $facebook_result = agrochamba_post_to_facebook($post_id, $job_data_for_facebook);
-                
-                if (is_wp_error($facebook_result)) {
-                    error_log('AgroChamba Facebook Error: ' . $facebook_result->get_error_message());
-                } else {
-                    error_log('AgroChamba Facebook Success: Post ID ' . $post_id . ' publicado en Facebook');
-                }
+        // Publicar en Facebook SOLO si el usuario lo solicitó explícitamente
+        if ($publish_to_facebook && function_exists('agrochamba_post_to_facebook')) {
+            error_log('AgroChamba Facebook Debug - Intentando publicar en Facebook...');
+            
+            // Preparar datos para Facebook incluyendo todas las imágenes
+            $job_data_for_facebook = array_merge($params, array(
+                'featured_media' => isset($params['featured_media']) ? $params['featured_media'] : get_post_thumbnail_id($post_id),
+                'gallery_ids' => isset($params['gallery_ids']) && is_array($params['gallery_ids']) ? $params['gallery_ids'] : array(),
+            ));
+            
+            $facebook_result = agrochamba_post_to_facebook($post_id, $job_data_for_facebook);
+            
+            if (is_wp_error($facebook_result)) {
+                error_log('AgroChamba Facebook Error: ' . $facebook_result->get_error_message());
+            } else {
+                error_log('AgroChamba Facebook Success: Post ID ' . $post_id . ' publicado en Facebook');
+            }
+        } else {
+            if (!$publish_to_facebook) {
+                error_log('AgroChamba Facebook Debug - No se publicará en Facebook. El usuario no lo solicitó.');
             } else {
                 error_log('AgroChamba Facebook Error: La función agrochamba_post_to_facebook no existe');
             }
-        } else {
-            error_log('AgroChamba Facebook Debug - No se publicará en Facebook. publish_to_facebook=' . ($publish_to_facebook ? 'true' : 'false') . ', post_status=' . $post_status);
         }
 
         $response_data = array(
@@ -575,13 +577,15 @@ class JobsController {
             update_post_meta($post_id, 'gallery_ids', array_map('intval', $params['gallery_ids']));
         }
 
-        // Intentar publicar en Facebook si se solicita
+        // Publicar en Facebook SOLO si el usuario lo solicitó explícitamente
         $facebook_result = null;
         $publish_to_facebook = isset($params['publish_to_facebook']) && filter_var($params['publish_to_facebook'], FILTER_VALIDATE_BOOLEAN);
         
         if ($publish_to_facebook && function_exists('agrochamba_post_to_facebook')) {
+            // Preparar datos para Facebook incluyendo todas las imágenes
             $job_data_for_facebook = array_merge($params, array(
                 'featured_media' => isset($params['featured_media']) ? $params['featured_media'] : get_post_thumbnail_id($post_id),
+                'gallery_ids' => isset($params['gallery_ids']) && is_array($params['gallery_ids']) ? $params['gallery_ids'] : array(),
             ));
             $facebook_result = agrochamba_post_to_facebook($post_id, $job_data_for_facebook);
         }

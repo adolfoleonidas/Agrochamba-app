@@ -111,8 +111,9 @@ fun EditJobScreen(
     var alojamiento by remember { mutableStateOf(job.meta?.alojamiento ?: false) }
     var transporte by remember { mutableStateOf(job.meta?.transporte ?: false) }
     var alimentacion by remember { mutableStateOf(job.meta?.alimentacion ?: false) }
-    // Inicializar el switch basado en si el trabajo ya tiene un facebook_post_id
-    var publishToFacebook by remember { mutableStateOf(!job.meta?.facebookPostId.isNullOrBlank()) }
+    // IMPORTANTE: Siempre inicializar en false para que el usuario tenga control explícito
+    // No usar facebookPostId como indicador porque puede haber sido publicado automáticamente sin consentimiento
+    var publishToFacebook by remember { mutableStateOf(false) }
     
     var showMoreOptions by remember { mutableStateOf(false) }
     
