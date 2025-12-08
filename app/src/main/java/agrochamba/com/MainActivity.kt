@@ -38,6 +38,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import agrochamba.com.data.AppDataHolder
 import agrochamba.com.data.AuthManager
+import agrochamba.com.data.SettingsManager
 import agrochamba.com.ui.auth.CompanyRegisterScreen
 import agrochamba.com.ui.auth.ForgotPasswordScreen
 import agrochamba.com.ui.auth.LoginScreen
@@ -45,6 +46,7 @@ import agrochamba.com.ui.auth.EditProfileScreen
 import agrochamba.com.ui.auth.ProfileScreen
 import agrochamba.com.ui.auth.RegisterChoiceScreen
 import agrochamba.com.ui.auth.RegisterScreen
+import agrochamba.com.ui.auth.SettingsScreen
 import agrochamba.com.ui.jobs.CompanyProfileScreen
 import agrochamba.com.ui.jobs.CreateJobScreen
 import agrochamba.com.ui.jobs.EditJobScreen
@@ -78,6 +80,7 @@ sealed class Screen(val route: String, val label: String? = null, val icon: Imag
     object Moderation : Screen("moderation")
     object Favorites : Screen("favorites")
     object Saved : Screen("saved")
+    object Settings : Screen("settings")
 }
 
 val bottomBarItems = listOf(Screen.Jobs, Screen.Routes, Screen.Dates, Screen.Rooms, Screen.Profile)
@@ -87,6 +90,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         AuthManager.init(this)
+        SettingsManager.init(this)
         setContent {
             AgrochambaTheme {
                 AppEntry()
@@ -238,6 +242,9 @@ fun MainAppScreen() {
             }
             composable(Screen.Saved.route) {
                 SavedScreen(navController = navController)
+            }
+            composable(Screen.Settings.route) {
+                SettingsScreen(navController = navController)
             }
         }
     }

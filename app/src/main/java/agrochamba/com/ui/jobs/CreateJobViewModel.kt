@@ -10,6 +10,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import agrochamba.com.data.AuthManager
 import agrochamba.com.data.Category
+import agrochamba.com.data.SettingsManager
 import agrochamba.com.data.WordPressApi
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
@@ -204,6 +205,10 @@ class CreateJobViewModel @Inject constructor() : androidx.lifecycle.ViewModel() 
                     // Publicar en Facebook - SIEMPRE enviar el flag (true o false) para que el backend respete la decisión del usuario
                     val publishToFacebook = jobData["publish_to_facebook"] as? Boolean ?: false
                     put("publish_to_facebook", publishToFacebook)
+                    
+                    // Enviar preferencia de publicación en Facebook (imágenes adjuntas o link preview)
+                    val useLinkPreview = SettingsManager.facebookUseLinkPreview
+                    put("facebook_use_link_preview", useLinkPreview)
 
                     // Galería de imágenes
                     if (galleryIds.isNotEmpty()) {

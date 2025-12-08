@@ -80,7 +80,7 @@ fun ProfileScreen(navController: NavController, viewModel: ProfileViewModel = vi
             TopAppBar(
                 title = { Text("Mi Perfil") },
                 actions = {
-                    IconButton(onClick = { /* TODO: Settings */ }) {
+                    IconButton(onClick = { navController.navigate(Screen.Settings.route) }) {
                         Icon(Icons.Default.Settings, contentDescription = "Configuración")
                     }
                 }

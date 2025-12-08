@@ -118,7 +118,7 @@ interface WordPressApiService {
         @Body jobData: Map<String, @JvmSuppressWildcards Any>
     ): Response<UpdateJobResponse>
 
-    @DELETE("wp/v2/trabajos/{id}")
+    @DELETE("agrochamba/v1/jobs/{id}")
     suspend fun deleteJob(
         @Header("Authorization") token: String,
         @Path("id") id: Int

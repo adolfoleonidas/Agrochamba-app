@@ -146,7 +146,8 @@ fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel 
                     val empresaIdToUse = if (AuthManager.isUserAdmin()) {
                         selectedEmpresa?.id
                     } else {
-                        uiState.userCompanyId ?: selectedEmpresa?.id
+                        // Empresa normal: siempre usar su empresa automáticamente
+                        uiState.userCompanyId
                     }
                     
                     val jobData = mapOf(

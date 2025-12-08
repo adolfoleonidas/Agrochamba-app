@@ -15,6 +15,7 @@ import agrochamba.com.data.UserProfileResponse
 import agrochamba.com.data.WordPressApi
 import agrochamba.com.data.toJobPost
 import kotlinx.coroutines.launch
+import retrofit2.HttpException
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
@@ -117,21 +118,21 @@ class ProfileViewModel : ViewModel() {
                     kotlinx.coroutines.delay(100)
                     uiState = uiState.copy(deleteSuccess = false)
                 } else {
-                    val errorMessage = try {
-                        val errorBody = response.errorBody()?.string()
-                        if (!errorBody.isNullOrBlank()) {
-                            // Intentar extraer mensaje del error
-                            errorBody
-                        } else {
-                            "Error al eliminar el trabajo (${response.code()})"
-                        }
+                    // Usar ApiErrorUtils para obtener un mensaje amigable
+                    val friendlyMessage = try {
+                        ApiErrorUtils.getReadableApiError(
+                            HttpException(response),
+                            "No se pudo eliminar el trabajo"
+                        )
                     } catch (e: Exception) {
                         "Error al eliminar el trabajo (${response.code()})"
                     }
-                    uiState = uiState.copy(isLoading = false, error = errorMessage)
+                    uiState = uiState.copy(isLoading = false, error = friendlyMessage)
                 }
             } catch (e: Exception) {
-                uiState = uiState.copy(isLoading = false, error = "Error al eliminar el trabajo: ${e.message}")
+                // Usar ApiErrorUtils para obtener un mensaje amigable
+                val friendlyMessage = ApiErrorUtils.getReadableApiError(e, "No se pudo eliminar el trabajo")
+                uiState = uiState.copy(isLoading = false, error = friendlyMessage)
             }
         }
     }

@@ -56,6 +56,7 @@ if (!AGROCHAMBA_USE_MODULE_LOADER) {
             '10-cache-system.php',            // Sistema de caché
             '11-image-optimization.php',      // Optimización de imágenes
             '12-regenerate-thumbnails.php',   // Regeneración de thumbnails
+            '13-ai-moderation.php',           // Moderación automática con IA
         );
 
         // Cargar cada módulo

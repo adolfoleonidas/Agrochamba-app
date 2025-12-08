@@ -66,6 +66,23 @@ class JobsController {
             ));
         }
 
+        // Eliminar trabajo
+        register_rest_route(self::API_NAMESPACE, '/jobs/(?P<id>\d+)', array(
+            'methods' => 'DELETE',
+            'callback' => array(__CLASS__, 'delete_job'),
+            'permission_callback' => function() {
+                return is_user_logged_in();
+            },
+            'args' => array(
+                'id' => array(
+                    'required' => true,
+                    'validate_callback' => function($param) {
+                        return is_numeric($param);
+                    }
+                ),
+            ),
+        ));
+
         // Obtener trabajos del usuario actual
         if (!isset($routes['/' . self::API_NAMESPACE . '/me/jobs'])) {
             register_rest_route(self::API_NAMESPACE, '/me/jobs', array(
@@ -544,6 +561,52 @@ class JobsController {
         if (isset($params['tipo_puesto_id'])) {
             wp_set_post_terms($post_id, array(intval($params['tipo_puesto_id'])), 'tipo_puesto', false);
         }
+        
+        // Actualizar empresa según el rol del usuario
+        $empresa_term_id = null;
+        $is_admin = in_array('administrator', $user->roles);
+        $is_employer = in_array('employer', $user->roles);
+
+        if ($is_employer && !$is_admin) {
+            // Empresa normal: siempre usar su empresa automáticamente (ignorar empresa_id del request)
+            $empresa_term_id_from_user = get_user_meta($user_id, 'empresa_term_id', true);
+            
+            if ($empresa_term_id_from_user) {
+                $empresa_term_id = intval($empresa_term_id_from_user);
+            } else {
+                // Si no tiene empresa_term_id, buscar por display_name (razón social)
+                $company_name = $user->display_name;
+                if (!empty($company_name)) {
+                    $empresa_term = get_term_by('name', $company_name, 'empresa');
+                    if ($empresa_term) {
+                        $empresa_term_id = $empresa_term->term_id;
+                        // Guardar para futuras referencias
+                        update_user_meta($user_id, 'empresa_term_id', $empresa_term_id);
+                    }
+                }
+            }
+        } elseif ($is_admin) {
+            // Admin: puede especificar empresa_id o usar la automática
+            if (isset($params['empresa_id']) && !empty($params['empresa_id'])) {
+                $empresa_term_id = intval($params['empresa_id']);
+            } else {
+                // Si no especifica, usar su empresa si es employer también
+                $empresa_term_id_from_user = get_user_meta($user_id, 'empresa_term_id', true);
+                if ($empresa_term_id_from_user) {
+                    $empresa_term_id = intval($empresa_term_id_from_user);
+                }
+            }
+        } else {
+            // Usuario normal (trabajador): debe especificar empresa_id
+            if (isset($params['empresa_id']) && !empty($params['empresa_id'])) {
+                $empresa_term_id = intval($params['empresa_id']);
+            }
+        }
+
+        // Asignar la empresa al trabajo
+        if ($empresa_term_id) {
+            wp_set_post_terms($post_id, array($empresa_term_id), 'empresa', false);
+        }
 
         // Actualizar meta fields
         $meta_fields = array(
@@ -816,6 +879,51 @@ class JobsController {
         return new WP_REST_Response(array(
             'success' => true,
             'message' => 'Trabajo aprobado y publicado.'
+        ), 200);
+    }
+
+    /**
+     * Eliminar trabajo
+     * Permite a las empresas eliminar sus propios trabajos o a los admins eliminar cualquier trabajo
+     *
+     * @param WP_REST_Request $request
+     * @return WP_REST_Response|WP_Error
+     */
+    public static function delete_job($request) {
+        $user_id = get_current_user_id();
+        $user = get_userdata($user_id);
+        $post_id = intval($request->get_param('id'));
+
+        // Verificar que el trabajo existe
+        $post = get_post($post_id);
+        if (!$post || $post->post_type !== 'trabajo') {
+            return new WP_Error('rest_not_found', 'Trabajo no encontrado.', array('status' => 404));
+        }
+
+        // Verificar permisos: el usuario debe ser el autor del trabajo o administrador
+        if ($post->post_author != $user_id && !in_array('administrator', $user->roles)) {
+            return new WP_Error(
+                'rest_cannot_delete',
+                'No puedes eliminar este trabajo porque no eres el autor. Solo puedes eliminar tus propios trabajos.',
+                array('status' => 403)
+            );
+        }
+
+        // Eliminar el trabajo (mover a papelera)
+        $deleted = wp_delete_post($post_id, false);
+
+        if (!$deleted) {
+            return new WP_Error(
+                'rest_delete_error',
+                'No se pudo eliminar el trabajo.',
+                array('status' => 500)
+            );
+        }
+
+        return new WP_REST_Response(array(
+            'success' => true,
+            'message' => 'Trabajo eliminado correctamente.',
+            'deleted' => true
         ), 200);
     }
 

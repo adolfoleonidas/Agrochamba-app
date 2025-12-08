@@ -90,9 +90,16 @@ fun EditJobScreen(
         }
     }
     
-    LaunchedEffect(uiState.empresas, initialEmpresaTerm) {
-        if (uiState.empresas.isNotEmpty() && initialEmpresaTerm != null && selectedEmpresa == null) {
-            selectedEmpresa = uiState.empresas.find { it.id == initialEmpresaTerm.id }
+    LaunchedEffect(uiState.empresas, initialEmpresaTerm, uiState.userCompanyId) {
+        if (uiState.empresas.isNotEmpty() && selectedEmpresa == null) {
+            // Si hay empresa inicial del trabajo, usarla
+            if (initialEmpresaTerm != null) {
+                selectedEmpresa = uiState.empresas.find { it.id == initialEmpresaTerm.id }
+            } 
+            // Si no hay empresa inicial pero el usuario es empresa normal, usar su empresa automáticamente
+            else if (uiState.userCompanyId != null && !AuthManager.isUserAdmin()) {
+                selectedEmpresa = uiState.empresas.find { it.id == uiState.userCompanyId }
+            }
         }
     }
     
@@ -183,7 +190,8 @@ fun EditJobScreen(
                     val empresaIdToUse = if (AuthManager.isUserAdmin()) {
                         selectedEmpresa?.id
                     } else {
-                        uiState.userCompanyId ?: selectedEmpresa?.id
+                        // Empresa normal: siempre usar su empresa automáticamente
+                        uiState.userCompanyId
                     }
                     
                     val jobData = mutableMapOf<String, Any>(

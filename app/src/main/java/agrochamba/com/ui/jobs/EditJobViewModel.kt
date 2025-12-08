@@ -9,6 +9,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import agrochamba.com.data.AuthManager
+import agrochamba.com.data.SettingsManager
 import agrochamba.com.data.Category
 import agrochamba.com.data.JobPost
 import agrochamba.com.data.MyJobResponse
@@ -430,6 +431,10 @@ class EditJobViewModel(private val job: JobPost) : ViewModel() {
                     finalJobData["featured_media"] = 0
                     finalJobData["gallery_ids"] = emptyList<Int>()
                 }
+                
+                // Enviar preferencia de publicación en Facebook (imágenes adjuntas o link preview)
+                val useLinkPreview = SettingsManager.facebookUseLinkPreview
+                finalJobData["facebook_use_link_preview"] = useLinkPreview
 
                 val response = WordPressApi.retrofitService.updateJob(authHeader, job.id, finalJobData)
 

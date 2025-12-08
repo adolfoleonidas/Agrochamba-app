@@ -103,9 +103,16 @@ if (!function_exists('agrochamba_post_to_facebook')) {
 
         $job_url = get_permalink($post_id);
         $photo_ids = array();
+        
+        // Verificar si el usuario prefiere usar link preview en lugar de imágenes adjuntas
+        $use_link_preview = isset($job_data['facebook_use_link_preview']) && filter_var($job_data['facebook_use_link_preview'], FILTER_VALIDATE_BOOLEAN);
+        
+        if ($use_link_preview) {
+            error_log('AgroChamba Facebook: Usuario prefiere usar link preview en lugar de imágenes adjuntas');
+        }
 
-        // Si hay imágenes, subirlas nativamente a Facebook primero (todas las imágenes)
-        if (!empty($image_urls)) {
+        // Si hay imágenes Y el usuario NO prefiere link preview, subirlas nativamente a Facebook
+        if (!empty($image_urls) && !$use_link_preview) {
             error_log('AgroChamba Facebook: Subiendo ' . count($image_urls) . ' imagen(es) nativa(s) a Facebook');
             
             foreach ($image_urls as $index => $image_url) {
@@ -155,8 +162,8 @@ if (!function_exists('agrochamba_post_to_facebook')) {
             'message' => $message,
         );
 
-        // Si tenemos photo_ids, adjuntarlos al post (múltiples imágenes)
-        if (!empty($photo_ids)) {
+        // Si tenemos photo_ids Y el usuario NO prefiere link preview, adjuntarlos al post (múltiples imágenes)
+        if (!empty($photo_ids) && !$use_link_preview) {
             // Construir el array de attached_media en el formato correcto para Facebook
             $attached_media = array();
             foreach ($photo_ids as $photo_id) {
@@ -169,9 +176,15 @@ if (!function_exists('agrochamba_post_to_facebook')) {
             // NO incluir 'link' cuando hay imágenes adjuntas, ya que Facebook prioriza el link preview sobre las imágenes
             // El link ya está incluido en el mensaje de texto al final
         } else {
-            // Solo incluir link si NO hay imágenes adjuntas para mostrar preview del link
+            // Usar link preview si:
+            // 1. El usuario prefiere link preview, O
+            // 2. No hay imágenes disponibles
             $post_data['link'] = $job_url;
-            error_log('AgroChamba Facebook: No hay imágenes, usando link preview');
+            if ($use_link_preview) {
+                error_log('AgroChamba Facebook: Usando link preview (preferencia del usuario)');
+            } else {
+                error_log('AgroChamba Facebook: No hay imágenes, usando link preview');
+            }
         }
 
         $graph_url = "https://graph.facebook.com/v18.0/{$page_id}/feed";
@@ -283,6 +296,9 @@ if (!function_exists('agrochamba_post_to_facebook_via_n8n')) {
         // Obtener URL del trabajo
         $job_url = get_permalink($post_id);
         
+        // Verificar si el usuario prefiere usar link preview en lugar de imágenes adjuntas
+        $use_link_preview = isset($job_data['facebook_use_link_preview']) && filter_var($job_data['facebook_use_link_preview'], FILTER_VALIDATE_BOOLEAN);
+        
         // Preparar payload para n8n
         $payload = array(
             'post_id' => $post_id,
@@ -291,6 +307,7 @@ if (!function_exists('agrochamba_post_to_facebook_via_n8n')) {
             'link' => $job_url,
             'image_url' => !empty($image_urls) ? $image_urls[0] : null, // Primera imagen para compatibilidad
             'image_urls' => $image_urls, // Todas las imágenes para n8n
+            'use_link_preview' => $use_link_preview, // Preferencia del usuario
             'timestamp' => current_time('mysql'),
             'site_url' => get_site_url(),
         );
@@ -546,8 +563,8 @@ if (!function_exists('agrochamba_execute_facebook_post')) {
 if (!function_exists('agrochamba_facebook_settings_menu')) {
     function agrochamba_facebook_settings_menu() {
         add_options_page(
-            'Configuración de Facebook',
-            'Facebook Integration',
+            'Configuración de Integraciones',
+            'AgroChamba Integraciones',
             'manage_options',
             'agrochamba-facebook',
             'agrochamba_facebook_settings_page'
@@ -561,27 +578,44 @@ if (!function_exists('agrochamba_facebook_settings_page')) {
         if (isset($_POST['submit'])) {
             check_admin_referer('agrochamba_facebook_settings');
             
+            // Configuración de Facebook
             update_option('agrochamba_facebook_enabled', isset($_POST['facebook_enabled']));
             update_option('agrochamba_use_n8n', isset($_POST['use_n8n']));
             update_option('agrochamba_n8n_webhook_url', sanitize_text_field($_POST['n8n_webhook_url']));
             update_option('agrochamba_facebook_page_token', sanitize_text_field($_POST['facebook_page_token']));
             update_option('agrochamba_facebook_page_id', sanitize_text_field($_POST['facebook_page_id']));
             
+            // Configuración de Moderación por IA
+            update_option('agrochamba_ai_moderation_enabled', isset($_POST['ai_moderation_enabled']));
+            update_option('agrochamba_ai_service', sanitize_text_field($_POST['ai_service'] ?? 'openai'));
+            update_option('agrochamba_ai_api_key', sanitize_text_field($_POST['ai_api_key']));
+            update_option('agrochamba_ai_gemini_api_key', sanitize_text_field($_POST['ai_gemini_api_key'] ?? ''));
+            
             echo '<div class="notice notice-success"><p>Configuración guardada correctamente.</p></div>';
         }
         
+        // Valores de Facebook
         $facebook_enabled = get_option('agrochamba_facebook_enabled', false);
         $use_n8n = get_option('agrochamba_use_n8n', false);
         $n8n_webhook_url = get_option('agrochamba_n8n_webhook_url', '');
         $page_token = get_option('agrochamba_facebook_page_token', '');
         $page_id = get_option('agrochamba_facebook_page_id', '');
+        
+        // Valores de Moderación por IA
+        $ai_moderation_enabled = get_option('agrochamba_ai_moderation_enabled', true);
+        $ai_service = get_option('agrochamba_ai_service', 'openai');
+        $ai_api_key = get_option('agrochamba_ai_api_key', '');
+        $ai_gemini_api_key = get_option('agrochamba_ai_gemini_api_key', '');
         ?>
         <div class="wrap">
-            <h1>Configuración de Facebook</h1>
-            <p>Configura la integración con Facebook para publicar trabajos automáticamente.</p>
+            <h1>Configuración de Integraciones</h1>
+            <p>Configura las integraciones de AgroChamba: Facebook y Moderación por IA.</p>
             
             <form method="post" action="">
                 <?php wp_nonce_field('agrochamba_facebook_settings'); ?>
+                
+                <h2 class="title">Facebook Integration</h2>
+                <p>Configura la integración con Facebook para publicar trabajos automáticamente.</p>
                 
                 <table class="form-table">
                     <tr>
@@ -637,6 +671,96 @@ if (!function_exists('agrochamba_facebook_settings_page')) {
                         </td>
                     </tr>
                 </table>
+                
+                <h2 class="title" style="margin-top: 30px;">Moderación por IA</h2>
+                <p>Configura la moderación automática de trabajos usando inteligencia artificial para detectar contenido violento, inapropiado o fraudulento.</p>
+                
+                <table class="form-table">
+                    <tr>
+                        <th scope="row">Habilitar moderación por IA</th>
+                        <td>
+                            <label>
+                                <input type="checkbox" name="ai_moderation_enabled" value="1" <?php checked($ai_moderation_enabled, true); ?>>
+                                Activar moderación automática con IA
+                            </label>
+                            <p class="description">
+                                Cuando está activado, todos los trabajos nuevos serán revisados automáticamente por IA antes de publicarse.<br>
+                                La IA detecta y elimina contenido violento, links sospechosos, imágenes inapropiadas y texto fraudulento.
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">Servicio de IA</th>
+                        <td>
+                            <select name="ai_service" id="ai_service_select" class="regular-text">
+                                <option value="openai" <?php selected($ai_service, 'openai'); ?>>OpenAI (GPT-3.5/GPT-4/GPT-4 Vision)</option>
+                                <option value="gemini" <?php selected($ai_service, 'gemini'); ?>>Google Gemini</option>
+                            </select>
+                            <p class="description">
+                                Selecciona el servicio de IA que deseas usar para la moderación.<br>
+                                Cada servicio requiere su propia API Key.
+                            </p>
+                        </td>
+                    </tr>
+                    <tr id="openai_config" style="display: <?php echo $ai_service === 'openai' ? 'table-row' : 'none'; ?>;">
+                        <th scope="row">OpenAI API Key</th>
+                        <td>
+                            <input type="password" name="ai_api_key" value="<?php echo esc_attr($ai_api_key); ?>" class="regular-text" placeholder="sk-..." />
+                            <p class="description">
+                                API Key de OpenAI para usar GPT-3.5/GPT-4 y GPT-4 Vision.<br>
+                                Puedes obtenerla desde: <a href="https://platform.openai.com/api-keys" target="_blank">OpenAI Platform</a>
+                            </p>
+                        </td>
+                    </tr>
+                    <tr id="gemini_config" style="display: <?php echo $ai_service === 'gemini' ? 'table-row' : 'none'; ?>;">
+                        <th scope="row">Google Gemini API Key</th>
+                        <td>
+                            <input type="password" name="ai_gemini_api_key" value="<?php echo esc_attr($ai_gemini_api_key); ?>" class="regular-text" placeholder="AIza..." />
+                            <p class="description">
+                                API Key de Google Gemini para usar Gemini Pro y Gemini Pro Vision.<br>
+                                Puedes obtenerla desde: <a href="https://makersuite.google.com/app/apikey" target="_blank">Google AI Studio</a>
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">Estado de la moderación</th>
+                        <td>
+                            <?php
+                            $current_api_key = '';
+                            if ($ai_service === 'openai') {
+                                $current_api_key = $ai_api_key;
+                                $service_name = 'OpenAI';
+                            } elseif ($ai_service === 'gemini') {
+                                $current_api_key = $ai_gemini_api_key;
+                                $service_name = 'Google Gemini';
+                            }
+                            
+                            if (!$ai_moderation_enabled) {
+                                echo '<span style="color: #d63638;">❌ Moderación por IA deshabilitada manualmente</span>';
+                            } elseif (empty($current_api_key)) {
+                                echo '<span style="color: #d63638;">⚠️ API Key de ' . esc_html($service_name) . ' no configurada - La moderación por IA está deshabilitada</span>';
+                            } else {
+                                echo '<span style="color: #00a32a;">✅ Moderación por IA activa usando ' . esc_html($service_name) . '</span>';
+                            }
+                            ?>
+                        </td>
+                    </tr>
+                </table>
+                
+                <script>
+                jQuery(document).ready(function($) {
+                    $('#ai_service_select').on('change', function() {
+                        var selected = $(this).val();
+                        if (selected === 'openai') {
+                            $('#openai_config').show();
+                            $('#gemini_config').hide();
+                        } else if (selected === 'gemini') {
+                            $('#openai_config').hide();
+                            $('#gemini_config').show();
+                        }
+                    });
+                });
+                </script>
                 
                 <?php submit_button(); ?>
             </form>
