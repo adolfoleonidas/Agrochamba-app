@@ -115,20 +115,21 @@ fun EditJobScreen(
     var publishToFacebook by remember { mutableStateOf(!job.meta?.facebookPostId.isNullOrBlank()) }
     
     var showMoreOptions by remember { mutableStateOf(false) }
-
-    // Recargar imágenes cuando cambia el trabajo - asegurar que se ejecute siempre
-    LaunchedEffect(job.id) {
-        android.util.Log.d("EditJobScreen", "LaunchedEffect ejecutado para job.id: ${job.id}")
-        // Pequeño delay para asegurar que el ViewModel esté listo
-        kotlinx.coroutines.delay(100)
-        viewModel.reloadImages()
-    }
     
-    // También resetear cuando cambia el job para asegurar estado limpio
+    // IMPORTANTE: Recargar imágenes cuando cambia el trabajo
+    // Esto asegura que cada trabajo tenga sus propias imágenes cargadas
+    // Usar una variable remember para rastrear el último job.id procesado
+    var lastProcessedJobId by remember { mutableStateOf<Int?>(null) }
     LaunchedEffect(job.id) {
-        // Resetear estado local si es necesario
-        android.util.Log.d("EditJobScreen", "Reseteando estado para nuevo trabajo: ${job.id}")
+        if (lastProcessedJobId != job.id) {
+            android.util.Log.d("EditJobScreen", "Job ID cambió de $lastProcessedJobId a ${job.id}, recargando imágenes...")
+            lastProcessedJobId = job.id
+            viewModel.reloadImages()
+        }
     }
+
+    // El ViewModel ya carga las imágenes en su init, no necesitamos recargarlas aquí
+    // Esto evita interferencias y asegura que las imágenes se carguen correctamente
 
     LaunchedEffect(uiState.updateSuccess) {
         if (uiState.updateSuccess) {
@@ -510,7 +511,10 @@ private fun EditImageSection(
     onReorderNew: (Int, Int) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-        if (!imagesLoaded && isLoading) {
+        val totalImages = existingImageUrls.size + newImages.size
+        
+        // Mostrar loading SOLO si no hay imágenes y está cargando
+        if (totalImages == 0 && !imagesLoaded && isLoading) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -530,34 +534,7 @@ private fun EditImageSection(
                 }
             }
         } else {
-            val totalImages = existingImageUrls.size + newImages.size
-            
-            if (totalImages == 0 && imagesLoaded) {
-                // Mostrar mensaje cuando no hay imágenes pero ya se cargaron
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            "No hay imágenes en este trabajo",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            "Agrega imágenes para mejorar tu anuncio",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                        )
-                    }
-                }
-            }
-            
+            // SIEMPRE mostrar el LazyRow (incluso si está vacío, para mostrar el botón de agregar)
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier.fillMaxWidth()
@@ -583,7 +560,7 @@ private fun EditImageSection(
                     )
                 }
                 
-                // Botón para agregar más imágenes (siempre visible si hay menos de 10)
+                // Botón para agregar más imágenes (SIEMPRE visible si hay menos de 10)
                 if (totalImages < 10) {
                     item {
                         TikTokAddImageButton(
@@ -592,6 +569,17 @@ private fun EditImageSection(
                         )
                     }
                 }
+            }
+            
+            // Mostrar mensaje solo si no hay imágenes Y ya se cargaron (debajo del botón)
+            if (totalImages == 0 && imagesLoaded) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "No hay imágenes en este trabajo",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
             }
         }
     }
