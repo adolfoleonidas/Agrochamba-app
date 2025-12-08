@@ -55,12 +55,18 @@ if (!function_exists('agrochamba_post_to_facebook')) {
         if (isset($job_data['featured_media']) && !empty($job_data['featured_media'])) {
             $featured_url = wp_get_attachment_image_url($job_data['featured_media'], 'large');
             if ($featured_url) {
+                // Asegurar URL absoluta
+                $featured_url = (strpos($featured_url, 'http') === 0) ? $featured_url : site_url($featured_url);
                 $image_urls[] = $featured_url;
+                error_log('AgroChamba Facebook: Imagen destacada encontrada: ' . $featured_url);
             }
         } elseif (has_post_thumbnail($post_id)) {
             $featured_url = get_the_post_thumbnail_url($post_id, 'large');
             if ($featured_url) {
+                // Asegurar URL absoluta
+                $featured_url = (strpos($featured_url, 'http') === 0) ? $featured_url : site_url($featured_url);
                 $image_urls[] = $featured_url;
+                error_log('AgroChamba Facebook: Imagen destacada (thumbnail) encontrada: ' . $featured_url);
             }
         }
         
@@ -68,8 +74,13 @@ if (!function_exists('agrochamba_post_to_facebook')) {
         if (isset($job_data['gallery_ids']) && is_array($job_data['gallery_ids']) && !empty($job_data['gallery_ids'])) {
             foreach ($job_data['gallery_ids'] as $gallery_id) {
                 $gallery_url = wp_get_attachment_image_url(intval($gallery_id), 'large');
-                if ($gallery_url && !in_array($gallery_url, $image_urls)) {
-                    $image_urls[] = $gallery_url;
+                if ($gallery_url) {
+                    // Asegurar URL absoluta
+                    $gallery_url = (strpos($gallery_url, 'http') === 0) ? $gallery_url : site_url($gallery_url);
+                    if (!in_array($gallery_url, $image_urls)) {
+                        $image_urls[] = $gallery_url;
+                        error_log('AgroChamba Facebook: Imagen de galería encontrada: ' . $gallery_url);
+                    }
                 }
             }
         } else {
@@ -78,23 +89,89 @@ if (!function_exists('agrochamba_post_to_facebook')) {
             if (is_array($gallery_ids) && !empty($gallery_ids)) {
                 foreach ($gallery_ids as $gallery_id) {
                     $gallery_url = wp_get_attachment_image_url(intval($gallery_id), 'large');
-                    if ($gallery_url && !in_array($gallery_url, $image_urls)) {
-                        $image_urls[] = $gallery_url;
+                    if ($gallery_url) {
+                        // Asegurar URL absoluta
+                        $gallery_url = (strpos($gallery_url, 'http') === 0) ? $gallery_url : site_url($gallery_url);
+                        if (!in_array($gallery_url, $image_urls)) {
+                            $image_urls[] = $gallery_url;
+                            error_log('AgroChamba Facebook: Imagen de galería (meta) encontrada: ' . $gallery_url);
+                        }
                     }
                 }
             }
         }
 
         $job_url = get_permalink($post_id);
+        $photo_ids = array();
 
+        // Si hay imágenes, subirlas nativamente a Facebook primero (todas las imágenes)
+        if (!empty($image_urls)) {
+            error_log('AgroChamba Facebook: Subiendo ' . count($image_urls) . ' imagen(es) nativa(s) a Facebook');
+            
+            foreach ($image_urls as $index => $image_url) {
+                error_log('AgroChamba Facebook: Subiendo imagen ' . ($index + 1) . ' de ' . count($image_urls) . ': ' . $image_url);
+                
+                // Subir la imagen a Facebook usando el endpoint /photos
+                $photo_url = "https://graph.facebook.com/v18.0/{$page_id}/photos";
+                
+                $photo_response = wp_remote_post($photo_url, array(
+                    'method' => 'POST',
+                    'timeout' => 30,
+                    'headers' => array(
+                        'Content-Type' => 'application/x-www-form-urlencoded',
+                    ),
+                    'body' => array(
+                        'access_token' => $page_access_token,
+                        'url' => $image_url, // Facebook descargará la imagen desde la URL
+                        'published' => false, // No publicar aún, solo subir
+                    ),
+                ));
+                
+                if (!is_wp_error($photo_response)) {
+                    $photo_response_code = wp_remote_retrieve_response_code($photo_response);
+                    $photo_response_body = json_decode(wp_remote_retrieve_body($photo_response), true);
+                    
+                    if ($photo_response_code === 200 && isset($photo_response_body['id'])) {
+                        $photo_ids[] = $photo_response_body['id'];
+                        error_log('AgroChamba Facebook: Imagen ' . ($index + 1) . ' subida exitosamente. Photo ID: ' . $photo_response_body['id']);
+                    } else {
+                        error_log('AgroChamba Facebook Error al subir imagen ' . ($index + 1) . ': ' . json_encode($photo_response_body));
+                    }
+                } else {
+                    error_log('AgroChamba Facebook Error al conectar para subir imagen ' . ($index + 1) . ': ' . $photo_response->get_error_message());
+                }
+                
+                // Pequeña pausa entre subidas para evitar rate limiting
+                if ($index < count($image_urls) - 1) {
+                    usleep(500000); // 0.5 segundos
+                }
+            }
+        } else {
+            error_log('AgroChamba Facebook: No se encontraron imágenes para el post ID: ' . $post_id);
+        }
+
+        // Publicar el post en Facebook
         $post_data = array(
             'message' => $message,
-            'link' => $job_url,
         );
 
-        // Usar la primera imagen (Facebook solo permite una imagen en el feed)
-        if (!empty($image_urls)) {
-            $post_data['picture'] = $image_urls[0];
+        // Si tenemos photo_ids, adjuntarlos al post (múltiples imágenes)
+        if (!empty($photo_ids)) {
+            // Construir el array de attached_media en el formato correcto para Facebook
+            $attached_media = array();
+            foreach ($photo_ids as $photo_id) {
+                $attached_media[] = array('media_fbid' => $photo_id);
+            }
+            // Facebook requiere attached_media como JSON string en el body
+            $post_data['attached_media'] = json_encode($attached_media);
+            error_log('AgroChamba Facebook: Adjuntando ' . count($photo_ids) . ' foto(s) nativa(s) al post. Photo IDs: ' . implode(', ', $photo_ids));
+            error_log('AgroChamba Facebook: attached_media JSON: ' . json_encode($attached_media));
+            // NO incluir 'link' cuando hay imágenes adjuntas, ya que Facebook prioriza el link preview sobre las imágenes
+            // El link ya está incluido en el mensaje de texto al final
+        } else {
+            // Solo incluir link si NO hay imágenes adjuntas para mostrar preview del link
+            $post_data['link'] = $job_url;
+            error_log('AgroChamba Facebook: No hay imágenes, usando link preview');
         }
 
         $graph_url = "https://graph.facebook.com/v18.0/{$page_id}/feed";
@@ -161,11 +238,15 @@ if (!function_exists('agrochamba_post_to_facebook_via_n8n')) {
         if (isset($job_data['featured_media']) && !empty($job_data['featured_media'])) {
             $featured_url = wp_get_attachment_image_url($job_data['featured_media'], 'large');
             if ($featured_url) {
+                // Asegurar URL absoluta
+                $featured_url = (strpos($featured_url, 'http') === 0) ? $featured_url : site_url($featured_url);
                 $image_urls[] = $featured_url;
             }
         } elseif (has_post_thumbnail($post_id)) {
             $featured_url = get_the_post_thumbnail_url($post_id, 'large');
             if ($featured_url) {
+                // Asegurar URL absoluta
+                $featured_url = (strpos($featured_url, 'http') === 0) ? $featured_url : site_url($featured_url);
                 $image_urls[] = $featured_url;
             }
         }
@@ -174,8 +255,12 @@ if (!function_exists('agrochamba_post_to_facebook_via_n8n')) {
         if (isset($job_data['gallery_ids']) && is_array($job_data['gallery_ids']) && !empty($job_data['gallery_ids'])) {
             foreach ($job_data['gallery_ids'] as $gallery_id) {
                 $gallery_url = wp_get_attachment_image_url(intval($gallery_id), 'large');
-                if ($gallery_url && !in_array($gallery_url, $image_urls)) {
-                    $image_urls[] = $gallery_url;
+                if ($gallery_url) {
+                    // Asegurar URL absoluta
+                    $gallery_url = (strpos($gallery_url, 'http') === 0) ? $gallery_url : site_url($gallery_url);
+                    if (!in_array($gallery_url, $image_urls)) {
+                        $image_urls[] = $gallery_url;
+                    }
                 }
             }
         } else {
@@ -184,8 +269,12 @@ if (!function_exists('agrochamba_post_to_facebook_via_n8n')) {
             if (is_array($gallery_ids) && !empty($gallery_ids)) {
                 foreach ($gallery_ids as $gallery_id) {
                     $gallery_url = wp_get_attachment_image_url(intval($gallery_id), 'large');
-                    if ($gallery_url && !in_array($gallery_url, $image_urls)) {
-                        $image_urls[] = $gallery_url;
+                    if ($gallery_url) {
+                        // Asegurar URL absoluta
+                        $gallery_url = (strpos($gallery_url, 'http') === 0) ? $gallery_url : site_url($gallery_url);
+                        if (!in_array($gallery_url, $image_urls)) {
+                            $image_urls[] = $gallery_url;
+                        }
                     }
                 }
             }
@@ -256,10 +345,65 @@ if (!function_exists('agrochamba_post_to_facebook_via_n8n')) {
 // ==========================================
 // 2. CONSTRUIR MENSAJE PARA FACEBOOK
 // ==========================================
+if (!function_exists('agrochamba_get_emoji_for_crop')) {
+    /**
+     * Obtener emoji basado en el cultivo
+     */
+    function agrochamba_get_emoji_for_crop($crop_name) {
+        if (empty($crop_name)) {
+            return '🌱';
+        }
+        
+        $crop_lower = strtolower($crop_name);
+        
+        if (strpos($crop_lower, 'uva') !== false) {
+            return '🍇';
+        } elseif (strpos($crop_lower, 'arándano') !== false || strpos($crop_lower, 'arandano') !== false) {
+            return '🫐';
+        } elseif (strpos($crop_lower, 'palta') !== false || strpos($crop_lower, 'aguacate') !== false) {
+            return '🥑';
+        } elseif (strpos($crop_lower, 'mango') !== false) {
+            return '🥭';
+        } elseif (strpos($crop_lower, 'fresa') !== false || strpos($crop_lower, 'frutilla') !== false) {
+            return '🍓';
+        } elseif (strpos($crop_lower, 'limón') !== false || strpos($crop_lower, 'limon') !== false) {
+            return '🍋';
+        } elseif (strpos($crop_lower, 'naranja') !== false) {
+            return '🍊';
+        } elseif (strpos($crop_lower, 'plátano') !== false || strpos($crop_lower, 'platano') !== false || strpos($crop_lower, 'banana') !== false) {
+            return '🍌';
+        } else {
+            return '🌱';
+        }
+    }
+}
+
 if (!function_exists('agrochamba_build_facebook_message')) {
     function agrochamba_build_facebook_message($post_id, $job_data) {
         $title = get_the_title($post_id);
         $content = get_post_field('post_content', $post_id);
+        
+        // Obtener empresa y ubicación
+        $empresas = wp_get_post_terms($post_id, 'empresa', array('fields' => 'names'));
+        $empresa = !empty($empresas) ? $empresas[0] : '';
+        
+        $ubicaciones = wp_get_post_terms($post_id, 'ubicacion', array('fields' => 'names'));
+        $ubicacion = !empty($ubicaciones) ? $ubicaciones[0] : '';
+        
+        // Obtener cultivo para determinar el emoji
+        $cultivos = wp_get_post_terms($post_id, 'cultivo', array('fields' => 'names'));
+        $cultivo = !empty($cultivos) ? $cultivos[0] : '';
+        $emoji = agrochamba_get_emoji_for_crop($cultivo);
+        
+        // Construir encabezado dinámico: #UBICACION | 🍇 EMPRESA
+        $header = '';
+        if (!empty($ubicacion) && !empty($empresa)) {
+            $header = '#' . strtoupper($ubicacion) . ' | ' . $emoji . ' ' . $empresa;
+        } elseif (!empty($ubicacion)) {
+            $header = '#' . strtoupper($ubicacion);
+        } elseif (!empty($empresa)) {
+            $header = $emoji . ' ' . $empresa;
+        }
         
         // Preservar formato: convertir HTML a texto plano manteniendo saltos de línea
         // Primero convertir <br>, <p>, <div> a saltos de línea
@@ -272,57 +416,70 @@ if (!function_exists('agrochamba_build_facebook_message')) {
         // Remover otros tags HTML pero mantener el texto
         $content = wp_strip_all_tags($content);
         
-        // Limpiar espacios múltiples y saltos de línea excesivos
+        // Limpiar espacios múltiples y saltos de línea excesivos (máximo 2 saltos seguidos)
         $content = preg_replace('/\n{3,}/', "\n\n", $content);
         $content = trim($content);
         
-        // Si el contenido es muy largo, truncar pero mantener formato
-        if (strlen($content) > 500) {
-            $content = substr($content, 0, 500);
-            $last_newline = strrpos($content, "\n");
-            if ($last_newline !== false && $last_newline > 400) {
-                $content = substr($content, 0, $last_newline);
-            }
-            $content .= '...';
-        }
+        // NO truncar el contenido - mostrar todo lo que el usuario escribió
         
-        $ubicaciones = wp_get_post_terms($post_id, 'ubicacion', array('fields' => 'names'));
-        $ubicacion = !empty($ubicaciones) ? $ubicaciones[0] : '';
-        
+        // Obtener valores de meta fields (solo si fueron rellenados)
         $salario_min = get_post_meta($post_id, 'salario_min', true);
         $salario_max = get_post_meta($post_id, 'salario_max', true);
         $vacantes = get_post_meta($post_id, 'vacantes', true);
         
-        $message = "🌾 NUEVA OFERTA DE TRABAJO AGRÍCOLA 🌾\n\n";
-        $message .= "📋 " . $title . "\n\n";
+        // Construir mensaje con encabezado dinámico
+        $message = '';
         
+        if (!empty($header)) {
+            $message .= $header . "\n\n";
+        }
+        
+        $message .= $title . "\n\n";
+        
+        // El contenido del editor es lo principal - mostrarlo tal cual
         if (!empty($content)) {
-            $message .= $content . "\n\n";
+            $message .= $content;
         }
         
+        // Solo agregar campos adicionales si fueron rellenados (no valores por defecto)
+        $additional_info = array();
+        
+        // Ubicación: solo si está definida
         if (!empty($ubicacion)) {
-            $message .= "📍 Ubicación: " . $ubicacion . "\n";
+            $additional_info[] = "📍 Ubicación: " . $ubicacion;
         }
         
-        if (!empty($salario_min) || !empty($salario_max)) {
+        // Salario: solo si tiene valores reales (mayor a 0)
+        $salario_min_val = intval($salario_min);
+        $salario_max_val = intval($salario_max);
+        if ($salario_min_val > 0 || $salario_max_val > 0) {
             $salario_text = '';
-            if (!empty($salario_min) && !empty($salario_max)) {
-                $salario_text = "S/ " . number_format($salario_min, 0) . " - S/ " . number_format($salario_max, 0);
-            } elseif (!empty($salario_min)) {
-                $salario_text = "Desde S/ " . number_format($salario_min, 0);
-            } elseif (!empty($salario_max)) {
-                $salario_text = "Hasta S/ " . number_format($salario_max, 0);
+            if ($salario_min_val > 0 && $salario_max_val > 0) {
+                $salario_text = "S/ " . number_format($salario_min_val, 0) . " - S/ " . number_format($salario_max_val, 0);
+            } elseif ($salario_min_val > 0) {
+                $salario_text = "Desde S/ " . number_format($salario_min_val, 0);
+            } elseif ($salario_max_val > 0) {
+                $salario_text = "Hasta S/ " . number_format($salario_max_val, 0);
             }
             if (!empty($salario_text)) {
-                $message .= "💰 Salario: " . $salario_text . "\n";
+                $additional_info[] = "💰 Salario: " . $salario_text;
             }
         }
         
-        if (!empty($vacantes)) {
-            $message .= "👥 Vacantes: " . $vacantes . "\n";
+        // Vacantes: solo si tiene un valor real (mayor a 0 y no es el valor por defecto de 1)
+        $vacantes_val = intval($vacantes);
+        if ($vacantes_val > 1) { // No mostrar si es 0 o 1 (valor por defecto)
+            $additional_info[] = "👥 Vacantes: " . $vacantes_val;
         }
         
-        $message .= "\n👉 Ver más detalles en AgroChamba";
+        // Agregar información adicional solo si hay algo que mostrar
+        if (!empty($additional_info)) {
+            $message .= "\n\n" . implode("\n", $additional_info);
+        }
+        
+        // Agregar link al final del mensaje (se incluirá en el texto)
+        $job_url = get_permalink($post_id);
+        $message .= "\n\n👉 Ver más detalles: " . $job_url;
         
         return $message;
     }
@@ -487,4 +644,5 @@ if (!function_exists('agrochamba_facebook_settings_page')) {
         <?php
     }
 }
+
 
