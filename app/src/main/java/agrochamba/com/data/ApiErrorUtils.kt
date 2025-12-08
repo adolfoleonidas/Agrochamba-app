@@ -50,25 +50,33 @@ object ApiErrorUtils {
             } catch (_: Exception) { /* cuerpo no es JSON */ }
         }
 
+        // Para errores 429 (rate limit), mostrar mensaje formal y amigable
+        if (status == 429) {
+            return "Has realizado demasiadas solicitudes en poco tiempo. Por favor, espera unos minutos antes de intentar nuevamente."
+        }
+
         val hint = when (status) {
             400 -> "(Solicitud inválida: revisa los campos enviados)"
             401 -> "(No autorizado: token inválido o expirado)"
             403 -> "(Prohibido: sin permisos para esta acción)"
             404 -> "(Recurso no encontrado)"
             413 -> "(Archivo demasiado grande: supera el límite del servidor)"
-            429 -> "(Demasiadas solicitudes: espera un momento y reintenta)"
             in 500..599 -> "(Error del servidor: intenta nuevamente en unos segundos)"
             else -> null
         }
 
         return buildString {
-            append("Error HTTP $status")
-            if (!wpCode.isNullOrBlank()) append(" · $wpCode")
-            if (!wpMessage.isNullOrBlank()) append(": $wpMessage")
-            hint?.let { append(" $it") }
-            if (wpMessage.isNullOrBlank() && fallback != null) {
-                if (length > 0) append(" — ")
-                append(fallback)
+            // Si hay mensaje de WordPress, usarlo directamente (ya es amigable)
+            if (!wpMessage.isNullOrBlank()) {
+                append(wpMessage)
+            } else {
+                append("Error HTTP $status")
+                if (!wpCode.isNullOrBlank()) append(" · $wpCode")
+                hint?.let { append(" $it") }
+                if (fallback != null) {
+                    if (length > 0) append(" — ")
+                    append(fallback)
+                }
             }
         }
     }

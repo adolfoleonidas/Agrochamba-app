@@ -226,11 +226,22 @@ class EditJobViewModel(private val job: JobPost) : ViewModel() {
         val currentImages = uiState.selectedImages.toMutableList()
         currentImages.addAll(uris)
         val newImages = currentImages.take(10)
-        val newFeaturedIndex = if (uiState.selectedImages.isEmpty() && newImages.isNotEmpty()) {
-            0
-        } else {
-            uiState.featuredImageIndex.coerceIn(0, newImages.size - 1)
+        
+        // Calcular el índice destacado de forma segura
+        val newFeaturedIndex = when {
+            newImages.isEmpty() -> 0 // Si no hay imágenes, usar 0 por defecto
+            uiState.selectedImages.isEmpty() && newImages.isNotEmpty() -> 0 // Si es la primera selección, usar 0
+            else -> {
+                // Asegurar que el índice esté dentro del rango válido
+                val maxIndex = newImages.size - 1
+                if (maxIndex >= 0) {
+                    uiState.featuredImageIndex.coerceIn(0, maxIndex)
+                } else {
+                    0
+                }
+            }
         }
+        
         uiState = uiState.copy(
             selectedImages = newImages,
             featuredImageIndex = newFeaturedIndex

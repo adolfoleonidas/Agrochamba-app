@@ -231,15 +231,22 @@ private fun FormatButton(
  * Detecta si el texto seleccionado tiene un formato específico
  */
 private fun detectFormat(text: String, selection: TextRange, marker: String): Boolean {
+    if (text.isEmpty()) return false
+    
     if (selection.collapsed) {
         // Si no hay selección, verificar el formato en la posición del cursor
-        val start = maxOf(0, selection.start - marker.length)
-        val end = minOf(text.length, selection.start + marker.length)
+        val safeStart = selection.start.coerceIn(0, text.length)
+        val start = maxOf(0, safeStart - marker.length)
+        val end = minOf(text.length, safeStart + marker.length)
+        if (start >= end || start < 0 || end > text.length) return false
         val context = text.substring(start, end)
         return context.contains(marker)
     } else {
         // Si hay selección, verificar si está envuelta en el marcador
-        val selectedText = text.substring(selection.start, selection.end)
+        val start = selection.start.coerceIn(0, text.length)
+        val end = selection.end.coerceIn(0, text.length)
+        if (start >= end || start < 0 || end > text.length) return false
+        val selectedText = text.substring(start, end)
         return selectedText.startsWith(marker) && selectedText.endsWith(marker)
     }
 }
@@ -248,8 +255,11 @@ private fun detectFormat(text: String, selection: TextRange, marker: String): Bo
  * Detecta si la línea actual es una lista con viñetas
  */
 private fun detectBulletList(text: String, selection: TextRange): Boolean {
-    val lineStart = text.lastIndexOf('\n', selection.start - 1) + 1
-    val lineEnd = text.indexOf('\n', selection.start).let { if (it == -1) text.length else it }
+    if (text.isEmpty()) return false
+    val safeStart = selection.start.coerceIn(0, text.length)
+    val lineStart = text.lastIndexOf('\n', safeStart - 1) + 1
+    val lineEnd = text.indexOf('\n', safeStart).let { if (it == -1) text.length else it }
+    if (lineStart >= lineEnd || lineStart < 0 || lineEnd > text.length) return false
     val line = text.substring(lineStart, lineEnd)
     return line.trimStart().startsWith("- ") || line.trimStart().startsWith("* ")
 }
@@ -258,8 +268,11 @@ private fun detectBulletList(text: String, selection: TextRange): Boolean {
  * Detecta si la línea actual es una lista numerada
  */
 private fun detectNumberedList(text: String, selection: TextRange): Boolean {
-    val lineStart = text.lastIndexOf('\n', selection.start - 1) + 1
-    val lineEnd = text.indexOf('\n', selection.start).let { if (it == -1) text.length else it }
+    if (text.isEmpty()) return false
+    val safeStart = selection.start.coerceIn(0, text.length)
+    val lineStart = text.lastIndexOf('\n', safeStart - 1) + 1
+    val lineEnd = text.indexOf('\n', safeStart).let { if (it == -1) text.length else it }
+    if (lineStart >= lineEnd || lineStart < 0 || lineEnd > text.length) return false
     val line = text.substring(lineStart, lineEnd)
     return Regex("^\\d+\\.\\s").containsMatchIn(line.trimStart())
 }

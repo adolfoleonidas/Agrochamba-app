@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import agrochamba.com.data.ApiErrorUtils
 import agrochamba.com.data.AuthManager
 import agrochamba.com.data.JobPost
 import agrochamba.com.data.MyJobResponse
@@ -90,19 +91,11 @@ class ProfileViewModel : ViewModel() {
                 android.util.Log.d("ProfileViewModel", "Jobs cargados: ${jobs.size}")
                 uiState = uiState.copy(isLoading = false, myJobs = jobs)
 
-            } catch (e: retrofit2.HttpException) {
-                val errorMessage = try {
-                    val errorBody = e.response()?.errorBody()?.string()
-                    android.util.Log.e("ProfileViewModel", "Error HTTP: ${e.code()}, Body: $errorBody")
-                    errorBody ?: "Error ${e.code()}: ${e.message()}"
-                } catch (ex: Exception) {
-                    android.util.Log.e("ProfileViewModel", "Error al parsear error: ${ex.message}")
-                    "Error al cargar tus anuncios: ${e.message}"
-                }
-                uiState = uiState.copy(isLoading = false, error = errorMessage)
             } catch (e: Exception) {
                 android.util.Log.e("ProfileViewModel", "Error al cargar trabajos: ${e.message}", e)
-                uiState = uiState.copy(isLoading = false, error = "No se pudieron cargar tus anuncios: ${e.message}")
+                // Usar ApiErrorUtils para obtener un mensaje amigable
+                val friendlyMessage = ApiErrorUtils.getReadableApiError(e, "No se pudieron cargar tus anuncios")
+                uiState = uiState.copy(isLoading = false, error = friendlyMessage)
             }
         }
     }
