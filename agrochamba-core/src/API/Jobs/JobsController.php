@@ -204,11 +204,21 @@ class JobsController {
             );
         }
 
-        if (strlen($params['title']) > 200) {
+        // Validación: Límite de 200 caracteres para el título
+        $title_length = strlen($params['title']);
+        if ($title_length > 200) {
             return new WP_Error(
                 'rest_invalid_param',
-                'El título no puede exceder 200 caracteres.',
-                array('status' => 400, 'code' => 'title_too_long')
+                sprintf(
+                    'El título no puede exceder 200 caracteres. Tu título tiene %d caracteres.',
+                    $title_length
+                ),
+                array(
+                    'status' => 400, 
+                    'code' => 'title_too_long',
+                    'current_length' => $title_length,
+                    'max_length' => 200
+                )
             );
         }
 
@@ -405,21 +415,21 @@ class JobsController {
         
         // Publicar en Facebook SOLO si el usuario lo solicitó explícitamente
         if ($publish_to_facebook && function_exists('agrochamba_post_to_facebook')) {
-            error_log('AgroChamba Facebook Debug - Intentando publicar en Facebook...');
+                error_log('AgroChamba Facebook Debug - Intentando publicar en Facebook...');
             
             // Preparar datos para Facebook incluyendo todas las imágenes
-            $job_data_for_facebook = array_merge($params, array(
-                'featured_media' => isset($params['featured_media']) ? $params['featured_media'] : get_post_thumbnail_id($post_id),
+                $job_data_for_facebook = array_merge($params, array(
+                    'featured_media' => isset($params['featured_media']) ? $params['featured_media'] : get_post_thumbnail_id($post_id),
                 'gallery_ids' => isset($params['gallery_ids']) && is_array($params['gallery_ids']) ? $params['gallery_ids'] : array(),
-            ));
+                ));
             
-            $facebook_result = agrochamba_post_to_facebook($post_id, $job_data_for_facebook);
-            
-            if (is_wp_error($facebook_result)) {
-                error_log('AgroChamba Facebook Error: ' . $facebook_result->get_error_message());
-            } else {
-                error_log('AgroChamba Facebook Success: Post ID ' . $post_id . ' publicado en Facebook');
-            }
+                $facebook_result = agrochamba_post_to_facebook($post_id, $job_data_for_facebook);
+                
+                if (is_wp_error($facebook_result)) {
+                    error_log('AgroChamba Facebook Error: ' . $facebook_result->get_error_message());
+                } else {
+                    error_log('AgroChamba Facebook Success: Post ID ' . $post_id . ' publicado en Facebook');
+                }
         } else {
             if (!$publish_to_facebook) {
                 error_log('AgroChamba Facebook Debug - No se publicará en Facebook. El usuario no lo solicitó.');
@@ -480,8 +490,22 @@ class JobsController {
         $post_content = isset($params['content']) ? wp_kses_post($params['content']) : $post->post_content;
 
         if (isset($params['title'])) {
-            if (strlen($params['title']) > 200) {
-                return new WP_Error('rest_invalid_param', 'El título no puede exceder 200 caracteres.', array('status' => 400));
+            // Validación: Límite de 200 caracteres para el título
+            $title_length = strlen($params['title']);
+            if ($title_length > 200) {
+                return new WP_Error(
+                    'rest_invalid_param', 
+                    sprintf(
+                        'El título no puede exceder 200 caracteres. Tu título tiene %d caracteres.',
+                        $title_length
+                    ), 
+                    array(
+                        'status' => 400,
+                        'code' => 'title_too_long',
+                        'current_length' => $title_length,
+                        'max_length' => 200
+                    )
+                );
             }
             $post_data['post_title'] = sanitize_text_field($params['title']);
         }

@@ -57,12 +57,21 @@ if (!function_exists('agrochamba_create_job')) {
             );
         }
 
-        // Validar longitud del título (máximo 200 caracteres)
-        if (strlen($params['title']) > 200) {
+        // Validación: Límite de 200 caracteres para el título
+        $title_length = strlen($params['title']);
+        if ($title_length > 200) {
             return new WP_Error(
                 'rest_invalid_param',
-                'El título no puede exceder 200 caracteres.',
-                array('status' => 400, 'code' => 'title_too_long')
+                sprintf(
+                    'El título no puede exceder 200 caracteres. Tu título tiene %d caracteres.',
+                    $title_length
+                ),
+                array(
+                    'status' => 400, 
+                    'code' => 'title_too_long',
+                    'current_length' => $title_length,
+                    'max_length' => 200
+                )
             );
         }
 
@@ -332,13 +341,24 @@ if (!function_exists('agrochamba_update_job')) {
             $post_data['post_excerpt'] = sanitize_textarea_field($params['excerpt']);
         }
 
-        // Validar longitud del título si se actualiza
-        if (isset($params['title']) && strlen($params['title']) > 200) {
-            return new WP_Error(
-                'rest_invalid_param',
-                'El título no puede exceder 200 caracteres.',
-                array('status' => 400, 'code' => 'title_too_long')
-            );
+        // Validación: Límite de 200 caracteres para el título
+        if (isset($params['title'])) {
+            $title_length = strlen($params['title']);
+            if ($title_length > 200) {
+                return new WP_Error(
+                    'rest_invalid_param',
+                    sprintf(
+                        'El título no puede exceder 200 caracteres. Tu título tiene %d caracteres.',
+                        $title_length
+                    ),
+                    array(
+                        'status' => 400, 
+                        'code' => 'title_too_long',
+                        'current_length' => $title_length,
+                        'max_length' => 200
+                    )
+                );
+            }
         }
 
         // Validar contenido si se actualiza

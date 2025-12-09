@@ -194,6 +194,14 @@ fun String.htmlToMarkdown(): String {
         "${it.groupValues[1].trim()}\n\n"
     }
     
+    // PRESERVAR guiones tal como están escritos en el editor
+    // Si el usuario escribió --- en el editor, debe preservarse como ---
+    // Si WordPress convirtió --- a &#8212;, convertirlo de vuelta a --- para edición
+    markdown = markdown.replace("&#8212;", "---") // em dash a tres guiones
+    markdown = markdown.replace("&#8211;", "--") // en dash a dos guiones
+    markdown = markdown.replace("—", "---") // em dash ya decodificado a tres guiones
+    markdown = markdown.replace("–", "--") // en dash ya decodificado a dos guiones
+    
     // Limpiar HTML restante
     markdown = Regex("<[^>]+>").replace(markdown, "")
     

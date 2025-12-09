@@ -45,13 +45,21 @@ fun RichTextEditor(
     enabled: Boolean = true
 ) {
     val keyboardController = LocalSoftwareKeyboardController.current
-    var textFieldValue by remember(value) { mutableStateOf(TextFieldValue(value, TextRange(value.length))) }
+    // Usar una clave estable para remember, no el valor que cambia constantemente
+    var textFieldValue by remember { mutableStateOf(TextFieldValue(value, TextRange(value.length))) }
+    var isInternalChange by remember { mutableStateOf(false) }
     
-    // Actualizar cuando cambia el valor externo
+    // Actualizar cuando cambia el valor externo (solo cuando viene de fuera, no de nuestra edición)
     LaunchedEffect(value) {
-        if (textFieldValue.text != value) {
-            textFieldValue = TextFieldValue(value, TextRange(value.length))
+        // Solo actualizar si el cambio NO viene de nuestra edición interna
+        if (!isInternalChange && textFieldValue.text != value) {
+            // Preservar la posición del cursor si es posible
+            val currentCursor = textFieldValue.selection.start
+            val newCursor = currentCursor.coerceIn(0, value.length)
+            textFieldValue = TextFieldValue(value, TextRange(newCursor))
         }
+        // Resetear la bandera después de procesar
+        isInternalChange = false
     }
     
     // Detectar formato en la selección actual
@@ -84,6 +92,8 @@ fun RichTextEditor(
             BasicTextField(
                 value = textFieldValue,
                 onValueChange = { newValue ->
+                    // Marcar que este es un cambio interno
+                    isInternalChange = true
                     textFieldValue = newValue
                     onValueChange(newValue.text)
                 },
@@ -233,21 +243,41 @@ private fun FormatButton(
 private fun detectFormat(text: String, selection: TextRange, marker: String): Boolean {
     if (text.isEmpty()) return false
     
-    if (selection.collapsed) {
-        // Si no hay selección, verificar el formato en la posición del cursor
-        val safeStart = selection.start.coerceIn(0, text.length)
-        val start = maxOf(0, safeStart - marker.length)
-        val end = minOf(text.length, safeStart + marker.length)
-        if (start >= end || start < 0 || end > text.length) return false
-        val context = text.substring(start, end)
-        return context.contains(marker)
-    } else {
-        // Si hay selección, verificar si está envuelta en el marcador
-        val start = selection.start.coerceIn(0, text.length)
-        val end = selection.end.coerceIn(0, text.length)
-        if (start >= end || start < 0 || end > text.length) return false
-        val selectedText = text.substring(start, end)
-        return selectedText.startsWith(marker) && selectedText.endsWith(marker)
+    try {
+        if (selection.collapsed) {
+            // Si no hay selección, verificar el formato en la posición del cursor
+            val safeStart = selection.start.coerceIn(0, text.length)
+            // Asegurar que tenemos suficiente espacio para buscar el marcador
+            if (safeStart < 0 || safeStart > text.length) return false
+            
+            val start = maxOf(0, safeStart - marker.length).coerceIn(0, text.length)
+            val end = minOf(text.length, safeStart + marker.length).coerceIn(0, text.length)
+            
+            // Validación más robusta: asegurar que start < end y ambos están en rango válido
+            if (start < 0 || end > text.length || start >= end || start == end) return false
+            
+            // Validación final antes de substring
+            if (start >= text.length || end > text.length || start < 0 || end < 0) return false
+            
+            val context = text.substring(start, end)
+            return context.contains(marker)
+        } else {
+            // Si hay selección, verificar si está envuelta en el marcador
+            val start = selection.start.coerceIn(0, text.length)
+            val end = selection.end.coerceIn(0, text.length)
+            
+            // Validación más robusta: asegurar que start < end y ambos están en rango válido
+            if (start < 0 || end > text.length || start >= end || start == end) return false
+            
+            // Validación final antes de substring
+            if (start >= text.length || end > text.length || start < 0 || end < 0) return false
+            
+            val selectedText = text.substring(start, end)
+            return selectedText.startsWith(marker) && selectedText.endsWith(marker)
+        }
+    } catch (e: StringIndexOutOfBoundsException) {
+        // Si ocurre un error de índice, simplemente retornar false
+        return false
     }
 }
 
@@ -256,12 +286,20 @@ private fun detectFormat(text: String, selection: TextRange, marker: String): Bo
  */
 private fun detectBulletList(text: String, selection: TextRange): Boolean {
     if (text.isEmpty()) return false
-    val safeStart = selection.start.coerceIn(0, text.length)
-    val lineStart = text.lastIndexOf('\n', safeStart - 1) + 1
-    val lineEnd = text.indexOf('\n', safeStart).let { if (it == -1) text.length else it }
-    if (lineStart >= lineEnd || lineStart < 0 || lineEnd > text.length) return false
-    val line = text.substring(lineStart, lineEnd)
-    return line.trimStart().startsWith("- ") || line.trimStart().startsWith("* ")
+    try {
+        val safeStart = selection.start.coerceIn(0, text.length)
+        val searchStart = maxOf(0, safeStart - 1)
+        val lineStart = text.lastIndexOf('\n', searchStart) + 1
+        val lineEnd = text.indexOf('\n', safeStart).let { if (it == -1) text.length else it }
+        // Validación más robusta
+        if (lineStart < 0 || lineEnd > text.length || lineStart >= lineEnd || lineStart == lineEnd) return false
+        // Validación final antes de substring
+        if (lineStart >= text.length || lineEnd > text.length || lineStart < 0 || lineEnd < 0) return false
+        val line = text.substring(lineStart, lineEnd)
+        return line.trimStart().startsWith("- ") || line.trimStart().startsWith("* ")
+    } catch (e: StringIndexOutOfBoundsException) {
+        return false
+    }
 }
 
 /**
@@ -269,12 +307,20 @@ private fun detectBulletList(text: String, selection: TextRange): Boolean {
  */
 private fun detectNumberedList(text: String, selection: TextRange): Boolean {
     if (text.isEmpty()) return false
-    val safeStart = selection.start.coerceIn(0, text.length)
-    val lineStart = text.lastIndexOf('\n', safeStart - 1) + 1
-    val lineEnd = text.indexOf('\n', safeStart).let { if (it == -1) text.length else it }
-    if (lineStart >= lineEnd || lineStart < 0 || lineEnd > text.length) return false
-    val line = text.substring(lineStart, lineEnd)
-    return Regex("^\\d+\\.\\s").containsMatchIn(line.trimStart())
+    try {
+        val safeStart = selection.start.coerceIn(0, text.length)
+        val searchStart = maxOf(0, safeStart - 1)
+        val lineStart = text.lastIndexOf('\n', searchStart) + 1
+        val lineEnd = text.indexOf('\n', safeStart).let { if (it == -1) text.length else it }
+        // Validación más robusta
+        if (lineStart < 0 || lineEnd > text.length || lineStart >= lineEnd || lineStart == lineEnd) return false
+        // Validación final antes de substring
+        if (lineStart >= text.length || lineEnd > text.length || lineStart < 0 || lineEnd < 0) return false
+        val line = text.substring(lineStart, lineEnd)
+        return Regex("^\\d+\\.\\s").containsMatchIn(line.trimStart())
+    } catch (e: StringIndexOutOfBoundsException) {
+        return false
+    }
 }
 
 /**
@@ -284,29 +330,39 @@ private fun toggleFormat(textFieldValue: TextFieldValue, marker: String): TextFi
     val text = textFieldValue.text
     val selection = textFieldValue.selection
     
-    return if (selection.collapsed) {
-        // Insertar marcadores en la posición del cursor
-        val newText = text.substring(0, selection.start) + marker + marker + text.substring(selection.start)
-        val newSelection = TextRange(selection.start + marker.length)
-        textFieldValue.copy(text = newText, selection = newSelection)
-    } else {
-        // Envolver la selección con marcadores
-        val selectedText = text.substring(selection.start, selection.end)
-        val isFormatted = selectedText.startsWith(marker) && selectedText.endsWith(marker)
-        
-        if (isFormatted) {
-            // Remover formato
-            val unformatted = selectedText.removePrefix(marker).removeSuffix(marker)
-            val newText = text.substring(0, selection.start) + unformatted + text.substring(selection.end)
-            val newSelection = TextRange(selection.start, selection.start + unformatted.length)
+    try {
+        return if (selection.collapsed) {
+            // Insertar marcadores en la posición del cursor
+            val safeStart = selection.start.coerceIn(0, text.length)
+            val newText = text.substring(0, safeStart) + marker + marker + text.substring(safeStart)
+            val newSelection = TextRange(safeStart + marker.length)
             textFieldValue.copy(text = newText, selection = newSelection)
         } else {
-            // Aplicar formato
-            val formatted = marker + selectedText + marker
-            val newText = text.substring(0, selection.start) + formatted + text.substring(selection.end)
-            val newSelection = TextRange(selection.start, selection.start + formatted.length)
-            textFieldValue.copy(text = newText, selection = newSelection)
+            // Envolver la selección con marcadores
+            val start = selection.start.coerceIn(0, text.length)
+            val end = selection.end.coerceIn(0, text.length)
+            if (start >= end || start < 0 || end > text.length) return textFieldValue
+            
+            val selectedText = text.substring(start, end)
+            val isFormatted = selectedText.startsWith(marker) && selectedText.endsWith(marker)
+            
+            if (isFormatted) {
+                // Remover formato
+                val unformatted = selectedText.removePrefix(marker).removeSuffix(marker)
+                val newText = text.substring(0, start) + unformatted + text.substring(end)
+                val newSelection = TextRange(start, start + unformatted.length)
+                textFieldValue.copy(text = newText, selection = newSelection)
+            } else {
+                // Aplicar formato
+                val formatted = marker + selectedText + marker
+                val newText = text.substring(0, start) + formatted + text.substring(end)
+                val newSelection = TextRange(start, start + formatted.length)
+                textFieldValue.copy(text = newText, selection = newSelection)
+            }
         }
+    } catch (e: StringIndexOutOfBoundsException) {
+        // Si ocurre un error, retornar el valor original
+        return textFieldValue
     }
 }
 
@@ -317,26 +373,35 @@ private fun toggleBulletList(textFieldValue: TextFieldValue): TextFieldValue {
     val text = textFieldValue.text
     val selection = textFieldValue.selection
     
-    val lineStart = text.lastIndexOf('\n', selection.start - 1) + 1
-    val lineEnd = text.indexOf('\n', selection.start).let { if (it == -1) text.length else it }
-    val line = text.substring(lineStart, lineEnd)
-    val isBulletList = line.trimStart().startsWith("- ") || line.trimStart().startsWith("* ")
-    
-    return if (isBulletList) {
-        // Remover viñeta
-        val newLine = line.replaceFirst(Regex("^\\s*[-*]\\s+"), "")
-        val newText = text.substring(0, lineStart) + newLine + text.substring(lineEnd)
-        val offset = line.length - newLine.length
-        val newSelection = TextRange(maxOf(0, selection.start - offset))
-        textFieldValue.copy(text = newText, selection = newSelection)
-    } else {
-        // Agregar viñeta
-        val indent = line.takeWhile { it == ' ' }
-        val newLine = indent + "- " + line.trimStart()
-        val newText = text.substring(0, lineStart) + newLine + text.substring(lineEnd)
-        val offset = newLine.length - line.length
-        val newSelection = TextRange(selection.start + offset)
-        textFieldValue.copy(text = newText, selection = newSelection)
+    try {
+        val safeStart = selection.start.coerceIn(0, text.length)
+        val searchStart = maxOf(0, safeStart - 1)
+        val lineStart = text.lastIndexOf('\n', searchStart) + 1
+        val lineEnd = text.indexOf('\n', safeStart).let { if (it == -1) text.length else it }
+        
+        if (lineStart < 0 || lineEnd > text.length || lineStart >= lineEnd) return textFieldValue
+        
+        val line = text.substring(lineStart, lineEnd)
+        val isBulletList = line.trimStart().startsWith("- ") || line.trimStart().startsWith("* ")
+        
+        return if (isBulletList) {
+            // Remover viñeta
+            val newLine = line.replaceFirst(Regex("^\\s*[-*]\\s+"), "")
+            val newText = text.substring(0, lineStart) + newLine + text.substring(lineEnd)
+            val offset = line.length - newLine.length
+            val newSelection = TextRange(maxOf(0, selection.start - offset))
+            textFieldValue.copy(text = newText, selection = newSelection)
+        } else {
+            // Agregar viñeta
+            val indent = line.takeWhile { it == ' ' }
+            val newLine = indent + "- " + line.trimStart()
+            val newText = text.substring(0, lineStart) + newLine + text.substring(lineEnd)
+            val offset = newLine.length - line.length
+            val newSelection = TextRange(selection.start + offset)
+            textFieldValue.copy(text = newText, selection = newSelection)
+        }
+    } catch (e: StringIndexOutOfBoundsException) {
+        return textFieldValue
     }
 }
 
@@ -347,36 +412,45 @@ private fun toggleNumberedList(textFieldValue: TextFieldValue): TextFieldValue {
     val text = textFieldValue.text
     val selection = textFieldValue.selection
     
-    val lineStart = text.lastIndexOf('\n', selection.start - 1) + 1
-    val lineEnd = text.indexOf('\n', selection.start).let { if (it == -1) text.length else it }
-    val line = text.substring(lineStart, lineEnd)
-    val isNumberedList = Regex("^\\d+\\.\\s").containsMatchIn(line.trimStart())
-    
-    return if (isNumberedList) {
-        // Remover numeración
-        val newLine = line.replaceFirst(Regex("^\\s*\\d+\\.\\s+"), "")
-        val newText = text.substring(0, lineStart) + newLine + text.substring(lineEnd)
-        val offset = line.length - newLine.length
-        val newSelection = TextRange(maxOf(0, selection.start - offset))
-        textFieldValue.copy(text = newText, selection = newSelection)
-    } else {
-        // Agregar numeración (encontrar el siguiente número)
-        val indent = line.takeWhile { it == ' ' }
-        val previousLines = text.substring(0, lineStart).split('\n')
-        var nextNumber = 1
-        for (i in previousLines.size - 2 downTo 0) {
-            val prevLine = previousLines[i]
-            val match = Regex("^\\s*(\\d+)\\.\\s").find(prevLine.trimStart())
-            if (match != null) {
-                nextNumber = match.groupValues[1].toIntOrNull()?.plus(1) ?: 1
-                break
+    try {
+        val safeStart = selection.start.coerceIn(0, text.length)
+        val searchStart = maxOf(0, safeStart - 1)
+        val lineStart = text.lastIndexOf('\n', searchStart) + 1
+        val lineEnd = text.indexOf('\n', safeStart).let { if (it == -1) text.length else it }
+        
+        if (lineStart < 0 || lineEnd > text.length || lineStart >= lineEnd) return textFieldValue
+        
+        val line = text.substring(lineStart, lineEnd)
+        val isNumberedList = Regex("^\\d+\\.\\s").containsMatchIn(line.trimStart())
+        
+        return if (isNumberedList) {
+            // Remover numeración
+            val newLine = line.replaceFirst(Regex("^\\s*\\d+\\.\\s+"), "")
+            val newText = text.substring(0, lineStart) + newLine + text.substring(lineEnd)
+            val offset = line.length - newLine.length
+            val newSelection = TextRange(maxOf(0, selection.start - offset))
+            textFieldValue.copy(text = newText, selection = newSelection)
+        } else {
+            // Agregar numeración (encontrar el siguiente número)
+            val indent = line.takeWhile { it == ' ' }
+            val previousLines = text.substring(0, lineStart).split('\n')
+            var nextNumber = 1
+            for (i in previousLines.size - 2 downTo 0) {
+                val prevLine = previousLines[i]
+                val match = Regex("^\\s*(\\d+)\\.\\s").find(prevLine.trimStart())
+                if (match != null) {
+                    nextNumber = match.groupValues[1].toIntOrNull()?.plus(1) ?: 1
+                    break
+                }
             }
+            val newLine = indent + "$nextNumber. " + line.trimStart()
+            val newText = text.substring(0, lineStart) + newLine + text.substring(lineEnd)
+            val offset = newLine.length - line.length
+            val newSelection = TextRange(selection.start + offset)
+            textFieldValue.copy(text = newText, selection = newSelection)
         }
-        val newLine = indent + "$nextNumber. " + line.trimStart()
-        val newText = text.substring(0, lineStart) + newLine + text.substring(lineEnd)
-        val offset = newLine.length - line.length
-        val newSelection = TextRange(selection.start + offset)
-        textFieldValue.copy(text = newText, selection = newSelection)
+    } catch (e: StringIndexOutOfBoundsException) {
+        return textFieldValue
     }
 }
 

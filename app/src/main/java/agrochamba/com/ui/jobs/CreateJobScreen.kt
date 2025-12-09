@@ -82,7 +82,7 @@ fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel 
     var publishToFacebook by remember { mutableStateOf(false) }
     
     var showMoreOptions by remember { mutableStateOf(false) }
-    
+
     // Reiniciar el estado cuando se navega a esta pantalla
     LaunchedEffect(Unit) {
         // Asegurar que el estado se reinicialice cuando se entra a la pantalla
@@ -197,16 +197,42 @@ fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel 
                 
                 // Título con placeholder descriptivo
                 Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                    Text(
-                        text = "Agrega un título llamativo",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Agrega un título llamativo",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        // Contador de caracteres (límite máximo: 200, recomendación SEO: 50-60)
+                        val maxLength = 200 // Límite máximo permitido
+                        val seoOptimalMax = 60 // Recomendación SEO de Google
+                        val seoOptimalMin = 50 // Recomendación SEO de Google
+                        Text(
+                            text = "${title.length}/$maxLength",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = when {
+                                title.length > maxLength -> Color(0xFFD32F2F) // Rojo si excede límite máximo
+                                title.length > seoOptimalMax -> Color(0xFFFF9800) // Naranja si excede recomendación SEO
+                                title.length >= seoOptimalMin -> Color(0xFF4CAF50) // Verde si está en rango óptimo SEO
+                                else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) // Gris si está por debajo
+                            },
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                    }
                     TextField(
                         value = title,
-                        onValueChange = { title = it },
+                        onValueChange = { newTitle ->
+                            // Permitir hasta 200 caracteres (límite máximo)
+                            if (newTitle.length <= 200) {
+                                title = newTitle
+                            }
+                        },
                         placeholder = {
                             Text(
                                 "Ej: Se busca personal para cosecha de uva en Ica",
@@ -216,10 +242,41 @@ fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel 
                         modifier = Modifier.fillMaxWidth(),
                         colors = TextFieldDefaults.colors(
                             focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent
+                            unfocusedContainerColor = Color.Transparent,
+                            focusedIndicatorColor = when {
+                                title.length > 200 -> Color(0xFFD32F2F) // Rojo si excede límite máximo
+                                title.length > 60 -> Color(0xFFFF9800) // Naranja si excede recomendación SEO
+                                else -> MaterialTheme.colorScheme.primary
+                            },
+                            unfocusedIndicatorColor = when {
+                                title.length > 200 -> Color(0xFFD32F2F)
+                                title.length > 60 -> Color(0xFFFF9800)
+                                else -> MaterialTheme.colorScheme.outline
+                            }
                         ),
-                        textStyle = MaterialTheme.typography.bodyLarge
+                        textStyle = MaterialTheme.typography.bodyLarge,
+                        maxLines = 3, // Permitir hasta 3 líneas para ver el título completo
+                        minLines = 1
                     )
+                    // Mensaje de ayuda SEO (solo recomendación, no bloquea)
+                    if (title.length > 0) {
+                        Text(
+                            text = when {
+                                title.length <= 50 -> "✓ Título óptimo para SEO (50-60 caracteres recomendado)"
+                                title.length <= 60 -> "✓ Título dentro del rango SEO recomendado"
+                                title.length <= 100 -> "⚠ Título largo: puede truncarse en resultados de búsqueda de Google"
+                                title.length <= 200 -> "⚠ Título muy largo: se truncará significativamente en resultados"
+                                else -> "⚠ Título extremadamente largo: se truncará completamente en resultados de búsqueda"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = when {
+                                title.length <= 60 -> Color(0xFF4CAF50) // Verde
+                                title.length <= 100 -> Color(0xFFFF9800) // Naranja
+                                else -> Color(0xFFD32F2F) // Rojo
+                            },
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
                 }
                 
                 Spacer(Modifier.height(16.dp))
