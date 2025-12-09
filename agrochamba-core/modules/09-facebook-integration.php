@@ -113,7 +113,7 @@ if (!function_exists('agrochamba_post_to_facebook')) {
 
         // Si hay imágenes Y el usuario NO prefiere link preview, subirlas nativamente a Facebook
         if (!empty($image_urls) && !$use_link_preview) {
-            error_log('AgroChamba Facebook: Subiendo ' . count($image_urls) . ' imagen(es) nativa(s) a Facebook');
+            error_log('AgroChamba Facebook: Subiendo ' . count($image_urls) . ' imagen(es) nativa(s) a Facebook (usuario prefiere imágenes adjuntas)');
             
             foreach ($image_urls as $index => $image_url) {
                 error_log('AgroChamba Facebook: Subiendo imagen ' . ($index + 1) . ' de ' . count($image_urls) . ': ' . $image_url);
@@ -154,7 +154,11 @@ if (!function_exists('agrochamba_post_to_facebook')) {
                 }
             }
         } else {
-            error_log('AgroChamba Facebook: No se encontraron imágenes para el post ID: ' . $post_id);
+            if ($use_link_preview && !empty($image_urls)) {
+                error_log('AgroChamba Facebook: Usuario prefiere link preview, no se subirán imágenes nativas aunque estén disponibles');
+            } elseif (empty($image_urls)) {
+                error_log('AgroChamba Facebook: No se encontraron imágenes para el post ID: ' . $post_id);
+            }
         }
 
         // Publicar el post en Facebook
@@ -437,7 +441,58 @@ if (!function_exists('agrochamba_build_facebook_message')) {
         $content = preg_replace('/\n{3,}/', "\n\n", $content);
         $content = trim($content);
         
-        // NO truncar el contenido - mostrar todo lo que el usuario escribió
+        // Verificar si se debe acortar el contenido
+        // Prioridad: 1) Preferencia del usuario desde la app, 2) Configuración global del admin
+        $shorten_content = false;
+        if (isset($job_data['facebook_shorten_content'])) {
+            // Preferencia específica del usuario desde la app
+            $shorten_content = filter_var($job_data['facebook_shorten_content'], FILTER_VALIDATE_BOOLEAN);
+        } else {
+            // Usar configuración global del admin
+            $shorten_content = get_option('agrochamba_facebook_shorten_content', false);
+        }
+        
+        // Verificar si se debe usar link preview
+        // Prioridad: 1) Preferencia del usuario desde la app, 2) Configuración global del admin
+        $use_link_preview = false;
+        if (isset($job_data['facebook_use_link_preview'])) {
+            // Preferencia específica del usuario desde la app
+            $use_link_preview = filter_var($job_data['facebook_use_link_preview'], FILTER_VALIDATE_BOOLEAN);
+        } else {
+            // Usar configuración global del admin
+            $use_link_preview = get_option('agrochamba_facebook_use_link_preview', false);
+        }
+        
+        $original_content = $content;
+        
+        if ($shorten_content && !empty($content)) {
+            // Truncar contenido a aproximadamente 300 caracteres (ajustable)
+            // Intentar cortar en un punto lógico (punto, salto de línea, etc.)
+            $max_length = 300;
+            if (strlen($content) > $max_length) {
+                // Buscar el último punto, signo de exclamación o interrogación antes del límite
+                $truncate_pos = $max_length;
+                $punctuation = array('. ', '.\n', '! ', '!\n', '? ', '?\n', '.\n\n', '!\n\n', '?\n\n');
+                $best_pos = 0;
+                
+                foreach ($punctuation as $punct) {
+                    $pos = strrpos(substr($content, 0, $max_length), $punct);
+                    if ($pos !== false && $pos > $best_pos) {
+                        $best_pos = $pos + strlen($punct);
+                    }
+                }
+                
+                // Si encontramos un punto lógico, usar ese; si no, cortar en el límite
+                if ($best_pos > 100) { // Solo usar si encontramos algo razonable (al menos 100 caracteres)
+                    $truncate_pos = $best_pos;
+                }
+                
+                $content = substr($content, 0, $truncate_pos);
+                $content = trim($content);
+                
+                // No agregar texto aquí, se agregará al final de forma consistente
+            }
+        }
         
         // Obtener valores de meta fields (solo si fueron rellenados)
         $salario_min = get_post_meta($post_id, 'salario_min', true);
@@ -494,9 +549,19 @@ if (!function_exists('agrochamba_build_facebook_message')) {
             $message .= "\n\n" . implode("\n", $additional_info);
         }
         
-        // Agregar link al final del mensaje (se incluirá en el texto)
+        // Agregar mensaje corto y llamativo al final para motivar a visitar
         $job_url = get_permalink($post_id);
-        $message .= "\n\n👉 Ver más detalles: " . $job_url;
+        
+        // Lógica para agregar el link:
+        // - Si use_link_preview está ACTIVO: NO agregar link (Facebook lo genera automáticamente con preview)
+        // - Si use_link_preview está INACTIVO: SÍ agregar link (para que sea clickeable)
+        if ($use_link_preview) {
+            // Preview activo: Facebook genera el link automáticamente, solo mensaje
+            $message .= "\n\n👉 Ver más detalles";
+        } else {
+            // Preview inactivo: Necesitamos agregar el link para que sea clickeable
+            $message .= "\n\n👉 Ver más detalles: " . $job_url;
+        }
         
         return $message;
     }
@@ -584,6 +649,7 @@ if (!function_exists('agrochamba_facebook_settings_page')) {
             update_option('agrochamba_n8n_webhook_url', sanitize_text_field($_POST['n8n_webhook_url']));
             update_option('agrochamba_facebook_page_token', sanitize_text_field($_POST['facebook_page_token']));
             update_option('agrochamba_facebook_page_id', sanitize_text_field($_POST['facebook_page_id']));
+            update_option('agrochamba_facebook_shorten_content', isset($_POST['facebook_shorten_content']));
             
             // Configuración de Moderación por IA
             update_option('agrochamba_ai_moderation_enabled', isset($_POST['ai_moderation_enabled']));
@@ -600,6 +666,7 @@ if (!function_exists('agrochamba_facebook_settings_page')) {
         $n8n_webhook_url = get_option('agrochamba_n8n_webhook_url', '');
         $page_token = get_option('agrochamba_facebook_page_token', '');
         $page_id = get_option('agrochamba_facebook_page_id', '');
+        $facebook_shorten_content = get_option('agrochamba_facebook_shorten_content', false);
         
         // Valores de Moderación por IA
         $ai_moderation_enabled = get_option('agrochamba_ai_moderation_enabled', true);
@@ -667,6 +734,19 @@ if (!function_exists('agrochamba_facebook_settings_page')) {
                             <p class="description">
                                 ID de tu página de Facebook (puedes encontrarlo en la configuración de tu página).<br>
                                 Solo necesario si NO usas n8n.
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">Acortar contenido en Facebook</th>
+                        <td>
+                            <label>
+                                <input type="checkbox" name="facebook_shorten_content" value="1" <?php checked($facebook_shorten_content, true); ?>>
+                                Mostrar solo una parte del contenido y dirigir tráfico al sitio web
+                            </label>
+                            <p class="description">
+                                Cuando está activado, solo se mostrará una parte del contenido en Facebook (aproximadamente 300 caracteres).<br>
+                                Al final se agregará: "📌 Mayor información en el link adjunto de AgroChamba" para dirigir más tráfico a tu sitio web.
                             </p>
                         </td>
                     </tr>
