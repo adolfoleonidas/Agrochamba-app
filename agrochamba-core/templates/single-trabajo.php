@@ -8,6 +8,49 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+// Filtrar wp_kses para permitir elementos HTML básicos
+add_filter('wp_kses_allowed_html', function($allowed, $context) {
+    if ($context === 'post' || $context === 'agrochamba_content') {
+        // Permitir span con atributos data
+        if (!isset($allowed['span'])) {
+            $allowed['span'] = array();
+        }
+        $allowed['span']['class'] = true;
+        $allowed['span']['data-phone'] = true;
+        $allowed['span']['data-phone-display'] = true;
+        $allowed['span']['id'] = true;
+        
+        // Permitir button con onclick
+        $allowed['button'] = array(
+            'type' => true,
+            'class' => true,
+            'onclick' => true,
+            'title' => true,
+        );
+        
+        // Permitir SVG completo
+        $allowed['svg'] = array(
+            'width' => true,
+            'height' => true,
+            'viewbox' => true,
+            'viewBox' => true,
+            'fill' => true,
+            'xmlns' => true,
+            'class' => true,
+        );
+        
+        $allowed['path'] = array(
+            'd' => true,
+            'fill' => true,
+            'stroke' => true,
+            'stroke-width' => true,
+            'stroke-linecap' => true,
+            'stroke-linejoin' => true,
+        );
+    }
+    return $allowed;
+}, 10, 2);
+
 get_header();
 
 $trabajo_id = get_the_ID();
@@ -45,26 +88,331 @@ $ubicacion = !empty($ubicaciones) ? $ubicaciones[0] : null;
 // Obtener empresa (CPT)
 $empresa_id = get_post_meta($trabajo_id, 'empresa_id', true);
 $empresa_data = null;
+
+// Si no hay empresa_id en meta, intentar obtener desde taxonomía empresa
+if (!$empresa_id) {
+    $empresa_terms = wp_get_post_terms($trabajo_id, 'empresa');
+    if (!empty($empresa_terms) && !is_wp_error($empresa_terms)) {
+        $empresa_term = $empresa_terms[0];
+        // Buscar CPT Empresa por nombre
+        $empresa_posts = get_posts(array(
+            'post_type' => 'empresa',
+            'name' => $empresa_term->slug,
+            'posts_per_page' => 1,
+            'post_status' => 'publish'
+        ));
+        if (!empty($empresa_posts)) {
+            $empresa_id = $empresa_posts[0]->ID;
+        }
+    }
+}
+
 if ($empresa_id) {
     $empresa_data = agrochamba_get_empresa_data($empresa_id);
 }
 
-// Imagen destacada
+// Si aún no hay empresa_data pero hay taxonomía empresa, crear datos básicos desde la taxonomía
+if (!$empresa_data && !empty($empresa_terms) && !is_wp_error($empresa_terms)) {
+    $empresa_term = $empresa_terms[0];
+    $empresa_data = array(
+        'nombre_comercial' => $empresa_term->name,
+        'url' => get_term_link($empresa_term),
+        'logo_url' => null,
+        'verificada' => false,
+    );
+}
+
+// Obtener todas las imágenes para el slider
+$all_images = array();
+
+// 1. Imagen destacada (primera prioridad)
 $featured_image_id = get_post_thumbnail_id($trabajo_id);
-$featured_image_url = $featured_image_id ? wp_get_attachment_image_url($featured_image_id, 'full') : null;
+if ($featured_image_id) {
+    $featured_image_url = wp_get_attachment_image_url($featured_image_id, 'full');
+    $featured_image_thumb = wp_get_attachment_image_url($featured_image_id, 'large');
+    if ($featured_image_url) {
+        $all_images[] = array(
+            'id' => $featured_image_id,
+            'url' => $featured_image_url,
+            'thumb' => $featured_image_thumb
+        );
+    }
+}
+
+// 2. Imágenes de la galería (gallery_ids)
+$gallery_ids = get_post_meta($trabajo_id, 'gallery_ids', true);
+if (!empty($gallery_ids) && is_array($gallery_ids)) {
+    foreach ($gallery_ids as $gallery_id) {
+        $gallery_id = intval($gallery_id);
+        // Evitar duplicar la imagen destacada
+        if ($gallery_id != $featured_image_id) {
+            $gallery_url = wp_get_attachment_image_url($gallery_id, 'full');
+            $gallery_thumb = wp_get_attachment_image_url($gallery_id, 'large');
+            if ($gallery_url) {
+                $all_images[] = array(
+                    'id' => $gallery_id,
+                    'url' => $gallery_url,
+                    'thumb' => $gallery_thumb
+                );
+            }
+        }
+    }
+}
+
+// Si no hay imágenes, usar la imagen destacada como fallback
+if (empty($all_images) && $featured_image_id) {
+    $featured_image_url = wp_get_attachment_image_url($featured_image_id, 'full');
+    $featured_image_thumb = wp_get_attachment_image_url($featured_image_id, 'large');
+    if ($featured_image_url) {
+        $all_images[] = array(
+            'id' => $featured_image_id,
+            'url' => $featured_image_url,
+            'thumb' => $featured_image_thumb
+        );
+    }
+}
+
+// Obtener IDs de todas las imágenes que están en el slider
+$slider_image_ids = array();
+foreach ($all_images as $image) {
+    if (isset($image['id'])) {
+        $slider_image_ids[] = $image['id'];
+    }
+}
+
+// Función para filtrar imágenes del contenido que ya están en el slider
+function agrochamba_remove_slider_images_from_content($content, $image_ids_to_remove) {
+    if (empty($image_ids_to_remove) || empty($content)) {
+        return $content;
+    }
+    
+    // Crear un patrón regex para encontrar todas las imágenes con esos IDs
+    foreach ($image_ids_to_remove as $image_id) {
+        // Patrón para encontrar <img> tags con el attachment_id en la URL o en atributos
+        // Buscar por ID en la URL de la imagen (wp-image-{id})
+        $pattern = '/<img[^>]*class="[^"]*wp-image-' . preg_quote($image_id, '/') . '[^"]*"[^>]*>.*?<\/img>|<img[^>]*class="[^"]*wp-image-' . preg_quote($image_id, '/') . '[^"]*"[^>]*\/>/i';
+        $content = preg_replace($pattern, '', $content);
+        
+        // También buscar por URL de la imagen (puede tener diferentes tamaños)
+        $image_url = wp_get_attachment_url($image_id);
+        if ($image_url) {
+            // Extraer el nombre del archivo sin extensión
+            $image_filename = basename($image_url);
+            $image_filename_no_ext = preg_replace('/\.[^.]+$/', '', $image_filename);
+            
+            // Buscar imágenes con este nombre de archivo
+            $pattern = '/<img[^>]*src="[^"]*' . preg_quote($image_filename_no_ext, '/') . '[^"]*"[^>]*>.*?<\/img>|<img[^>]*src="[^"]*' . preg_quote($image_filename_no_ext, '/') . '[^"]*"[^>]*\/>/i';
+            $content = preg_replace($pattern, '', $content);
+        }
+        
+        // Buscar por data-id o attachment_id
+        $pattern = '/<img[^>]*(data-id|attachment-id)="' . preg_quote($image_id, '/') . '"[^>]*>.*?<\/img>|<img[^>]*(data-id|attachment-id)="' . preg_quote($image_id, '/') . '"[^>]*\/>/i';
+        $content = preg_replace($pattern, '', $content);
+    }
+    
+    // Limpiar párrafos, divs y figures vacíos que puedan quedar
+    $content = preg_replace('/<p[^>]*>\s*<\/p>/i', '', $content);
+    $content = preg_replace('/<div[^>]*>\s*<\/div>/i', '', $content);
+    $content = preg_replace('/<figure[^>]*>\s*<\/figure>/i', '', $content);
+    
+    return $content;
+}
+
+// Filtrar el contenido para remover imágenes del slider
+$filtered_content = $trabajo->post_content;
+if (!empty($slider_image_ids)) {
+    $filtered_content = agrochamba_remove_slider_images_from_content($filtered_content, $slider_image_ids);
+}
+
+// Asegurarse de que el contenido no esté doblemente escapado
+// WordPress puede escapar el contenido, así que lo decodificamos
+$filtered_content = wp_specialchars_decode($filtered_content, ENT_QUOTES);
+$filtered_content = html_entity_decode($filtered_content, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+// Función helper para obtener permisos HTML personalizados que permiten botones de teléfono
+function agrochamba_get_allowed_html_for_content() {
+    $allowed_html = wp_kses_allowed_html('post');
+    
+    // Permitir atributos adicionales en span
+    $allowed_html['span'] = array_merge(
+        isset($allowed_html['span']) ? $allowed_html['span'] : array(),
+        array(
+            'class' => true,
+            'data-phone' => true,
+            'data-phone-display' => true,
+            'id' => true,
+        )
+    );
+    
+    // Permitir atributos adicionales en enlaces
+    $allowed_html['a'] = array_merge(
+        isset($allowed_html['a']) ? $allowed_html['a'] : array(),
+        array(
+            'class' => true,
+            'href' => true,
+            'target' => true,
+            'rel' => true,
+            'title' => true,
+        )
+    );
+    
+    // Permitir botones con onclick
+    $allowed_html['button'] = array(
+        'type' => true,
+        'class' => true,
+        'onclick' => true,
+        'title' => true,
+    );
+    
+    // Permitir SVG e iconos
+    $allowed_html['svg'] = array(
+        'width' => true,
+        'height' => true,
+        'viewbox' => true,
+        'viewBox' => true,
+        'fill' => true,
+        'xmlns' => true,
+        'class' => true,
+    );
+    
+    $allowed_html['path'] = array(
+        'd' => true,
+        'fill' => true,
+        'stroke' => true,
+        'stroke-width' => true,
+        'stroke-linecap' => true,
+        'stroke-linejoin' => true,
+    );
+    
+    return $allowed_html;
+}
+
+// Función para hacer clicables correos, teléfonos y URLs en el contenido
+function agrochamba_make_content_clickable($content) {
+    if (empty($content)) {
+        return $content;
+    }
+    
+    // Primero, proteger los enlaces HTML existentes usando marcadores temporales
+    $link_placeholders = array();
+    $placeholder_index = 0;
+    
+    // Reemplazar enlaces existentes con placeholders
+    $content = preg_replace_callback('/<a\s[^>]*>.*?<\/a>/is', function($matches) use (&$link_placeholders, &$placeholder_index) {
+        $placeholder = '___LINK_PLACEHOLDER_' . $placeholder_index . '___';
+        $link_placeholders[$placeholder] = $matches[0];
+        $placeholder_index++;
+        return $placeholder;
+    }, $content);
+    
+    // Patrón para detectar teléfonos (peruano: 9 dígitos, puede empezar con +51 o 0)
+    // Formato: +51 999 999 999, 999 999 999, (01) 999-9999, etc.
+    // Evitar números dentro de placeholders (enlaces existentes)
+    $phone_pattern = '/(?<![\d+])(?<!___LINK_PLACEHOLDER_)(\+?51\s?)?(0?\d{1,2}[\s\-]?)?(\d{3}[\s\-]?\d{3}[\s\-]?\d{3,4})(?![\d])/';
+    $content = preg_replace_callback($phone_pattern, function($matches) {
+        $full_phone = $matches[0];
+        $phone_clean = preg_replace('/[^0-9]/', '', $full_phone);
+        // Crear enlace simple para teléfono
+        $phone_display = esc_html($full_phone);
+        return '<a href="tel:' . esc_attr($phone_clean) . '" class="clickable-phone">' . $phone_display . '</a>';
+    }, $content);
+    
+    // Patrón para detectar correos electrónicos (evitar los que ya están en enlaces)
+    $email_pattern = '/(?<!href=["\']mailto:)(?<!>)([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})(?![^<]*<\/a>)/';
+    $content = preg_replace($email_pattern, '<a href="mailto:$1" class="clickable-email">$1</a>', $content);
+    
+    // Patrón para detectar URLs (http/https/www) - evitar las que ya están en enlaces
+    $url_pattern = '/(?<!href=["\'])(?<!src=["\'])(?<!>)(https?:\/\/[^\s<>"\'{}|\\^`\[\]]+|[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]?\.[a-zA-Z]{2,}[^\s<>"\'{}|\\^`\[\]]*)(?![^<]*<\/a>)/i';
+    $content = preg_replace_callback($url_pattern, function($matches) {
+        $url = $matches[0];
+        // Si no tiene protocolo, agregar https://
+        if (!preg_match('/^https?:\/\//i', $url)) {
+            $url = 'https://' . $url;
+        }
+        return '<a href="' . esc_url($url) . '" class="clickable-url" target="_blank" rel="noopener">' . esc_html($matches[0]) . '</a>';
+    }, $content);
+    
+    // Restaurar los enlaces originales
+    foreach ($link_placeholders as $placeholder => $original_link) {
+        $content = str_replace($placeholder, $original_link, $content);
+    }
+    
+    return $content;
+}
 
 ?>
+<!-- Swiper CSS -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
+<!-- Swiper JS -->
+<script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
+
 <div class="trabajo-detalle-wrapper">
+    <!-- Slider de Imágenes -->
+    <?php if (!empty($all_images)): ?>
+        <div class="trabajo-image-slider-wrapper">
+            <div class="swiper trabajo-image-slider">
+                <div class="swiper-wrapper">
+                    <?php foreach ($all_images as $index => $image): ?>
+                        <div class="swiper-slide">
+                            <img src="<?php echo esc_url($image['thumb']); ?>" 
+                                 data-full="<?php echo esc_url($image['url']); ?>"
+                                 alt="<?php echo esc_attr($trabajo->post_title . ' - Imagen ' . ($index + 1)); ?>"
+                                 class="slider-image"
+                                 onclick="openFullscreenSlider(<?php echo $index; ?>)">
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+                <?php if (count($all_images) > 1): ?>
+                    <div class="swiper-pagination"></div>
+                    <div class="swiper-button-next"></div>
+                    <div class="swiper-button-prev"></div>
+                <?php endif; ?>
+            </div>
+        </div>
+    <?php else: ?>
+        <!-- Placeholder si no hay imágenes -->
+        <div class="trabajo-image-placeholder">
+            <svg width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                <circle cx="8.5" cy="8.5" r="1.5"/>
+                <polyline points="21 15 16 10 5 21"/>
+            </svg>
+        </div>
+    <?php endif; ?>
+
     <!-- Header del Trabajo -->
     <div class="trabajo-header-section">
         <div class="trabajo-header-content">
             <div class="trabajo-header-left">
                 <h1 class="trabajo-titulo">
                     <?php echo esc_html($trabajo->post_title); ?>
-                    <?php if ($ubicacion): ?>
-                        <span class="trabajo-ubicacion-header">, <?php echo esc_html($ubicacion->name); ?></span>
-                    <?php endif; ?>
                 </h1>
+                
+                <!-- Nombre de la empresa y ubicación (similar a la app) -->
+                <?php if ($empresa_data || $ubicacion): ?>
+                    <div class="empresa-meta-header">
+                        <?php if ($empresa_data): ?>
+                            <a href="<?php echo esc_url($empresa_data['url']); ?>" class="empresa-nombre-link-destacado">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z"/>
+                                </svg>
+                                <span><?php echo esc_html($empresa_data['nombre_comercial']); ?></span>
+                            </a>
+                        <?php endif; ?>
+                        
+                        <?php if ($ubicacion): ?>
+                            <?php if ($empresa_data): ?>
+                                <span class="meta-separator">•</span>
+                            <?php endif; ?>
+                            <div class="trabajo-location-header">
+                                <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor">
+                                    <path d="M8 0a5 5 0 0 0-5 5c0 4.5 5 10 5 10s5-5.5 5-10a5 5 0 0 0-5-5zm0 7a2 2 0 1 1 0-4 2 2 0 0 1 0 4z"/>
+                                </svg>
+                                <span><?php echo esc_html($ubicacion->name); ?></span>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                <?php endif; ?>
                 
                 <?php if ($empresa_data): ?>
                     <div class="empresa-info-header">
@@ -73,20 +421,8 @@ $featured_image_url = $featured_image_id ? wp_get_attachment_image_url($featured
                                 <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
                             </svg>
                             <span class="rating-value">4.2</span>
-                            <a href="<?php echo esc_url($empresa_data['url']); ?>" class="empresa-nombre-link">
-                                <?php echo esc_html($empresa_data['nombre_comercial']); ?>
-                            </a>
                             <span class="evaluaciones-count">0 evaluaciones</span>
                         </div>
-                        
-                        <?php if ($ubicacion): ?>
-                            <div class="trabajo-location-header">
-                                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                    <path d="M8 0a5 5 0 0 0-5 5c0 4.5 5 10 5 10s5-5.5 5-10a5 5 0 0 0-5-5zm0 7a2 2 0 1 1 0-4 2 2 0 0 1 0 4z"/>
-                                </svg>
-                                <?php echo esc_html($ubicacion->name); ?>
-                            </div>
-                        <?php endif; ?>
                         
                         <?php if ($empresa_data['verificada']): ?>
                             <div class="empresa-verificada-badge-header">
@@ -99,13 +435,6 @@ $featured_image_url = $featured_image_id ? wp_get_attachment_image_url($featured
                     </div>
                 <?php endif; ?>
             </div>
-            
-            <?php if ($empresa_data && $empresa_data['logo_url']): ?>
-                <div class="empresa-logo-header">
-                    <img src="<?php echo esc_url($empresa_data['logo_url']); ?>" 
-                         alt="<?php echo esc_attr($empresa_data['nombre_comercial']); ?>" />
-                </div>
-            <?php endif; ?>
         </div>
     </div>
 
@@ -186,7 +515,12 @@ $featured_image_url = $featured_image_id ? wp_get_attachment_image_url($featured
             <div class="trabajo-section">
                 <h2 class="section-title">Descripción del trabajo</h2>
                 <div class="trabajo-descripcion-text">
-                    <?php echo wp_kses_post(wpautop($trabajo->post_content)); ?>
+                    <?php 
+                    // Hacer clicables los elementos (teléfonos, correos, URLs)
+                    $clickable_content = agrochamba_make_content_clickable($filtered_content);
+                    // Aplicar wpautop y wp_kses_post normalmente
+                    echo wp_kses_post(wpautop($clickable_content)); 
+                    ?>
                 </div>
             </div>
 
@@ -205,7 +539,10 @@ $featured_image_url = $featured_image_id ? wp_get_attachment_image_url($featured
                                 <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                                     <path d="M10.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l2.094 2.093 3.99-4.01z"/>
                                 </svg>
-                                <span><?php echo esc_html($responsabilidad); ?></span>
+                                <span><?php 
+                                    $clickable_responsabilidad = agrochamba_make_content_clickable($responsabilidad);
+                                    echo wp_kses_post($clickable_responsabilidad); 
+                                ?></span>
                             </div>
                         <?php 
                             endif;
@@ -221,7 +558,10 @@ $featured_image_url = $featured_image_id ? wp_get_attachment_image_url($featured
                     <h2 class="section-title">Requisitos</h2>
                     <div class="requisitos-list">
                         <div class="requisito-item">
-                            <strong>Experiencia:</strong> <?php echo esc_html($experiencia); ?>
+                            <strong>Experiencia:</strong> <?php 
+                                $clickable_experiencia = agrochamba_make_content_clickable($experiencia);
+                                echo wp_kses_post($clickable_experiencia); 
+                            ?>
                         </div>
                     </div>
                 </div>
@@ -262,7 +602,10 @@ $featured_image_url = $featured_image_id ? wp_get_attachment_image_url($featured
                         
                         <?php if ($beneficios): ?>
                             <div class="beneficio-texto">
-                                <?php echo wp_kses_post(wpautop($beneficios)); ?>
+                                <?php 
+                                $clickable_beneficios = agrochamba_make_content_clickable($beneficios);
+                                echo wp_kses_post(wpautop($clickable_beneficios)); 
+                                ?>
                             </div>
                         <?php endif; ?>
                     </div>
@@ -303,13 +646,17 @@ $featured_image_url = $featured_image_id ? wp_get_attachment_image_url($featured
             <!-- Información de la Empresa -->
             <?php if ($empresa_data): ?>
                 <div class="empresa-card-sidebar">
-                    <h3 class="sidebar-title">Acerca de <?php echo esc_html($empresa_data['nombre_comercial']); ?></h3>
+                    <h3 class="sidebar-title">
+                        Acerca de <a href="<?php echo esc_url($empresa_data['url']); ?>" class="empresa-nombre-sidebar-link"><?php echo esc_html($empresa_data['nombre_comercial']); ?></a>
+                    </h3>
                     
                     <div class="empresa-card-header">
                         <?php if ($empresa_data['logo_url']): ?>
-                            <img src="<?php echo esc_url($empresa_data['logo_url']); ?>" 
-                                 alt="<?php echo esc_attr($empresa_data['nombre_comercial']); ?>" 
-                                 class="empresa-logo-sidebar" />
+                            <a href="<?php echo esc_url($empresa_data['url']); ?>" class="empresa-logo-sidebar-link">
+                                <img src="<?php echo esc_url($empresa_data['logo_url']); ?>" 
+                                     alt="<?php echo esc_attr($empresa_data['nombre_comercial']); ?>" 
+                                     class="empresa-logo-sidebar" />
+                            </a>
                         <?php endif; ?>
                         
                         <a href="<?php echo esc_url($empresa_data['url']); ?>" class="btn-seguir-sidebar">
@@ -435,6 +782,58 @@ $featured_image_url = $featured_image_id ? wp_get_attachment_image_url($featured
     color: #1a1a1a;
 }
 
+.empresa-meta-header {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin: 16px 0 12px 0;
+}
+
+.empresa-nombre-link-destacado {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: #0066cc;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 16px;
+    transition: all 0.2s ease;
+}
+
+.meta-separator {
+    color: #999;
+    font-size: 18px;
+    line-height: 1;
+}
+
+.trabajo-location-header {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #666;
+    font-size: 16px;
+}
+
+.trabajo-location-header svg {
+    flex-shrink: 0;
+    color: #666;
+}
+
+.empresa-nombre-link-destacado:hover {
+    color: #0052a3;
+    text-decoration: underline;
+}
+
+.empresa-nombre-link-destacado svg {
+    flex-shrink: 0;
+    color: #0066cc;
+}
+
+.empresa-nombre-link-destacado:hover svg {
+    color: #0052a3;
+}
+
 .empresa-nombre-link {
     color: #0066cc;
     text-decoration: none;
@@ -467,19 +866,6 @@ $featured_image_url = $featured_image_id ? wp_get_attachment_image_url($featured
     font-weight: 500;
 }
 
-.empresa-logo-header {
-    width: 120px;
-    height: 120px;
-    flex-shrink: 0;
-}
-
-.empresa-logo-header img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    border-radius: 8px;
-    border: 2px solid #e0e0e0;
-}
 
 .trabajo-actions-section {
     background: #fff;
@@ -639,6 +1025,64 @@ $featured_image_url = $featured_image_id ? wp_get_attachment_image_url($featured
     color: #333;
 }
 
+/* Estilos para enlaces clicables en el contenido */
+.trabajo-descripcion-text a,
+.responsabilidad-item a,
+.requisito-item a,
+.beneficio-texto a {
+    color: #0066cc;
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.trabajo-descripcion-text a:hover,
+.responsabilidad-item a:hover,
+.requisito-item a:hover,
+.beneficio-texto a:hover {
+    color: #0052a3;
+    border-bottom-color: #0052a3;
+    text-decoration: none;
+}
+
+/* Estilos para contenedor de teléfonos con botones */
+/* Estilos para enlaces clicables de teléfonos */
+.clickable-phone {
+    color: #0066cc;
+    text-decoration: none;
+    font-weight: 500;
+    border-bottom: 1px solid transparent;
+    transition: all 0.2s ease;
+}
+
+.clickable-phone:hover {
+    color: #0052a3;
+    border-bottom-color: #0052a3;
+    text-decoration: none;
+}
+
+/* Estilos específicos para correos */
+.clickable-email {
+    color: #0066cc !important;
+}
+
+.clickable-email:hover {
+    color: #0052a3 !important;
+    border-bottom-color: #0052a3 !important;
+}
+
+/* Estilos específicos para URLs */
+.clickable-url {
+    color: #0066cc !important;
+    word-break: break-all;
+}
+
+.clickable-url:hover {
+    color: #0052a3 !important;
+    border-bottom-color: #0052a3 !important;
+}
+
 .contacto-info {
     display: flex;
     flex-direction: column;
@@ -680,12 +1124,39 @@ $featured_image_url = $featured_image_id ? wp_get_attachment_image_url($featured
     margin-bottom: 20px;
 }
 
+.empresa-logo-sidebar-link {
+    display: block;
+    transition: transform 0.3s ease;
+    text-decoration: none;
+    width: 80px;
+    height: 80px;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.empresa-logo-sidebar-link:hover {
+    transform: scale(1.05);
+}
+
 .empresa-logo-sidebar {
     width: 80px;
     height: 80px;
     object-fit: cover;
     border-radius: 8px;
     border: 2px solid #e0e0e0;
+    display: block;
+}
+
+.empresa-nombre-sidebar-link {
+    color: #0066cc;
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.2s ease;
+}
+
+.empresa-nombre-sidebar-link:hover {
+    color: #0052a3;
+    text-decoration: underline;
 }
 
 .btn-seguir-sidebar {
@@ -757,11 +1228,6 @@ $featured_image_url = $featured_image_id ? wp_get_attachment_image_url($featured
     .trabajo-header-content {
         flex-direction: column;
     }
-    
-    .empresa-logo-header {
-        margin-top: 20px;
-        align-self: center;
-    }
 }
 
 @media (max-width: 768px) {
@@ -778,6 +1244,220 @@ $featured_image_url = $featured_image_id ? wp_get_attachment_image_url($featured
         width: 100%;
     }
 }
+
+/* Estilos del Slider de Imágenes */
+.trabajo-image-slider-wrapper {
+    width: 100%;
+    position: relative;
+    background: #000;
+}
+
+.trabajo-image-slider {
+    width: 100%;
+    height: 500px;
+}
+
+.trabajo-image-slider .swiper-slide {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #000;
+}
+
+.trabajo-image-slider .slider-image {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    cursor: pointer;
+    transition: transform 0.3s ease;
+}
+
+.trabajo-image-slider .slider-image:hover {
+    transform: scale(1.02);
+}
+
+.trabajo-image-slider .swiper-pagination {
+    bottom: 20px;
+}
+
+.trabajo-image-slider .swiper-pagination-bullet {
+    background: #fff;
+    opacity: 0.5;
+    width: 10px;
+    height: 10px;
+}
+
+.trabajo-image-slider .swiper-pagination-bullet-active {
+    opacity: 1;
+    background: #0066cc;
+}
+
+.trabajo-image-slider .swiper-button-next,
+.trabajo-image-slider .swiper-button-prev {
+    color: #fff;
+    background: rgba(0, 0, 0, 0.5);
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    transition: background 0.3s;
+}
+
+.trabajo-image-slider .swiper-button-next:hover,
+.trabajo-image-slider .swiper-button-prev:hover {
+    background: rgba(0, 0, 0, 0.8);
+}
+
+.trabajo-image-slider .swiper-button-next::after,
+.trabajo-image-slider .swiper-button-prev::after {
+    font-size: 20px;
+    font-weight: bold;
+}
+
+.trabajo-image-placeholder {
+    width: 100%;
+    height: 400px;
+    background: linear-gradient(135deg, #f5f5f5 0%, #e0e0e0 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #999;
+}
+
+.trabajo-image-placeholder svg {
+    opacity: 0.3;
+}
+
+/* Vista en pantalla completa */
+.fullscreen-slider-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.95);
+    z-index: 9999;
+    cursor: pointer;
+}
+
+.fullscreen-slider-overlay.active {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.fullscreen-slider-container {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.fullscreen-swiper {
+    width: 100%;
+    height: 100%;
+}
+
+.fullscreen-swiper .swiper-slide {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.fullscreen-slider-image {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    margin: auto;
+    display: block;
+    width: auto;
+    height: auto;
+}
+
+.fullscreen-pagination {
+    position: absolute;
+    bottom: 60px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #fff;
+    font-size: 16px;
+    z-index: 10;
+}
+
+.fullscreen-button-next,
+.fullscreen-button-prev {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.2);
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    transition: background 0.3s;
+}
+
+.fullscreen-button-next:hover,
+.fullscreen-button-prev:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.fullscreen-button-next::after,
+.fullscreen-button-prev::after {
+    font-size: 20px;
+    font-weight: bold;
+}
+
+.fullscreen-slider-close {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
+    border: none;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    font-size: 24px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.3s;
+    z-index: 10000;
+}
+
+.fullscreen-slider-close:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.fullscreen-slider-counter {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #fff;
+    background: rgba(0, 0, 0, 0.5);
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 14px;
+}
+
+@media (max-width: 768px) {
+    .trabajo-image-slider {
+        height: 350px;
+    }
+    
+    .trabajo-image-slider .swiper-button-next,
+    .trabajo-image-slider .swiper-button-prev {
+        width: 36px;
+        height: 36px;
+    }
+    
+    .trabajo-image-slider .swiper-button-next::after,
+    .trabajo-image-slider .swiper-button-prev::after {
+        font-size: 16px;
+    }
+}
 </style>
 
 <script>
@@ -785,6 +1465,7 @@ function postularme() {
     // Aquí puedes agregar la lógica para postularse
     alert('Función de postulación próximamente disponible');
 }
+
 
 function toggleFavorito() {
     // Lógica para guardar en favoritos
@@ -814,6 +1495,829 @@ function masOpciones() {
     // Lógica para más opciones
     console.log('Más opciones');
 }
+
+// Inicializar Swiper para el slider de imágenes
+<?php if (!empty($all_images) && count($all_images) > 1): ?>
+document.addEventListener('DOMContentLoaded', function() {
+    const swiper = new Swiper('.trabajo-image-slider', {
+        slidesPerView: 1,
+        spaceBetween: 0,
+        loop: true,
+        autoplay: {
+            delay: 5000,
+            disableOnInteraction: false,
+        },
+        pagination: {
+            el: '.swiper-pagination',
+            clickable: true,
+        },
+        navigation: {
+            nextEl: '.swiper-button-next',
+            prevEl: '.swiper-button-prev',
+        },
+        keyboard: {
+            enabled: true,
+        },
+    });
+});
+<?php endif; ?>
+
+// Funcionalidad de vista en pantalla completa con soporte de swipe
+const allImagesData = <?php echo json_encode($all_images); ?>;
+
+let fullscreenSwiper = null;
+let currentFullscreenIndex = 0;
+
+function openFullscreenSlider(initialIndex) {
+    if (!allImagesData || allImagesData.length === 0) return;
+    
+    currentFullscreenIndex = initialIndex || 0;
+    
+    // Crear overlay si no existe
+    let overlay = document.getElementById('fullscreen-slider-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'fullscreen-slider-overlay';
+        overlay.className = 'fullscreen-slider-overlay';
+        overlay.innerHTML = `
+            <div class="fullscreen-slider-container">
+                <button class="fullscreen-slider-close" onclick="closeFullscreenSlider()">×</button>
+                <div class="swiper fullscreen-swiper">
+                    <div class="swiper-wrapper" id="fullscreen-swiper-wrapper">
+                    </div>
+                    <div class="swiper-pagination fullscreen-pagination"></div>
+                    <div class="swiper-button-next fullscreen-button-next"></div>
+                    <div class="swiper-button-prev fullscreen-button-prev"></div>
+                </div>
+                <div class="fullscreen-slider-counter">
+                    <span id="current-image-index">1</span> / <span id="total-images">${allImagesData.length}</span>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        
+        // Crear slides
+        const wrapper = overlay.querySelector('#fullscreen-swiper-wrapper');
+        allImagesData.forEach(function(image, index) {
+            const slide = document.createElement('div');
+            slide.className = 'swiper-slide';
+            slide.innerHTML = `<img src="${image.url}" class="fullscreen-slider-image" alt="Imagen ${index + 1}" />`;
+            wrapper.appendChild(slide);
+        });
+        
+        // Inicializar Swiper para pantalla completa
+        fullscreenSwiper = new Swiper('.fullscreen-swiper', {
+            slidesPerView: 1,
+            spaceBetween: 0,
+            initialSlide: currentFullscreenIndex,
+            pagination: {
+                el: '.fullscreen-pagination',
+                type: 'fraction',
+            },
+            navigation: {
+                nextEl: '.fullscreen-button-next',
+                prevEl: '.fullscreen-button-prev',
+            },
+            keyboard: {
+                enabled: true,
+            },
+            touchEventsTarget: 'container',
+            allowTouchMove: true,
+            on: {
+                slideChange: function() {
+                    const index = this.activeIndex;
+                    document.getElementById('current-image-index').textContent = index + 1;
+                    currentFullscreenIndex = index;
+                }
+            }
+        });
+    } else {
+        // Si ya existe, solo cambiar al slide inicial
+        if (fullscreenSwiper) {
+            fullscreenSwiper.slideTo(currentFullscreenIndex);
+        }
+    }
+    
+    // Navegación con teclado
+    function handleKeyPress(e) {
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+            if (fullscreenSwiper) {
+                fullscreenSwiper.slideNext();
+            }
+        } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+            if (fullscreenSwiper) {
+                fullscreenSwiper.slidePrev();
+            }
+        } else if (e.key === 'Escape') {
+            closeFullscreenSlider();
+        }
+    }
+    
+    // Guardar referencia al handler para poder removerlo después
+    overlay._keyHandler = handleKeyPress;
+    document.addEventListener('keydown', handleKeyPress);
+    
+    // Mostrar overlay
+    overlay.classList.add('active');
+    document.body.style.overflow = 'hidden';
+    
+    // Actualizar contador inicial
+    document.getElementById('current-image-index').textContent = currentFullscreenIndex + 1;
+    document.getElementById('total-images').textContent = allImagesData.length;
+}
+
+function closeFullscreenSlider() {
+    const overlay = document.getElementById('fullscreen-slider-overlay');
+    if (overlay) {
+        overlay.classList.remove('active');
+        document.body.style.overflow = '';
+        
+        // Remover handler de teclado
+        if (overlay._keyHandler) {
+            document.removeEventListener('keydown', overlay._keyHandler);
+            overlay._keyHandler = null;
+        }
+    }
+}
+</script>
+
+<!-- Sección de Comentarios -->
+<div class="trabajo-comments-section" id="comments">
+    <div class="comments-container">
+        <h2 class="comments-title">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+            Comentarios
+            <span class="comments-count" id="comments-total-count">
+                <?php echo get_comments_number($trabajo_id); ?>
+            </span>
+        </h2>
+        
+        <?php if (comments_open($trabajo_id)): ?>
+            <!-- Formulario de comentario -->
+            <?php if (is_user_logged_in()): ?>
+                <div class="comment-form-wrapper">
+                    <?php
+                    $current_user = wp_get_current_user();
+                    $avatar_url = get_avatar_url($current_user->ID, array('size' => 48));
+                    ?>
+                    <div class="comment-form-avatar">
+                        <img src="<?php echo esc_url($avatar_url); ?>" alt="<?php echo esc_attr($current_user->display_name); ?>">
+                    </div>
+                    <div class="comment-form-content">
+                        <form id="comment-form" class="comment-form">
+                            <textarea 
+                                id="comment-content" 
+                                name="comment" 
+                                placeholder="Escribe un comentario..." 
+                                rows="3"
+                                required></textarea>
+                            <div class="comment-form-actions">
+                                <button type="submit" class="btn-comment-submit">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="22" y1="2" x2="11" y2="13"/>
+                                        <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                                    </svg>
+                                    Publicar comentario
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            <?php else: ?>
+                <div class="comment-login-prompt">
+                    <p>Debes <a href="<?php echo esc_url(wp_login_url(get_permalink())); ?>">iniciar sesión</a> para comentar.</p>
+                </div>
+            <?php endif; ?>
+        <?php else: ?>
+            <div class="comments-closed">
+                <p>Los comentarios están cerrados para este trabajo.</p>
+            </div>
+        <?php endif; ?>
+        
+        <!-- Lista de comentarios -->
+        <div class="comments-list" id="comments-list">
+            <div class="comments-loading" id="comments-loading">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10" stroke-opacity="0.25"/>
+                    <path d="M12 2 A10 10 0 0 1 22 12" stroke-linecap="round"/>
+                </svg>
+                <span>Cargando comentarios...</span>
+            </div>
+        </div>
+        
+        <!-- Botón para cargar más comentarios -->
+        <div class="comments-load-more-wrapper" id="comments-load-more-wrapper" style="display: none;">
+            <button class="btn-load-more-comments" id="btn-load-more-comments">
+                Cargar más comentarios
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+/* ==========================================
+   ESTILOS DE COMENTARIOS
+   ========================================== */
+.trabajo-comments-section {
+    margin-top: 60px;
+    padding: 40px 0;
+    border-top: 2px solid #e0e0e0;
+}
+
+.comments-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+.comments-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 28px;
+    font-weight: 700;
+    color: #1a237e;
+    margin-bottom: 30px;
+}
+
+.comments-title svg {
+    color: #1877f2;
+}
+
+.comments-count {
+    font-size: 20px;
+    font-weight: 500;
+    color: #666;
+    margin-left: 8px;
+}
+
+.comment-form-wrapper {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 40px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 12px;
+}
+
+.comment-form-avatar {
+    flex-shrink: 0;
+}
+
+.comment-form-avatar img {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.comment-form-content {
+    flex: 1;
+}
+
+.comment-form textarea {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 15px;
+    font-family: inherit;
+    resize: vertical;
+    min-height: 80px;
+    transition: border-color 0.2s;
+}
+
+.comment-form textarea:focus {
+    outline: none;
+    border-color: #1877f2;
+}
+
+.comment-form-actions {
+    margin-top: 12px;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.btn-comment-submit {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: #1877f2;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.btn-comment-submit:hover {
+    background: #1565c0;
+}
+
+.btn-comment-submit:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+}
+
+.comment-login-prompt,
+.comments-closed {
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    text-align: center;
+    color: #666;
+    margin-bottom: 30px;
+}
+
+.comment-login-prompt a {
+    color: #1877f2;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.comment-login-prompt a:hover {
+    text-decoration: underline;
+}
+
+.comments-list {
+    margin-top: 30px;
+}
+
+.comments-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 40px;
+    color: #999;
+}
+
+.comments-loading svg {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.comment-item {
+    display: flex;
+    gap: 16px;
+    padding: 20px 0;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.comment-item:last-child {
+    border-bottom: none;
+}
+
+.comment-avatar {
+    flex-shrink: 0;
+}
+
+.comment-avatar img {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.comment-content-wrapper {
+    flex: 1;
+}
+
+.comment-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.comment-author-name {
+    font-weight: 600;
+    color: #1a237e;
+    font-size: 15px;
+}
+
+.comment-date {
+    font-size: 13px;
+    color: #999;
+}
+
+.comment-text {
+    color: #333;
+    line-height: 1.6;
+    margin-bottom: 8px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.comment-actions {
+    display: flex;
+    gap: 16px;
+    margin-top: 8px;
+}
+
+.comment-action-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    background: transparent;
+    border: none;
+    color: #65676b;
+    font-size: 13px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.comment-action-btn:hover {
+    background: #f0f2f5;
+    color: #1877f2;
+}
+
+.comment-action-btn.delete-btn:hover {
+    color: #dc3545;
+}
+
+.comments-load-more-wrapper {
+    text-align: center;
+    margin-top: 30px;
+}
+
+.btn-load-more-comments {
+    padding: 12px 24px;
+    background: #f0f2f5;
+    color: #1877f2;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.btn-load-more-comments:hover {
+    background: #e4e6eb;
+}
+
+.comment-empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: #999;
+}
+
+.comment-empty svg {
+    margin-bottom: 16px;
+    opacity: 0.5;
+}
+
+.comment-reply-form {
+    margin-top: 16px;
+    padding: 16px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    display: none;
+}
+
+.comment-reply-form.active {
+    display: block;
+}
+
+@media (max-width: 768px) {
+    .comment-form-wrapper {
+        flex-direction: column;
+    }
+    
+    .comment-form-avatar {
+        align-self: flex-start;
+    }
+    
+    .comments-title {
+        font-size: 24px;
+    }
+}
+</style>
+
+<script>
+// Sistema de comentarios
+(function() {
+    const jobId = <?php echo esc_js($trabajo_id); ?>;
+    let currentPage = 1;
+    let totalPages = 1;
+    let isLoading = false;
+    
+    // Cargar comentarios al iniciar
+    document.addEventListener('DOMContentLoaded', function() {
+        loadComments();
+        
+        // Manejar envío de formulario
+        const commentForm = document.getElementById('comment-form');
+        if (commentForm) {
+            commentForm.addEventListener('submit', handleCommentSubmit);
+        }
+        
+        // Manejar botón de cargar más
+        const loadMoreBtn = document.getElementById('btn-load-more-comments');
+        if (loadMoreBtn) {
+            loadMoreBtn.addEventListener('click', loadMoreComments);
+        }
+    });
+    
+    function loadComments(page = 1) {
+        if (isLoading) return;
+        
+        isLoading = true;
+        const commentsList = document.getElementById('comments-list');
+        const loadingEl = document.getElementById('comments-loading');
+        
+        if (page === 1) {
+            commentsList.innerHTML = '<div class="comments-loading" id="comments-loading"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" stroke-opacity="0.25"/><path d="M12 2 A10 10 0 0 1 22 12" stroke-linecap="round"/></svg><span>Cargando comentarios...</span></div>';
+        }
+        
+        fetch(`<?php echo esc_url(rest_url('agrochamba/v1/jobs/')); ?>${jobId}/comments?page=${page}&per_page=20`)
+            .then(response => response.json())
+            .then(data => {
+                isLoading = false;
+                currentPage = data.page;
+                totalPages = data.total_pages;
+                
+                if (page === 1) {
+                    renderComments(data.comments);
+                } else {
+                    appendComments(data.comments);
+                }
+                
+                updateLoadMoreButton();
+                updateCommentsCount(data.total);
+            })
+            .catch(error => {
+                isLoading = false;
+                console.error('Error:', error);
+                commentsList.innerHTML = '<div class="comment-empty"><p>Error al cargar comentarios. Por favor, recarga la página.</p></div>';
+            });
+    }
+    
+    function renderComments(comments) {
+        const commentsList = document.getElementById('comments-list');
+        
+        if (comments.length === 0) {
+            commentsList.innerHTML = '<div class="comment-empty"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><p>Aún no hay comentarios. ¡Sé el primero en comentar!</p></div>';
+            return;
+        }
+        
+        commentsList.innerHTML = comments.map(comment => renderComment(comment)).join('');
+    }
+    
+    function appendComments(comments) {
+        const commentsList = document.getElementById('comments-list');
+        const emptyDiv = commentsList.querySelector('.comment-empty');
+        if (emptyDiv) {
+            emptyDiv.remove();
+        }
+        
+        comments.forEach(comment => {
+            const commentEl = document.createElement('div');
+            commentEl.innerHTML = renderComment(comment);
+            commentsList.appendChild(commentEl.firstElementChild);
+        });
+    }
+    
+    function renderComment(comment) {
+        const date = new Date(comment.date);
+        const dateStr = date.toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        
+        return `
+            <div class="comment-item" data-comment-id="${comment.id}">
+                <div class="comment-avatar">
+                    <img src="${escapeHtml(comment.author.avatar)}" alt="${escapeHtml(comment.author.name)}">
+                </div>
+                <div class="comment-content-wrapper">
+                    <div class="comment-header">
+                        <span class="comment-author-name">${escapeHtml(comment.author.name)}</span>
+                        <span class="comment-date">${dateStr}</span>
+                    </div>
+                    <div class="comment-text">${comment.content}</div>
+                    ${comment.can_edit || comment.can_delete ? `
+                        <div class="comment-actions">
+                            ${comment.can_edit ? `<button class="comment-action-btn edit-btn" onclick="editComment(${comment.id})">Editar</button>` : ''}
+                            ${comment.can_delete ? `<button class="comment-action-btn delete-btn" onclick="deleteComment(${comment.id})">Eliminar</button>` : ''}
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+    }
+    
+    function handleCommentSubmit(e) {
+        e.preventDefault();
+        
+        const form = e.target;
+        const textarea = form.querySelector('#comment-content');
+        const content = textarea.value.trim();
+        
+        if (!content) {
+            alert('Por favor, escribe un comentario.');
+            return;
+        }
+        
+        const submitBtn = form.querySelector('.btn-comment-submit');
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Publicando...';
+        
+        fetch(`<?php echo esc_url(rest_url('agrochamba/v1/jobs/')); ?>${jobId}/comments`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-WP-Nonce': '<?php echo wp_create_nonce('wp_rest'); ?>'
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+                content: content
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> Publicar comentario';
+            
+            if (data.success) {
+                textarea.value = '';
+                // Recargar comentarios
+                loadComments(1);
+            } else {
+                alert(data.message || 'Error al publicar el comentario.');
+            }
+        })
+        .catch(error => {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> Publicar comentario';
+            console.error('Error:', error);
+            alert('Error de conexión. Por favor, intenta nuevamente.');
+        });
+    }
+    
+    function loadMoreComments() {
+        if (currentPage < totalPages) {
+            loadComments(currentPage + 1);
+        }
+    }
+    
+    function updateLoadMoreButton() {
+        const wrapper = document.getElementById('comments-load-more-wrapper');
+        if (currentPage < totalPages) {
+            wrapper.style.display = 'block';
+        } else {
+            wrapper.style.display = 'none';
+        }
+    }
+    
+    function updateCommentsCount(total) {
+        const countEl = document.getElementById('comments-total-count');
+        if (countEl) {
+            countEl.textContent = total;
+        }
+    }
+    
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    // Funciones globales para editar y eliminar
+    window.editComment = function(commentId) {
+        const commentItem = document.querySelector(`[data-comment-id="${commentId}"]`);
+        const commentText = commentItem.querySelector('.comment-text');
+        const currentText = commentText.textContent;
+        
+        const newText = prompt('Editar comentario:', currentText);
+        if (newText === null || newText.trim() === currentText.trim()) {
+            return;
+        }
+        
+        fetch(`<?php echo esc_url(rest_url('agrochamba/v1/comments/')); ?>${commentId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-WP-Nonce': '<?php echo wp_create_nonce('wp_rest'); ?>'
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+                content: newText.trim()
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                loadComments(1);
+            } else {
+                alert(data.message || 'Error al editar el comentario.');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error de conexión. Por favor, intenta nuevamente.');
+        });
+    };
+    
+    window.deleteComment = function(commentId) {
+        if (!confirm('¿Estás seguro de que quieres eliminar este comentario?')) {
+            return;
+        }
+        
+        fetch(`<?php echo esc_url(rest_url('agrochamba/v1/comments/')); ?>${commentId}`, {
+            method: 'DELETE',
+            headers: {
+                'X-WP-Nonce': '<?php echo wp_create_nonce('wp_rest'); ?>'
+            },
+            credentials: 'same-origin'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                loadComments(1);
+            } else {
+                alert(data.message || 'Error al eliminar el comentario.');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error de conexión. Por favor, intenta nuevamente.');
+        });
+    };
+})();
+
+// Contar vista cuando se carga la página individual (respaldo del método PHP)
+// Este script asegura que se cuente la vista incluso si el método PHP falla
+(function() {
+    const trabajoId = <?php echo intval($trabajo_id); ?>;
+    
+    if (trabajoId > 0) {
+        // Usar sessionStorage para evitar contar múltiples veces en la misma sesión del navegador
+        // pero permitir contar en diferentes sesiones o después de cerrar el navegador
+        const viewKey = 'agrochamba_viewed_' + trabajoId;
+        const alreadyViewed = sessionStorage.getItem(viewKey);
+        
+        if (!alreadyViewed) {
+            // Esperar 1 segundo para dar tiempo al método PHP de ejecutarse primero
+            setTimeout(function() {
+                // Contar vista usando el endpoint POST (respaldo si PHP falló)
+                // Esto se ejecuta cada vez que alguien visita la URL específica del trabajo
+                fetch('<?php echo esc_url(rest_url('agrochamba/v1/jobs/')); ?>' + trabajoId + '/views', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'same-origin'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Actualizar contador en la página si se devuelve
+                    if (data.views !== undefined) {
+                        const viewsElements = document.querySelectorAll('[data-counter="views"]');
+                        viewsElements.forEach(function(el) {
+                            el.textContent = data.views;
+                        });
+                        // Marcar como contado en esta sesión del navegador
+                        sessionStorage.setItem(viewKey, '1');
+                    }
+                })
+                .catch(error => {
+                    // Silenciar errores - el método PHP debería haber contado ya
+                });
+            }, 1000); // Esperar 1 segundo después de cargar
+        } else {
+            // Ya se contó en esta sesión, solo actualizar el display con el valor actual
+            fetch('<?php echo esc_url(rest_url('agrochamba/v1/jobs/')); ?>' + trabajoId + '/views', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                credentials: 'same-origin'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.views !== undefined) {
+                    const viewsElements = document.querySelectorAll('[data-counter="views"]');
+                    viewsElements.forEach(function(el) {
+                        el.textContent = data.views;
+                    });
+                }
+            })
+            .catch(error => {
+                // Silenciar errores
+            });
+        }
+    }
+})();
 </script>
 
 <?php

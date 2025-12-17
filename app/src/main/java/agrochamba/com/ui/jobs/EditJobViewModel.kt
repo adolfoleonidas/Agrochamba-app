@@ -364,6 +364,15 @@ class EditJobViewModel(private val job: JobPost) : ViewModel() {
                 // Si hay nuevas imágenes, subirlas
                 val finalJobData = jobData.toMutableMap()
                 
+                // IMPORTANTE: Asegurar que publish_to_facebook esté presente (puede venir como Boolean o String)
+                val publishToFacebook = when (val value = jobData["publish_to_facebook"]) {
+                    is Boolean -> value
+                    is String -> value.toBoolean()
+                    is Number -> value.toInt() != 0
+                    else -> false
+                }
+                finalJobData["publish_to_facebook"] = publishToFacebook
+                
                 // Combinar imágenes existentes y nuevas
                 val allImageIds = mutableListOf<Int>()
                 
@@ -435,6 +444,17 @@ class EditJobViewModel(private val job: JobPost) : ViewModel() {
                 // Enviar preferencia de publicación en Facebook (imágenes adjuntas o link preview)
                 val useLinkPreview = SettingsManager.facebookUseLinkPreview
                 finalJobData["facebook_use_link_preview"] = useLinkPreview
+                
+                // Enviar preferencia de acortar contenido en Facebook
+                val shortenContent = SettingsManager.facebookShortenContent
+                finalJobData["facebook_shorten_content"] = shortenContent
+                
+                // Asegurar que publish_to_facebook esté presente (ya se estableció arriba, pero por seguridad lo verificamos)
+                finalJobData["publish_to_facebook"] = publishToFacebook
+                
+                // Comentarios habilitados (por defecto true, siempre enviar)
+                val comentariosHabilitados = jobData["comentarios_habilitados"] as? Boolean ?: true
+                finalJobData["comentarios_habilitados"] = comentariosHabilitados
 
                 val response = WordPressApi.retrofitService.updateJob(authHeader, job.id, finalJobData)
 

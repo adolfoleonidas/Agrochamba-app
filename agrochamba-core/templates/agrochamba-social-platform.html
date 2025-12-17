@@ -1,0 +1,3572 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agrochamba - Plataforma Social de Empleos Agrícolas</title>
+    <!-- Font Awesome para iconos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Reset y variables */
+        :root {
+            --color-primary: #5cb85c;
+            --color-primary-dark: #4cae4c;
+            --color-primary-light: #ebf7eb;
+            --color-primary-text: #2b6a39;
+            --color-text-main: #333333;
+            --color-text-secondary: #4b5563;
+            --color-text-light: #6b7280;
+            --color-bg-main: #f8f9fa;
+            --color-bg-card: #ffffff;
+            --color-bg-secondary: #f9fafb;
+            --color-border: #e5e7eb;
+            --color-border-light: #f0f0f0;
+            --color-status-active: #dcfce7;
+            --color-status-active-text: #166534;
+            --color-status-urgent: #fee2e2;
+            --color-status-urgent-text: #b91c1c;
+            --color-status-closed: #f1f5f9;
+            --color-status-closed-text: #475569;
+            --color-status-upcoming: #e0f2fe;
+            --color-status-upcoming-text: #0369a1;
+            --color-like: #3b82f6;
+            --color-love: #ec4899;
+            --color-interested: #f59e0b;
+            --color-share: #8b5cf6;
+            --color-comment: #6b7280;
+            --border-radius-sm: 6px;
+            --border-radius-md: 8px;
+            --border-radius-lg: 12px;
+            --border-radius-xl: 16px;
+            --border-radius-full: 9999px;
+            --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            --spacing-xs: 4px;
+            --spacing-sm: 8px;
+            --spacing-md: 16px;
+            --spacing-lg: 24px;
+            --spacing-xl: 32px;
+            --spacing-2xl: 48px;
+            --font-size-xs: 12px;
+            --font-size-sm: 14px;
+            --font-size-md: 16px;
+            --font-size-lg: 18px;
+            --font-size-xl: 20px;
+            --font-size-2xl: 24px;
+            --font-size-3xl: 28px;
+            --transition-fast: 0.15s ease;
+            --transition-normal: 0.3s ease;
+            --header-height: 60px;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        html {
+            scroll-behavior: smooth;
+        }
+        
+        body {
+            background-color: var(--color-bg-main);
+            color: var(--color-text-main);
+            line-height: 1.5;
+            font-size: var(--font-size-md);
+            padding-top: var(--header-height);
+        }
+        
+        h1, h2, h3, h4, h5, h6 {
+            color: var(--color-primary-text);
+            font-weight: 600;
+        }
+
+        /* Utilidades */
+        .container {
+            width: 100%;
+            padding: 0 var(--spacing-md);
+            margin: 0 auto;
+            max-width: 100%;
+        }
+        
+        @media (min-width: 640px) {
+            .container {
+                padding: 0 var(--spacing-lg);
+            }
+        }
+        
+        @media (min-width: 1024px) {
+            .container {
+                max-width: 1024px;
+                padding: 0 var(--spacing-xl);
+            }
+        }
+        
+        @media (min-width: 1280px) {
+            .container {
+                max-width: 1200px;
+            }
+        }
+        
+        /* Header y navegación */
+        .header {
+            background-color: var(--color-bg-card);
+            box-shadow: var(--shadow-sm);
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            z-index: 100;
+            height: var(--header-height);
+            display: flex;
+            align-items: center;
+        }
+        
+        .header-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+        }
+        
+        .logo {
+            font-size: var(--font-size-xl);
+            font-weight: 700;
+            color: var(--color-primary-text);
+            display: flex;
+            align-items: center;
+            text-decoration: none;
+        }
+        
+        .logo i {
+            margin-right: var(--spacing-sm);
+            color: var(--color-primary);
+        }
+        
+        .mobile-nav-toggle {
+            display: block;
+            background: transparent;
+            border: none;
+            color: var(--color-text-secondary);
+            font-size: var(--font-size-lg);
+            cursor: pointer;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--border-radius-md);
+            transition: background-color var(--transition-fast);
+        }
+        
+        .mobile-nav-toggle:hover {
+            background-color: var(--color-border-light);
+        }
+        
+        .nav-links {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            background-color: var(--color-bg-card);
+            padding: var(--spacing-xl) var(--spacing-md);
+            flex-direction: column;
+            gap: var(--spacing-lg);
+            z-index: 200;
+            transition: transform var(--transition-normal);
+            transform: translateX(-100%);
+        }
+        
+        .nav-links.active {
+            transform: translateX(0);
+            display: flex;
+        }
+        
+        .nav-links .close-menu {
+            position: absolute;
+            top: var(--spacing-lg);
+            right: var(--spacing-lg);
+            background: transparent;
+            border: none;
+            color: var(--color-text-secondary);
+            font-size: var(--font-size-xl);
+            cursor: pointer;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--border-radius-md);
+        }
+        
+        .nav-links .close-menu:hover {
+            background-color: var(--color-border-light);
+        }
+        
+        .nav-link {
+            color: var(--color-text-secondary);
+            text-decoration: none;
+            font-weight: 500;
+            padding: var(--spacing-md);
+            border-radius: var(--border-radius-md);
+            transition: all var(--transition-fast);
+            display: flex;
+            align-items: center;
+        }
+        
+        .nav-link:hover, .nav-link.active {
+            color: var(--color-primary-text);
+            background-color: var(--color-primary-light);
+        }
+        
+        .nav-link i {
+            margin-right: var(--spacing-md);
+            font-size: var(--font-size-lg);
+            width: 24px;
+            text-align: center;
+        }
+        
+        .user-actions {
+            display: none;
+            gap: var(--spacing-md);
+        }
+        
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+            cursor: pointer;
+            padding: var(--spacing-xs) var(--spacing-sm);
+            border-radius: var(--border-radius-md);
+            transition: background-color var(--transition-fast);
+        }
+        
+        .user-profile:hover {
+            background-color: var(--color-border-light);
+        }
+        
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: var(--border-radius-full);
+            background-color: var(--color-primary-light);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--color-primary);
+            font-weight: 600;
+        }
+        
+        .user-name {
+            font-size: var(--font-size-sm);
+            font-weight: 500;
+            color: var(--color-text-secondary);
+            display: none;
+        }
+        
+        @media (min-width: 768px) {
+            .mobile-nav-toggle {
+                display: none;
+            }
+            
+            .nav-links {
+                position: static;
+                display: flex;
+                height: auto;
+                padding: 0;
+                flex-direction: row;
+                background-color: transparent;
+                transform: none;
+                width: auto;
+            }
+            
+            .nav-links .close-menu {
+                display: none;
+            }
+            
+            .nav-link {
+                padding: var(--spacing-xs) var(--spacing-md);
+            }
+            
+            .user-actions {
+                display: flex;
+            }
+            
+            .user-name {
+                display: block;
+            }
+        }
+        
+        @media (min-width: 1024px) {
+            .nav-link i {
+                margin-right: var(--spacing-sm);
+            }
+        }
+        
+        /* Botones */
+        .btn {
+            padding: var(--spacing-sm) var(--spacing-md);
+            border-radius: var(--border-radius-md);
+            font-weight: 500;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: var(--font-size-sm);
+            height: 40px;
+            border: none;
+        }
+        
+        .btn-outline {
+            border: 1px solid var(--color-primary);
+            color: var(--color-primary-text);
+            background-color: transparent;
+        }
+        
+        .btn-outline:hover {
+            background-color: var(--color-primary-light);
+        }
+        
+        .btn-primary {
+            background-color: var(--color-primary);
+            color: white;
+            border: 1px solid var(--color-primary);
+        }
+        
+        .btn-primary:hover {
+            background-color: var(--color-primary-dark);
+        }
+        
+        .btn-secondary {
+            background-color: var(--color-bg-secondary);
+            color: var(--color-text-secondary);
+            border: 1px solid var(--color-border);
+        }
+        
+        .btn-secondary:hover {
+            background-color: var(--color-border-light);
+        }
+        
+        .btn i {
+            margin-right: var(--spacing-sm);
+        }
+        
+        .btn-icon {
+            width: 40px;
+            height: 40px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--border-radius-full);
+        }
+        
+        .btn-icon i {
+            margin-right: 0;
+        }
+        
+        .btn-icon-sm {
+            width: 32px;
+            height: 32px;
+            font-size: var(--font-size-sm);
+        }
+        
+        .btn-full {
+            width: 100%;
+        }
+        
+        @media (min-width: 640px) {
+            .btn {
+                font-size: var(--font-size-md);
+            }
+            
+            .btn-full {
+                width: auto;
+            }
+        }
+        
+        /* Main content */
+        .main-content {
+            padding: var(--spacing-md) 0 var(--spacing-xl);
+        }
+        
+        /* Feed container */
+        .feed-container {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-lg);
+        }
+        
+        @media (min-width: 1024px) {
+            .feed-container {
+                flex-direction: row;
+            }
+            
+            .feed-main {
+                flex: 3;
+            }
+            
+            .feed-sidebar {
+                flex: 1;
+                height: calc(100vh - var(--header-height) - var(--spacing-lg));
+                position: sticky;
+                top: calc(var(--header-height) + var(--spacing-md));
+                overflow-y: auto;
+                padding-right: var(--spacing-md);
+                display: block;
+            }
+        }
+        
+        /* Feed header */
+        .feed-header {
+            margin-bottom: var(--spacing-lg);
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-md);
+        }
+        
+        .feed-title {
+            font-size: var(--font-size-2xl);
+            font-weight: 700;
+            color: var(--color-primary-text);
+            margin-bottom: var(--spacing-xs);
+        }
+        
+        .feed-description {
+            color: var(--color-text-secondary);
+            font-size: var(--font-size-md);
+        }
+        
+        .post-job-btn {
+            white-space: nowrap;
+        }
+        
+        @media (min-width: 768px) {
+            .feed-header {
+                flex-direction: row;
+                align-items: center;
+                justify-content: space-between;
+            }
+            
+            .feed-title {
+                font-size: var(--font-size-3xl);
+                margin-bottom: var(--spacing-sm);
+            }
+        }
+        
+        /* Banner */
+        .feed-banner {
+            background-color: var(--color-primary-light);
+            border: 1px solid var(--color-primary);
+            border-radius: var(--border-radius-md);
+            padding: var(--spacing-md);
+            margin-bottom: var(--spacing-lg);
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-md);
+            align-items: flex-start;
+        }
+        
+        .feed-banner-icon {
+            font-size: var(--font-size-2xl);
+            color: var(--color-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: white;
+            height: 48px;
+            width: 48px;
+            border-radius: 50%;
+            border: 2px solid var(--color-primary);
+        }
+        
+        .feed-banner-content h3 {
+            color: var(--color-primary-text);
+            margin-bottom: var(--spacing-xs);
+            font-size: var(--font-size-lg);
+        }
+        
+        .feed-banner-content p {
+            color: var(--color-text-secondary);
+            margin-bottom: 0;
+            font-size: var(--font-size-md);
+        }
+        
+        @media (min-width: 640px) {
+            .feed-banner {
+                flex-direction: row;
+                padding: var(--spacing-lg);
+            }
+            
+            .feed-banner-icon {
+                margin-right: var(--spacing-lg);
+            }
+        }
+        
+        /* Filter bar */
+        .filter-bar {
+            background-color: var(--color-bg-card);
+            border-radius: var(--border-radius-md);
+            box-shadow: var(--shadow-sm);
+            margin-bottom: var(--spacing-lg);
+            overflow: hidden;
+        }
+        
+        .filter-bar-header {
+            padding: var(--spacing-md);
+            border-bottom: 1px solid var(--color-border-light);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .filter-bar-title {
+            font-size: var(--font-size-md);
+            font-weight: 600;
+            color: var(--color-text-secondary);
+            display: flex;
+            align-items: center;
+        }
+        
+        .filter-bar-title i {
+            margin-right: var(--spacing-sm);
+            color: var(--color-primary);
+        }
+        
+        .filter-toggle {
+            background: transparent;
+            border: none;
+            color: var(--color-text-light);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            font-size: var(--font-size-sm);
+        }
+        
+        .filter-toggle i {
+            margin-left: var(--spacing-xs);
+            transition: transform var(--transition-fast);
+        }
+        
+        .filter-toggle.active i {
+            transform: rotate(180deg);
+        }
+        
+        .filter-content {
+            padding: var(--spacing-md);
+            display: none;
+        }
+        
+        .filter-content.active {
+            display: block;
+        }
+        
+        .filter-search {
+            position: relative;
+            margin-bottom: var(--spacing-md);
+        }
+        
+        .filter-search-icon {
+            position: absolute;
+            left: var(--spacing-md);
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--color-text-light);
+        }
+        
+        .filter-search-input {
+            width: 100%;
+            padding: var(--spacing-md) var(--spacing-md) var(--spacing-md) calc(var(--spacing-md) * 2 + 16px);
+            border: 1px solid var(--color-border);
+            border-radius: var(--border-radius-md);
+            font-size: var(--font-size-md);
+            outline: none;
+            transition: border-color var(--transition-fast);
+        }
+        
+        .filter-search-input:focus {
+            border-color: var(--color-primary);
+            box-shadow: 0 0 0 2px rgba(92, 184, 92, 0.2);
+        }
+        
+        .filter-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: var(--spacing-md);
+        }
+        
+        .filter-group {
+            position: relative;
+        }
+        
+        .filter-icon {
+            position: absolute;
+            left: var(--spacing-md);
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--color-text-light);
+        }
+        
+        .filter-select {
+            width: 100%;
+            padding: var(--spacing-md) var(--spacing-md) var(--spacing-md) calc(var(--spacing-md) * 2 + 16px);
+            border: 1px solid var(--color-border);
+            border-radius: var(--border-radius-md);
+            font-size: var(--font-size-md);
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%239ca3af'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right var(--spacing-md) center;
+            background-size: 16px;
+            outline: none;
+            transition: border-color var(--transition-fast);
+        }
+        
+        .filter-select:focus {
+            border-color: var(--color-primary);
+            box-shadow: 0 0 0 2px rgba(92, 184, 92, 0.2);
+        }
+        
+        .filter-actions {
+            display: flex;
+            justify-content: space-between;
+            margin-top: var(--spacing-md);
+        }
+        
+        @media (min-width: 768px) {
+            .filter-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+        
+        @media (min-width: 1024px) {
+            .filter-grid {
+                grid-template-columns: 1fr 1fr 1fr 1fr;
+            }
+        }
+        
+        /* Job cards in feed style */
+        .job-feed {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-lg);
+        }
+        
+        .job-card {
+            background-color: var(--color-bg-card);
+            border-radius: var(--border-radius-md);
+            border: 1px solid var(--color-border);
+            box-shadow: var(--shadow-sm);
+            overflow: hidden;
+            transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+            cursor: pointer;
+        }
+        
+        .job-card:hover {
+            box-shadow: var(--shadow-md);
+            transform: translateY(-2px);
+        }
+        
+        .job-card-header {
+            padding: var(--spacing-md);
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid var(--color-border-light);
+        }
+        
+        .company-logo {
+            width: 48px;
+            height: 48px;
+            border-radius: var(--border-radius-md);
+            object-fit: cover;
+            margin-right: var(--spacing-md);
+            background-color: var(--color-border-light);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--color-text-light);
+            font-size: var(--font-size-lg);
+            flex-shrink: 0;
+        }
+        
+        .company-logo img {
+            width: 100%;
+            height: 100%;
+            border-radius: var(--border-radius-md);
+            object-fit: cover;
+        }
+        
+        .company-info {
+            flex-grow: 1;
+        }
+        
+        .company-name {
+            font-size: var(--font-size-sm);
+            font-weight: 500;
+            color: var(--color-text-secondary);
+            display: flex;
+            align-items: center;
+        }
+        
+        .company-verified {
+            display: inline-flex;
+            align-items: center;
+            margin-left: var(--spacing-xs);
+            color: var(--color-primary);
+            font-size: var(--font-size-xs);
+        }
+        
+        .job-posted {
+            font-size: var(--font-size-xs);
+            color: var(--color-text-light);
+            display: flex;
+            align-items: center;
+        }
+        
+        .job-posted i {
+            margin-right: var(--spacing-xs);
+            font-size: 10px;
+        }
+        
+        .job-card-content {
+            padding: var(--spacing-md);
+        }
+        
+        .job-title {
+            font-size: var(--font-size-lg);
+            font-weight: 600;
+            color: var(--color-primary-text);
+            margin-bottom: var(--spacing-xs);
+        }
+        
+        .job-description {
+            color: var(--color-text-secondary);
+            font-size: var(--font-size-md);
+            margin-bottom: var(--spacing-md);
+            line-height: 1.5;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        
+        .job-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--spacing-sm);
+            margin-bottom: var(--spacing-md);
+        }
+        
+        .job-badge {
+            font-size: var(--font-size-xs);
+            font-weight: 500;
+            padding: var(--spacing-xs) var(--spacing-sm);
+            border-radius: var(--border-radius-full);
+            display: inline-flex;
+            align-items: center;
+        }
+        
+        .job-badge i {
+            margin-right: var(--spacing-xs);
+        }
+        
+        .badge-location {
+            background-color: #f1f5f9;
+            color: #475569;
+        }
+        
+        .badge-type {
+            background-color: #f0f9ff;
+            color: #0284c7;
+        }
+        
+        .badge-category {
+            background-color: var(--color-primary-light);
+            color: var(--color-primary-text);
+        }
+        
+        .badge-product {
+            background-color: #fff8e6;
+            color: #92400e;
+        }
+        
+        .badge-salary {
+            background-color: #f0fdf4;
+            color: #166534;
+        }
+        
+        .badge-urgency {
+            display: inline-flex;
+            align-items: center;
+            font-size: var(--font-size-xs);
+            font-weight: 500;
+            padding: var(--spacing-xs) var(--spacing-sm);
+            border-radius: var(--border-radius-full);
+        }
+        
+        .urgency-active {
+            background-color: var(--color-status-active);
+            color: var(--color-status-active-text);
+        }
+        
+        .urgency-urgent {
+            background-color: var(--color-status-urgent);
+            color: var(--color-status-urgent-text);
+        }
+        
+        .urgency-closed {
+            background-color: var(--color-status-closed);
+            color: var(--color-status-closed-text);
+        }
+        
+        .urgency-upcoming {
+            background-color: var(--color-status-upcoming);
+            color: var(--color-status-upcoming-text);
+        }
+        
+        .job-stats {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: var(--color-text-light);
+            font-size: var(--font-size-sm);
+            margin-bottom: var(--spacing-md);
+        }
+        
+        .job-stat {
+            display: flex;
+            align-items: center;
+        }
+        
+        .job-stat i {
+            margin-right: var(--spacing-xs);
+        }
+        
+        .job-card-footer {
+            padding: var(--spacing-md);
+            border-top: 1px solid var(--color-border-light);
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .job-social-actions {
+            display: flex;
+            gap: var(--spacing-md);
+        }
+        
+        .job-action {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-xs);
+            color: var(--color-text-secondary);
+            font-size: var(--font-size-sm);
+            cursor: pointer;
+            padding: var(--spacing-xs) var(--spacing-sm);
+            border-radius: var(--border-radius-md);
+            transition: background-color var(--transition-fast);
+        }
+        
+        .job-action:hover {
+            background-color: var(--color-border-light);
+        }
+        
+        .job-action.active {
+            font-weight: 500;
+        }
+        
+        .job-action.active.action-like {
+            color: var(--color-like);
+        }
+        
+        .job-action.active.action-love {
+            color: var(--color-love);
+        }
+        
+        .job-action.active.action-interested {
+            color: var(--color-interested);
+        }
+        
+        .job-action i {
+            font-size: var(--font-size-md);
+        }
+        
+        .job-share {
+            color: var(--color-text-secondary);
+            cursor: pointer;
+            padding: var(--spacing-xs) var(--spacing-sm);
+            border-radius: var(--border-radius-md);
+            transition: background-color var(--transition-fast);
+            display: flex;
+            align-items: center;
+        }
+        
+        .job-share:hover {
+            background-color: var(--color-border-light);
+            color: var(--color-share);
+        }
+        
+        /* Job detail modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity var(--transition-normal), visibility var(--transition-normal);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: var(--spacing-md);
+        }
+        
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .modal-container {
+            background-color: var(--color-bg-card);
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--shadow-lg);
+            width: 100%;
+            max-width: 800px;
+            max-height: 90vh;
+            overflow-y: auto;
+            transform: translateY(20px);
+            opacity: 0;
+            transition: transform var(--transition-normal), opacity var(--transition-normal);
+        }
+        
+        .modal-overlay.active .modal-container {
+            transform: translateY(0);
+            opacity: 1;
+        }
+        
+        .modal-header {
+            padding: var(--spacing-md);
+            border-bottom: 1px solid var(--color-border-light);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            background-color: var(--color-bg-card);
+            z-index: 10;
+        }
+        
+        .modal-title {
+            font-size: var(--font-size-lg);
+            font-weight: 600;
+            color: var(--color-primary-text);
+        }
+        
+        .modal-close {
+            background: transparent;
+            border: none;
+            color: var(--color-text-light);
+            font-size: var(--font-size-xl);
+            cursor: pointer;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--border-radius-full);
+            transition: background-color var(--transition-fast);
+        }
+        
+        .modal-close:hover {
+            background-color: var(--color-border-light);
+            color: var(--color-text-secondary);
+        }
+        
+        .modal-body {
+            padding: var(--spacing-md);
+        }
+        
+        .modal-footer {
+            padding: var(--spacing-md);
+            border-top: 1px solid var(--color-border-light);
+            display: flex;
+            justify-content: flex-end;
+            gap: var(--spacing-md);
+            position: sticky;
+            bottom: 0;
+            background-color: var(--color-bg-card);
+            z-index: 10;
+        }
+        
+        /* Job detail content */
+        .job-detail {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-lg);
+        }
+        
+        .job-detail-header {
+            border-bottom: 1px solid var(--color-border-light);
+            padding-bottom: var(--spacing-lg);
+        }
+        
+        .job-detail-company {
+            display: flex;
+            align-items: center;
+            margin-bottom: var(--spacing-md);
+        }
+        
+        .job-detail-company-logo {
+            width: 64px;
+            height: 64px;
+            border-radius: var(--border-radius-md);
+            overflow: hidden;
+            margin-right: var(--spacing-md);
+            background-color: var(--color-border-light);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--color-text-light);
+            font-size: var(--font-size-2xl);
+        }
+        
+        .job-detail-company-logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .job-detail-company-info {
+            flex: 1;
+        }
+        
+        .job-detail-company-name {
+            font-size: var(--font-size-md);
+            font-weight: 600;
+            color: var(--color-text-secondary);
+            display: flex;
+            align-items: center;
+            margin-bottom: var(--spacing-xs);
+        }
+        
+        .job-detail-company-name .company-verified {
+            margin-left: var(--spacing-xs);
+        }
+        
+        .job-detail-posted {
+            color: var(--color-text-light);
+            font-size: var(--font-size-sm);
+        }
+        
+        .job-detail-title {
+            font-size: var(--font-size-xl);
+            font-weight: 700;
+            color: var(--color-primary-text);
+            margin-bottom: var(--spacing-md);
+        }
+        
+        .job-detail-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--spacing-sm);
+            margin-bottom: var(--spacing-md);
+        }
+        
+        .job-detail-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--spacing-md);
+        }
+        
+        .job-detail-stat {
+            display: flex;
+            flex-direction: column;
+            padding: var(--spacing-md);
+            background-color: var(--color-bg-secondary);
+            border-radius: var(--border-radius-md);
+        }
+        
+        .job-detail-stat-label {
+            font-size: var(--font-size-xs);
+            color: var(--color-text-light);
+            margin-bottom: var(--spacing-xs);
+        }
+        
+        .job-detail-stat-value {
+            font-size: var(--font-size-md);
+            font-weight: 600;
+            color: var(--color-text-secondary);
+            display: flex;
+            align-items: center;
+        }
+        
+        .job-detail-stat-value i {
+            margin-right: var(--spacing-xs);
+            color: var(--color-primary);
+        }
+        
+        @media (min-width: 640px) {
+            .job-detail-stats {
+                grid-template-columns: 1fr 1fr 1fr 1fr;
+            }
+        }
+        
+        .job-detail-description {
+            margin-bottom: var(--spacing-lg);
+        }
+        
+        .job-detail-section-title {
+            font-size: var(--font-size-lg);
+            font-weight: 600;
+            color: var(--color-primary-text);
+            margin-bottom: var(--spacing-md);
+            display: flex;
+            align-items: center;
+        }
+        
+        .job-detail-section-title i {
+            margin-right: var(--spacing-sm);
+            color: var(--color-primary);
+        }
+        
+        .job-detail-text {
+            color: var(--color-text-secondary);
+            line-height: 1.6;
+            font-size: var(--font-size-md);
+        }
+        
+        .job-detail-requirements,
+        .job-detail-benefits {
+            list-style: none;
+            margin-bottom: var(--spacing-lg);
+        }
+        
+        .job-detail-list-item {
+            padding-left: 28px;
+            position: relative;
+            margin-bottom: var(--spacing-md);
+            color: var(--color-text-secondary);
+        }
+        
+        .job-detail-list-item:last-child {
+            margin-bottom: 0;
+        }
+        
+        .job-detail-list-item::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 6px;
+            width: 20px;
+            height: 20px;
+            background-color: var(--color-primary-light);
+            border-radius: var(--border-radius-full);
+        }
+        
+        .job-detail-list-item::after {
+            content: "\f00c";
+            font-family: "Font Awesome 6 Free";
+            font-weight: 900;
+            position: absolute;
+            left: 4px;
+            top: 7px;
+            font-size: 12px;
+            color: var(--color-primary);
+        }
+        
+        .job-detail-benefits .job-detail-list-item::after {
+            content: "\f005";
+            font-size: 10px;
+            left: 5px;
+            top: 6px;
+        }
+        
+        .job-detail-apply {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-md);
+            background-color: var(--color-primary-light);
+            padding: var(--spacing-lg);
+            border-radius: var(--border-radius-md);
+            margin-bottom: var(--spacing-lg);
+        }
+        
+        .job-detail-apply-title {
+            font-size: var(--font-size-lg);
+            font-weight: 600;
+            color: var(--color-primary-text);
+            display: flex;
+            align-items: center;
+        }
+        
+        .job-detail-apply-title i {
+            margin-right: var(--spacing-sm);
+        }
+        
+        .job-detail-apply-text {
+            color: var(--color-text-secondary);
+        }
+        
+        .job-detail-apply-btn {
+            background-color: var(--color-primary);
+            color: white;
+            border: none;
+            padding: var(--spacing-md);
+            border-radius: var(--border-radius-md);
+            font-size: var(--font-size-md);
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background-color var(--transition-fast);
+            max-width: 300px;
+        }
+        
+        .job-detail-apply-btn:hover {
+            background-color: var(--color-primary-dark);
+        }
+        
+        .job-detail-apply-btn i {
+            margin-right: var(--spacing-sm);
+        }
+        
+        .job-detail-contact {
+            margin-bottom: var(--spacing-lg);
+        }
+        
+        .job-detail-contact-info {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-md);
+        }
+        
+        .contact-item {
+            display: flex;
+            align-items: center;
+            color: var(--color-text-secondary);
+        }
+        
+        .contact-item i {
+            width: 30px;
+            color: var(--color-primary);
+            margin-right: var(--spacing-sm);
+        }
+        
+        /* Social interactions in detail */
+        .job-detail-social {
+            border-top: 1px solid var(--color-border-light);
+            padding-top: var(--spacing-lg);
+        }
+        
+        .job-detail-reactions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: var(--spacing-md);
+            border-bottom: 1px solid var(--color-border-light);
+            margin-bottom: var(--spacing-md);
+        }
+        
+        .reactions-count {
+            display: flex;
+            align-items: center;
+            color: var(--color-text-light);
+            font-size: var(--font-size-sm);
+        }
+        
+        .reactions-icons {
+            display: flex;
+            margin-right: var(--spacing-sm);
+        }
+        
+        .reaction-icon {
+            width: 18px;
+            height: 18px;
+            border-radius: var(--border-radius-full);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 10px;
+            margin-right: -5px;
+            border: 1px solid white;
+        }
+        
+        .reaction-icon.like-icon {
+            background-color: var(--color-like);
+            z-index: 3;
+        }
+        
+        .reaction-icon.love-icon {
+            background-color: var(--color-love);
+            z-index: 2;
+        }
+        
+        .reaction-icon.interested-icon {
+            background-color: var(--color-interested);
+            z-index: 1;
+        }
+        
+        .shares-comments-count {
+            color: var(--color-text-light);
+            font-size: var(--font-size-sm);
+        }
+        
+        .job-detail-actions {
+            display: flex;
+            justify-content: space-between;
+            padding-bottom: var(--spacing-md);
+            border-bottom: 1px solid var(--color-border-light);
+            margin-bottom: var(--spacing-md);
+        }
+        
+        .detail-action {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+            padding: var(--spacing-sm);
+            cursor: pointer;
+            border-radius: var(--border-radius-md);
+            transition: background-color var(--transition-fast);
+        }
+        
+        .detail-action:hover {
+            background-color: var(--color-border-light);
+        }
+        
+        .detail-action.active.action-like {
+            color: var(--color-like);
+        }
+        
+        .detail-action.active.action-love {
+            color: var(--color-love);
+        }
+        
+        .detail-action.active.action-interested {
+            color: var(--color-interested);
+        }
+        
+        .detail-action i {
+            font-size: var(--font-size-lg);
+            margin-bottom: var(--spacing-xs);
+        }
+        
+        .detail-action-label {
+            font-size: var(--font-size-sm);
+            font-weight: 500;
+        }
+        
+        /* Comments section */
+        .job-detail-comments {
+            margin-bottom: var(--spacing-lg);
+        }
+        
+        .comment-form {
+            display: flex;
+            gap: var(--spacing-sm);
+            margin-bottom: var(--spacing-lg);
+        }
+        
+        .comment-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: var(--border-radius-full);
+            background-color: var(--color-primary-light);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--color-primary);
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+        
+        .comment-input-container {
+            flex: 1;
+            position: relative;
+        }
+        
+        .comment-input {
+            width: 100%;
+            padding: var(--spacing-sm) var(--spacing-md);
+            border: 1px solid var(--color-border);
+            border-radius: var(--border-radius-full);
+            font-size: var(--font-size-md);
+            resize: none;
+            outline: none;
+            transition: border-color var(--transition-fast), height var(--transition-fast);
+            height: 40px;
+            line-height: 24px;
+        }
+        
+        .comment-input:focus {
+            border-color: var(--color-primary);
+            height: 80px;
+            border-radius: var(--border-radius-md);
+        }
+        
+        .comment-submit {
+            position: absolute;
+            right: var(--spacing-sm);
+            bottom: var(--spacing-sm);
+            background-color: var(--color-primary);
+            color: white;
+            border: none;
+            width: 30px;
+            height: 30px;
+            border-radius: var(--border-radius-full);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background-color var(--transition-fast);
+            opacity: 0;
+            visibility: hidden;
+        }
+        
+        .comment-input:focus + .comment-submit {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .comment-submit:hover {
+            background-color: var(--color-primary-dark);
+        }
+        
+        .comments-list {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-md);
+        }
+        
+        .comment-item {
+            display: flex;
+            gap: var(--spacing-sm);
+        }
+        
+        .comment-content {
+            flex: 1;
+            background-color: var(--color-bg-secondary);
+            padding: var(--spacing-md);
+            border-radius: var(--border-radius-md);
+        }
+        
+        .comment-author {
+            font-size: var(--font-size-sm);
+            font-weight: 600;
+            color: var(--color-text-secondary);
+            margin-bottom: var(--spacing-xs);
+        }
+        
+        .comment-text {
+            color: var(--color-text-secondary);
+            font-size: var(--font-size-sm);
+            margin-bottom: var(--spacing-sm);
+        }
+        
+        .comment-actions {
+            display: flex;
+            gap: var(--spacing-md);
+        }
+        
+        .comment-action {
+            font-size: var(--font-size-xs);
+            color: var(--color-text-light);
+            cursor: pointer;
+        }
+        
+        .comment-action:hover {
+            color: var(--color-primary);
+        }
+        
+        .comments-more {
+            text-align: center;
+            margin-top: var(--spacing-md);
+        }
+        
+        .comments-more-btn {
+            background: none;
+            border: none;
+            color: var(--color-primary);
+            font-size: var(--font-size-sm);
+            font-weight: 500;
+            cursor: pointer;
+        }
+        
+        .comments-more-btn:hover {
+            text-decoration: underline;
+        }
+        
+        /* Sidebar components */
+        .sidebar-card {
+            background-color: var(--color-bg-card);
+            border-radius: var(--border-radius-md);
+            box-shadow: var(--shadow-sm);
+            margin-bottom: var(--spacing-lg);
+            overflow: hidden;
+        }
+        
+        .sidebar-card-header {
+            padding: var(--spacing-md);
+            border-bottom: 1px solid var(--color-border-light);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .sidebar-card-title {
+            font-size: var(--font-size-md);
+            font-weight: 600;
+            color: var(--color-primary-text);
+            display: flex;
+            align-items: center;
+        }
+        
+        .sidebar-card-title i {
+            margin-right: var(--spacing-sm);
+            color: var(--color-primary);
+        }
+        
+        .sidebar-card-link {
+            color: var(--color-primary);
+            font-size: var(--font-size-sm);
+            text-decoration: none;
+            font-weight: 500;
+        }
+        
+        .sidebar-card-link:hover {
+            text-decoration: underline;
+        }
+        
+        .sidebar-card-body {
+            padding: var(--spacing-md);
+        }
+        
+        .profile-card {
+            text-align: center;
+        }
+        
+        .profile-avatar {
+            width: 100px;
+            height: 100px;
+            border-radius: var(--border-radius-full);
+            margin: 0 auto var(--spacing-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: var(--color-primary-light);
+            color: var(--color-primary);
+            font-size: var(--font-size-2xl);
+            font-weight: 600;
+        }
+        
+        .profile-name {
+            font-size: var(--font-size-lg);
+            font-weight: 600;
+            color: var(--color-text-secondary);
+            margin-bottom: var(--spacing-xs);
+        }
+        
+        .profile-title {
+            color: var(--color-text-light);
+            font-size: var(--font-size-sm);
+            margin-bottom: var(--spacing-md);
+        }
+        
+        .profile-stats {
+            display: flex;
+            justify-content: center;
+            gap: var(--spacing-lg);
+            margin-bottom: var(--spacing-md);
+        }
+        
+        .profile-stat {
+            text-align: center;
+        }
+        
+        .profile-stat-value {
+            font-size: var(--font-size-lg);
+            font-weight: 600;
+            color: var(--color-text-secondary);
+        }
+        
+        .profile-stat-label {
+            font-size: var(--font-size-xs);
+            color: var(--color-text-light);
+        }
+        
+        .profile-actions {
+            display: flex;
+            justify-content: center;
+            gap: var(--spacing-sm);
+        }
+        
+        .related-jobs-list {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .related-job-item {
+            display: flex;
+            padding: var(--spacing-md);
+            border-bottom: 1px solid var(--color-border-light);
+            cursor: pointer;
+            transition: background-color var(--transition-fast);
+        }
+        
+        .related-job-item:hover {
+            background-color: var(--color-bg-secondary);
+        }
+        
+        .related-job-item:last-child {
+            border-bottom: none;
+        }
+        
+        .related-job-logo {
+            width: 40px;
+            height: 40px;
+            border-radius: var(--border-radius-md);
+            margin-right: var(--spacing-sm);
+            background-color: var(--color-border-light);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--color-text-light);
+            font-size: var(--font-size-md);
+            flex-shrink: 0;
+        }
+        
+        .related-job-logo img {
+            width: 100%;
+            height: 100%;
+            border-radius: var(--border-radius-md);
+            object-fit: cover;
+        }
+        
+        .related-job-info {
+            flex: 1;
+        }
+        
+        .related-job-title {
+            font-size: var(--font-size-sm);
+            font-weight: 600;
+            color: var(--color-primary-text);
+            margin-bottom: var(--spacing-xs);
+            display: -webkit-box;
+            -webkit-line-clamp: 1;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        
+        .related-job-company {
+            font-size: var(--font-size-xs);
+            color: var(--color-text-light);
+            margin-bottom: var(--spacing-xs);
+        }
+        
+        .related-job-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--spacing-xs);
+        }
+        
+        .related-job-badge {
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: var(--border-radius-full);
+        }
+        
+        /* Loader */
+        .loader {
+            display: flex;
+            justify-content: center;
+            padding: var(--spacing-lg);
+        }
+        
+        .loader-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--color-border);
+            border-top-color: var(--color-primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Dark mode */
+        .dark-mode {
+            --color-bg-main: #121212;
+            --color-bg-card: #1e1e1e;
+            --color-bg-secondary: #2a2a2a;
+            --color-text-main: #e0e0e0;
+            --color-text-secondary: #b0b0b0;
+            --color-text-light: #909090;
+            --color-border: #333333;
+            --color-border-light: #2a2a2a;
+            
+            /* Mantener colores de acentuación para claridad */
+            --color-primary: #5cb85c;
+            --color-primary-dark: #4cae4c;
+            --color-primary-light: rgba(92, 184, 92, 0.2);
+            --color-primary-text: #6ed56e;
+            
+            /* Adaptar colores de estado para modo oscuro */
+            --color-status-active: rgba(22, 101, 52, 0.3);
+            --color-status-active-text: #34d399;
+            --color-status-urgent: rgba(185, 28, 28, 0.3);
+            --color-status-urgent-text: #f87171;
+            --color-status-closed: rgba(71, 85, 105, 0.3);
+            --color-status-closed-text: #cbd5e1;
+            --color-status-upcoming: rgba(3, 105, 161, 0.3);
+            --color-status-upcoming-text: #38bdf8;
+        }
+        
+        .dark-mode .badge-location {
+            background-color: rgba(71, 85, 105, 0.3);
+            color: #cbd5e1;
+        }
+        
+        .dark-mode .badge-type {
+            background-color: rgba(3, 105, 161, 0.3);
+            color: #38bdf8;
+        }
+        
+        .dark-mode .badge-salary {
+            background-color: rgba(22, 101, 52, 0.3);
+            color: #34d399;
+        }
+        
+        .dark-mode .job-detail-list-item::before {
+            background-color: rgba(92, 184, 92, 0.2);
+        }
+        
+        /* Accesibilidad */
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+                scroll-behavior: auto !important;
+            }
+        }
+        
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border-width: 0;
+        }
+        
+        /* Botón de modo oscuro */
+        .theme-toggle {
+            position: fixed;
+            bottom: var(--spacing-lg);
+            right: var(--spacing-lg);
+            width: 50px;
+            height: 50px;
+            border-radius: var(--border-radius-full);
+            background-color: var(--color-primary);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: var(--font-size-lg);
+            cursor: pointer;
+            border: none;
+            box-shadow: var(--shadow-md);
+            z-index: 90;
+            transition: transform var(--transition-fast), background-color var(--transition-fast);
+        }
+        
+        .theme-toggle:hover {
+            transform: scale(1.1);
+            background-color: var(--color-primary-dark);
+        }
+        
+        /* Flotante para compartir */
+        .share-popup {
+            position: absolute;
+            bottom: 100%;
+            right: 0;
+            background-color: var(--color-bg-card);
+            border-radius: var(--border-radius-md);
+            box-shadow: var(--shadow-md);
+            padding: var(--spacing-sm);
+            margin-bottom: var(--spacing-sm);
+            display: none;
+            z-index: 20;
+            min-width: 200px;
+        }
+        
+        .share-popup.active {
+            display: block;
+        }
+        
+        .share-popup-title {
+            font-size: var(--font-size-sm);
+            font-weight: 600;
+            color: var(--color-text-secondary);
+            margin-bottom: var(--spacing-sm);
+            padding: var(--spacing-xs) var(--spacing-sm);
+        }
+        
+        .share-options {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .share-option {
+            display: flex;
+            align-items: center;
+            padding: var(--spacing-sm);
+            cursor: pointer;
+            border-radius: var(--border-radius-md);
+            transition: background-color var(--transition-fast);
+        }
+        
+        .share-option:hover {
+            background-color: var(--color-bg-secondary);
+        }
+        
+        .share-option i {
+            width: 24px;
+            margin-right: var(--spacing-sm);
+        }
+        
+        .share-option-facebook i {
+            color: #1877f2;
+        }
+        
+        .share-option-twitter i {
+            color: #1da1f2;
+        }
+        
+        .share-option-linkedin i {
+            color: #0077b5;
+        }
+        
+        .share-option-whatsapp i {
+            color: #25d366;
+        }
+        
+        .share-option-copy i {
+            color: var(--color-text-light);
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container header-container">
+            <a href="#" class="logo">
+                <i class="fas fa-leaf"></i> Agrochamba
+            </a>
+            
+            <button class="mobile-nav-toggle" id="mobile-nav-toggle" aria-label="Abrir menú">
+                <i class="fas fa-bars"></i>
+            </button>
+            
+            <nav class="nav-links" id="nav-links">
+                <button class="close-menu" id="close-menu" aria-label="Cerrar menú">
+                    <i class="fas fa-times"></i>
+                </button>
+                <a href="#" class="nav-link active"><i class="fas fa-home"></i> Inicio</a>
+                <a href="#" class="nav-link"><i class="fas fa-bullhorn"></i> Trabajos</a>
+                <a href="#" class="nav-link"><i class="fas fa-building"></i> Empresas</a>
+                <a href="#" class="nav-link"><i class="fas fa-users"></i> Comunidad</a>
+                <a href="#" class="nav-link"><i class="fas fa-bell"></i> Notificaciones</a>
+            </nav>
+            
+            <div class="user-actions">
+                <a href="#" class="btn btn-outline"><i class="fas fa-sign-in-alt"></i> Ingresar</a>
+                <a href="#" class="btn btn-primary"><i class="fas fa-user-plus"></i> Registrarse</a>
+                <!-- Usuario logueado (descomentar cuando se implemente)
+                <div class="user-profile">
+                    <div class="user-avatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <span class="user-name">Juan Pérez</span>
+                </div>
+                -->
+            </div>
+        </div>
+    </header>
+    
+    <!-- Main content -->
+    <main class="main-content">
+        <div class="container">
+            <div class="feed-container">
+                <div class="feed-main">
+                    <!-- Feed header -->
+                    <div class="feed-header">
+                        <div>
+                            <h1 class="feed-title">Oportunidades Laborales</h1>
+                            <p class="feed-description">Encuentra trabajo en el sector agrícola y de empaque</p>
+                        </div>
+                        <a href="#" class="btn btn-primary post-job-btn"><i class="fas fa-plus"></i> Publicar Trabajo</a>
+                    </div>
+                    
+                    <!-- Banner -->
+                    <div class="feed-banner">
+                        <div class="feed-banner-icon">
+                            <i class="fas fa-bullhorn"></i>
+                        </div>
+                        <div class="feed-banner-content">
+                            <h3>¡Campaña de Uva 2025 en proceso!</h3>
+                            <p>Varias empresas están contratando personal para la temporada de cosecha y empaque de uva. ¡No pierdas esta oportunidad!</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Filter bar -->
+                    <div class="filter-bar">
+                        <div class="filter-bar-header">
+                            <h2 class="filter-bar-title">
+                                <i class="fas fa-filter"></i> Filtros
+                            </h2>
+                            <button class="filter-toggle" id="filter-toggle">
+                                Mostrar filtros <i class="fas fa-chevron-down"></i>
+                            </button>
+                        </div>
+                        <div class="filter-content" id="filter-content">
+                            <div class="filter-search">
+                                <i class="fas fa-search filter-search-icon"></i>
+                                <input type="text" class="filter-search-input" id="job-search" placeholder="Buscar trabajos...">
+                            </div>
+                            <div class="filter-grid">
+                                <div class="filter-group">
+                                    <i class="fas fa-th-large filter-icon"></i>
+                                    <select class="filter-select" id="category-filter">
+                                        <option value="">Todas las áreas</option>
+                                        <option value="Campo">Campo</option>
+                                        <option value="Empaque">Empaque</option>
+                                        <option value="Logística">Logística</option>
+                                        <option value="Supervisión">Supervisión</option>
+                                        <option value="Administración">Administración</option>
+                                        <option value="Calidad">Calidad</option>
+                                    </select>
+                                </div>
+                                <div class="filter-group">
+                                    <i class="fas fa-apple-alt filter-icon"></i>
+                                    <select class="filter-select" id="product-filter">
+                                        <option value="">Todos los productos</option>
+                                        <option value="Uva">Uva</option>
+                                        <option value="Palta">Palta</option>
+                                        <option value="Mango">Mango</option>
+                                        <option value="Cítricos">Cítricos</option>
+                                        <option value="Varios">Varios</option>
+                                    </select>
+                                </div>
+                                <div class="filter-group">
+                                    <i class="fas fa-map-marker-alt filter-icon"></i>
+                                    <select class="filter-select" id="location-filter">
+                                        <option value="">Todas las ubicaciones</option>
+                                        <option value="Ica">Ica</option>
+                                        <option value="Piura">Piura</option>
+                                        <option value="La Libertad">La Libertad</option>
+                                        <option value="Lima">Lima</option>
+                                        <option value="Arequipa">Arequipa</option>
+                                    </select>
+                                </div>
+                                <div class="filter-group">
+                                    <i class="fas fa-circle-check filter-icon"></i>
+                                    <select class="filter-select" id="status-filter">
+                                        <option value="">Todos los estados</option>
+                                        <option value="Activo">Activo</option>
+                                        <option value="Urgente">Urgente</option>
+                                        <option value="Próximo">Próximo</option>
+                                        <option value="Cerrado">Cerrado</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="filter-actions">
+                                <button class="btn btn-secondary" id="clear-filters">Limpiar filtros</button>
+                                <button class="btn btn-primary" id="apply-filters">Aplicar filtros</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Job feed -->
+                    <div class="job-feed" id="job-feed">
+                        <!-- Jobs will be inserted here dynamically -->
+                    </div>
+                    
+                    <!-- Loader (hidden by default) -->
+                    <div class="loader" id="loader" style="display: none;">
+                        <div class="loader-spinner"></div>
+                    </div>
+                    
+                    <!-- Load more button -->
+                    <div class="text-center" style="margin-top: 20px;">
+                        <button class="btn btn-secondary" id="load-more-btn">Cargar más trabajos</button>
+                    </div>
+                </div>
+                
+                <div class="feed-sidebar">
+                    <!-- Profile card (visible when logged in) -->
+                    <div class="sidebar-card" style="display: none;" id="profile-card">
+                        <div class="sidebar-card-body profile-card">
+                            <div class="profile-avatar">
+                                <i class="fas fa-user"></i>
+                            </div>
+                            <h3 class="profile-name">Juan Pérez</h3>
+                            <p class="profile-title">Técnico Agrícola</p>
+                            
+                            <div class="profile-stats">
+                                <div class="profile-stat">
+                                    <div class="profile-stat-value">12</div>
+                                    <div class="profile-stat-label">Aplicaciones</div>
+                                </div>
+                                <div class="profile-stat">
+                                    <div class="profile-stat-value">5</div>
+                                    <div class="profile-stat-label">Guardados</div>
+                                </div>
+                                <div class="profile-stat">
+                                    <div class="profile-stat-value">8</div>
+                                    <div class="profile-stat-label">Entrevistas</div>
+                                </div>
+                            </div>
+                            
+                            <div class="profile-actions">
+                                <a href="#" class="btn btn-outline btn-full">Ver perfil</a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Trending jobs -->
+                    <div class="sidebar-card">
+                        <div class="sidebar-card-header">
+                            <h3 class="sidebar-card-title">
+                                <i class="fas fa-fire"></i> Trabajos destacados
+                            </h3>
+                            <a href="#" class="sidebar-card-link">Ver todos</a>
+                        </div>
+                        <div class="related-jobs-list" id="trending-jobs">
+                            <!-- Trending jobs will be inserted here dynamically -->
+                        </div>
+                    </div>
+                    
+                    <!-- Featured companies -->
+                    <div class="sidebar-card">
+                        <div class="sidebar-card-header">
+                            <h3 class="sidebar-card-title">
+                                <i class="fas fa-building"></i> Empresas destacadas
+                            </h3>
+                            <a href="#" class="sidebar-card-link">Ver todas</a>
+                        </div>
+                        <div class="sidebar-card-body" id="featured-companies">
+                            <!-- Featured companies will be inserted here dynamically -->
+                        </div>
+                    </div>
+                    
+                    <!-- Upcoming campaigns -->
+                    <div class="sidebar-card">
+                        <div class="sidebar-card-header">
+                            <h3 class="sidebar-card-title">
+                                <i class="fas fa-calendar"></i> Próximas campañas
+                            </h3>
+                        </div>
+                        <div class="sidebar-card-body" id="upcoming-campaigns">
+                            <!-- Upcoming campaigns will be inserted here dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <!-- Job detail modal -->
+    <div class="modal-overlay" id="job-modal">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2 class="modal-title">Detalle del trabajo</h2>
+                <button class="modal-close" id="modal-close" aria-label="Cerrar">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body" id="job-detail-content">
+                <!-- Job detail content will be inserted here dynamically -->
+            </div>
+        </div>
+    </div>
+    
+    <!-- Dark mode toggle -->
+    <button class="theme-toggle" id="theme-toggle" aria-label="Cambiar modo oscuro/claro">
+        <i class="fas fa-moon"></i>
+    </button>
+
+    <!-- JavaScript -->
+    <script>
+        // Datos de ejemplo para los trabajos
+        const jobListings = [
+            {
+                id: 1,
+                title: "Cosechador(a) de Uva",
+                company: "AgroFrut Perú",
+                companyLogo: "/api/placeholder/48/48", // Placeholder para logo
+                verified: true,
+                location: "Ica, Perú",
+                type: "Temporal",
+                product: "Uva",
+                category: "Campo",
+                season: "Campaña Marzo-Mayo 2025",
+                date: "26 feb 2025",
+                dateAgo: "Hace 2 días",
+                salary: "S/. 1.20 por kilo + bonos",
+                status: "Urgente",
+                applications: 32,
+                vacancies: 50,
+                views: 243,
+                startDate: "15 de marzo, 2025",
+                duration: "3 meses",
+                description: "Buscamos cosechadores de uva para la campaña 2025 en nuestros campos de Ica. El trabajo consiste en la recolección manual de uvas de mesa para exportación, siguiendo los estándares de calidad establecidos por la empresa.",
+                requirements: [
+                    "Experiencia previa en cosecha de uva (deseable pero no indispensable)",
+                    "Disponibilidad para trabajar en jornada completa",
+                    "Capacidad para trabajar bajo el sol y en condiciones de campo",
+                    "Habilidad para trabajo en equipo",
+                    "Documentos en regla (DNI, certificado de salud)"
+                ],
+                benefits: [
+                    "Pago por producción (S/. 1.20 por kilo de uva recolectada)",
+                    "Transporte desde puntos de recojo designados",
+                    "Almuerzo en el campo",
+                    "Seguro contra accidentes",
+                    "Capacitación en técnicas de cosecha",
+                    "Posibilidad de extender contrato a otras campañas"
+                ],
+                contact: {
+                    department: "Departamento de Recursos Humanos",
+                    phone: "(056) 234-5678",
+                    email: "rrhh@agrofrutperu.com",
+                    address: "Km 320 Panamericana Sur, Ica"
+                },
+                tags: ["Uva", "Cosecha", "Campo", "Temporal"],
+                reactions: {
+                    like: 18,
+                    love: 7,
+                    interested: 24
+                },
+                shares: 12,
+                comments: 8,
+                commentsData: [
+                    {
+                        id: 1,
+                        author: "María López",
+                        avatar: "/api/placeholder/40/40",
+                        text: "Trabajé en la campaña anterior y fue una buena experiencia. El pago es justo y el ambiente es agradable.",
+                        time: "Hace 1 día",
+                        likes: 5
+                    },
+                    {
+                        id: 2,
+                        author: "Pedro Sánchez",
+                        avatar: "/api/placeholder/40/40",
+                        text: "¿Alguien sabe si hay transporte desde Subtanjalla?",
+                        time: "Hace 12 horas",
+                        likes: 0
+                    },
+                    {
+                        id: 3,
+                        author: "AgroFrut Perú",
+                        avatar: "/api/placeholder/40/40",
+                        text: "Hola Pedro, sí tenemos puntos de recojo en Subtanjalla. Para más información puedes llamar al número de contacto.",
+                        time: "Hace 10 horas",
+                        likes: 2
+                    }
+                ]
+            },
+            {
+                id: 2,
+                title: "Operario(a) de Empaque de Palta",
+                company: "Green Hass Exportaciones",
+                companyLogo: "/api/placeholder/48/48", // Placeholder para logo
+                verified: true,
+                location: "La Libertad, Perú",
+                type: "Temporal",
+                product: "Palta",
+                category: "Empaque",
+                season: "Campaña Abril-Julio 2025",
+                date: "25 feb 2025",
+                dateAgo: "Hace 3 días",
+                salary: "S/. 1,200 - 1,500 mensual",
+                status: "Activo",
+                applications: 28,
+                vacancies: 40,
+                views: 189,
+                startDate: "1 de abril, 2025",
+                duration: "4 meses",
+                description: "Necesitamos operarios para la línea de empaque de palta Hass. Las funciones incluyen selección, clasificación, pesaje y embalaje de paltas para exportación según los estándares internacionales de calidad.",
+                requirements: [
+                    "Experiencia previa en planta de empaque (deseable)",
+                    "Conocimientos básicos de manejo de alimentos",
+                    "Disponibilidad para trabajar turnos rotativos",
+                    "Capacidad para trabajar en ambientes refrigerados",
+                    "Documentos en regla (DNI, carnet de sanidad)"
+                ],
+                benefits: [
+                    "Sueldo básico más horas extras",
+                    "Transporte desde puntos designados",
+                    "Alimentación en planta",
+                    "Seguro complementario de trabajo de riesgo",
+                    "Capacitación constante"
+                ],
+                contact: {
+                    department: "Departamento de Recursos Humanos",
+                    phone: "(044) 345-6789",
+                    email: "rrhh@greenhass.com",
+                    address: "Parque Industrial Moche, La Libertad"
+                },
+                tags: ["Palta", "Empaque", "Planta", "Temporal"],
+                reactions: {
+                    like: 12,
+                    love: 4,
+                    interested: 18
+                },
+                shares: 7,
+                comments: 5,
+                commentsData: [
+                    {
+                        id: 1,
+                        author: "Carlos Rodríguez",
+                        avatar: "/api/placeholder/40/40",
+                        text: "¿Cuál es el horario de los turnos?",
+                        time: "Hace 2 días",
+                        likes: 3
+                    },
+                    {
+                        id: 2,
+                        author: "Green Hass Exportaciones",
+                        avatar: "/api/placeholder/40/40",
+                        text: "Hola Carlos, tenemos 3 turnos: 6am-2pm, 2pm-10pm y 10pm-6am. Se rotan semanalmente.",
+                        time: "Hace 2 días",
+                        likes: 1
+                    }
+                ]
+            },
+            {
+                id: 3,
+                title: "Supervisor de Calidad",
+                company: "Tropical Fruits",
+                companyLogo: "/api/placeholder/48/48", // Placeholder para logo
+                verified: true,
+                location: "Piura, Perú",
+                type: "Permanente",
+                product: "Mango",
+                category: "Calidad",
+                season: "Todo el año",
+                date: "22 feb 2025",
+                dateAgo: "Hace 6 días",
+                salary: "S/. 2,300 - 2,800 mensual",
+                status: "Activo",
+                applications: 15,
+                vacancies: 3,
+                views: 167,
+                startDate: "Inmediato",
+                duration: "Indefinido",
+                description: "Buscamos un supervisor de calidad para nuestra planta de procesamiento de mango. Será responsable de asegurar el cumplimiento de los estándares de calidad e inocuidad durante todo el proceso productivo.",
+                requirements: [
+                    "Título técnico o profesional en agronomía, industrias alimentarias o afines",
+                    "Experiencia mínima de 2 años en control de calidad de productos agrícolas",
+                    "Conocimiento en sistemas HACCP, BRC, Global GAP",
+                    "Capacidad de liderazgo y gestión de equipos",
+                    "Disponibilidad para trabajar en horarios rotativos"
+                ],
+                benefits: [
+                    "Sueldo competitivo acorde al mercado",
+                    "Contrato estable",
+                    "Capacitación constante",
+                    "Línea de carrera",
+                    "EPS y seguro de vida"
+                ],
+                contact: {
+                    department: "Jefe de Recursos Humanos",
+                    phone: "(073) 456-7890",
+                    email: "talentos@tropicalfruits.com",
+                    address: "Carretera Piura-Sullana Km 15, Piura"
+                },
+                tags: ["Mango", "Calidad", "Supervisor", "HACCP", "BRC"],
+                reactions: {
+                    like: 8,
+                    love: 3,
+                    interested: 13
+                },
+                shares: 4,
+                comments: 2,
+                commentsData: [
+                    {
+                        id: 1,
+                        author: "Ana Martínez",
+                        avatar: "/api/placeholder/40/40",
+                        text: "¿Es necesario tener experiencia específica en mango o sirve experiencia en otros frutos?",
+                        time: "Hace 4 días",
+                        likes: 4
+                    }
+                ]
+            },
+            {
+                id: 4,
+                title: "Operador de Montacargas",
+                company: "Agroexportadora del Sol",
+                companyLogo: "/api/placeholder/48/48", // Placeholder para logo
+                verified: false,
+                location: "Ica, Perú",
+                type: "Temporal",
+                product: "Varios",
+                category: "Logística",
+                season: "Campaña Marzo-Agosto 2025",
+                date: "20 feb 2025",
+                dateAgo: "Hace 1 semana",
+                salary: "S/. 1,500 - 1,800 mensual",
+                status: "Activo",
+                applications: 18,
+                vacancies: 5,
+                views: 120,
+                startDate: "1 de marzo, 2025",
+                duration: "6 meses",
+                description: "Requerimos operadores de montacargas para el manejo de productos en cámaras de frío. El trabajo incluye el traslado de pallets, organización de cámaras y despacho de contenedores.",
+                requirements: [
+                    "Certificación vigente como operador de montacargas",
+                    "Experiencia mínima de 1 año operando montacargas en cámaras refrigeradas",
+                    "Conocimiento de seguridad industrial",
+                    "Disponibilidad para trabajar en turnos rotativos",
+                    "Tolerancia a trabajar en ambientes fríos"
+                ],
+                benefits: [
+                    "Sueldo acorde al mercado",
+                    "Horas extras remuneradas",
+                    "Alimentación",
+                    "Transporte",
+                    "Seguro complementario de trabajo de riesgo"
+                ],
+                contact: {
+                    department: "Coordinador de Logística",
+                    phone: "(056) 567-8901",
+                    email: "logistica@agroexpdelsol.com",
+                    address: "Km 275 Panamericana Sur, Ica"
+                },
+                tags: ["Logística", "Montacargas", "Cámaras de frío", "Temporal"],
+                reactions: {
+                    like: 5,
+                    love: 2,
+                    interested: 9
+                },
+                shares: 3,
+                comments: 1,
+                commentsData: [
+                    {
+                        id: 1,
+                        author: "Jorge Castro",
+                        avatar: "/api/placeholder/40/40",
+                        text: "¿Se requiere alguna certificación específica para el manejo de montacargas?",
+                        time: "Hace 5 días",
+                        likes: 2
+                    }
+                ]
+            },
+            {
+                id: 5,
+                title: "Tractorista Agrícola",
+                company: "Valle Verde Agrícola",
+                companyLogo: "/api/placeholder/48/48", // Placeholder para logo
+                verified: true,
+                location: "La Libertad, Perú",
+                type: "Permanente",
+                product: "Varios",
+                category: "Campo",
+                season: "Todo el año",
+                date: "18 feb 2025",
+                dateAgo: "Hace 1 semana",
+                salary: "S/. 1,600 - 2,000 mensual",
+                status: "Activo",
+                applications: 12,
+                vacancies: 4,
+                views: 98,
+                startDate: "Inmediato",
+                duration: "Indefinido",
+                description: "Necesitamos tractoristas para labores agrícolas en nuestros campos de producción. Realizará trabajos de preparación de terreno, aplicación de insumos y mantenimiento general del campo.",
+                requirements: [
+                    "Experiencia mínima de 2 años como tractorista agrícola",
+                    "Conocimiento en manejo y mantenimiento básico de tractores",
+                    "Licencia de conducir A-II o superior",
+                    "Conocimientos en labores de campo",
+                    "Disponibilidad para trabajar en turnos según necesidad"
+                ],
+                benefits: [
+                    "Contrato estable",
+                    "Alimentación",
+                    "Transporte",
+                    "Capacitación constante",
+                    "Seguro complementario de trabajo de riesgo"
+                ],
+                contact: {
+                    department: "Jefe de Campo",
+                    phone: "(044) 678-9012",
+                    email: "rrhh@valleverde.com.pe",
+                    address: "Sector El Carmelo, Valle de Virú, La Libertad"
+                },
+                tags: ["Campo", "Tractorista", "Maquinaria agrícola", "Permanente"],
+                reactions: {
+                    like: 7,
+                    love: 2,
+                    interested: 8
+                },
+                shares: 5,
+                comments: 3,
+                commentsData: [
+                    {
+                        id: 1,
+                        author: "Ricardo Mendoza",
+                        avatar: "/api/placeholder/40/40",
+                        text: "¿Se requiere conocimientos específicos de algún cultivo?",
+                        time: "Hace 6 días",
+                        likes: 1
+                    }
+                ]
+            },
+            {
+                id: 6,
+                title: "Supervisor de Línea de Empaque",
+                company: "Tropical Fruits",
+                companyLogo: "/api/placeholder/48/48", // Placeholder para logo
+                verified: true,
+                location: "Piura, Perú",
+                type: "Temporal",
+                product: "Mango",
+                category: "Supervisión",
+                season: "Campaña Noviembre 2025-Febrero 2026",
+                date: "15 feb 2025",
+                dateAgo: "Hace 2 semanas",
+                salary: "S/. 2,000 - 2,500 mensual",
+                status: "Próximo",
+                applications: 8,
+                vacancies: 6,
+                views: 84,
+                startDate: "1 de noviembre, 2025",
+                duration: "4 meses",
+                description: "Buscamos supervisor para línea de empaque de mango. Será responsable de coordinar al equipo de trabajo, controlar el rendimiento y asegurar el cumplimiento de metas de producción y calidad.",
+                requirements: [
+                    "Experiencia previa como supervisor de línea en plantas de empaque de frutas",
+                    "Conocimiento en procesos de empaque de frutas frescas",
+                    "Capacidad de liderazgo y trabajo bajo presión",
+                    "Disponibilidad para trabajar en turnos rotativos",
+                    "Estudios técnicos o superiores (deseable)"
+                ],
+                benefits: [
+                    "Remuneración acorde al mercado",
+                    "Capacitación técnica especializada",
+                    "Alimentación",
+                    "Transporte",
+                    "Posibilidad de extensión de contrato"
+                ],
+                contact: {
+                    department: "Jefe de Planta",
+                    phone: "(073) 789-0123",
+                    email: "planta@tropicalfruits.com",
+                    address: "Carretera Piura-Sullana Km 15, Piura"
+                },
+                tags: ["Mango", "Supervisión", "Empaque", "Línea de producción", "Temporal"],
+                reactions: {
+                    like: 4,
+                    love: 1,
+                    interested: 10
+                },
+                shares: 2,
+                comments: 0,
+                commentsData: []
+            },
+            {
+                id: 7,
+                title: "Asistente Administrativo",
+                company: "AgroFrut Perú",
+                companyLogo: "/api/placeholder/48/48", // Placeholder para logo
+                verified: true,
+                location: "Lima, Perú",
+                type: "Permanente",
+                product: "Varios",
+                category: "Administración",
+                season: "Todo el año",
+                date: "12 feb 2025",
+                dateAgo: "Hace 2 semanas",
+                salary: "S/. 1,800 - 2,200 mensual",
+                status: "Cerrado",
+                applications: 45,
+                vacancies: 1,
+                views: 267,
+                startDate: "Inmediato",
+                duration: "Indefinido",
+                description: "Buscamos un asistente administrativo para las oficinas corporativas de Lima. Apoyará en las gestiones administrativas, coordinación con las sedes y control documentario de operaciones agrícolas.",
+                requirements: [
+                    "Estudios técnicos o universitarios en Administración o afines",
+                    "Experiencia mínima de 1 año en posiciones similares",
+                    "Dominio de MS Office a nivel intermedio",
+                    "Capacidad de organización y atención al detalle",
+                    "Proactividad y trabajo en equipo"
+                ],
+                benefits: [
+                    "Planilla desde el primer día",
+                    "Horario de oficina de lunes a viernes",
+                    "Oportunidades de crecimiento",
+                    "EPS",
+                    "Capacitación constante"
+                ],
+                contact: {
+                    department: "Gerente de Recursos Humanos",
+                    phone: "(01) 890-1234",
+                    email: "rrhh@agrofrutperu.com",
+                    address: "Av. Javier Prado Este 5846, La Molina, Lima"
+                },
+                tags: ["Administración", "Oficina", "Asistente", "Permanente"],
+                reactions: {
+                    like: 15,
+                    love: 8,
+                    interested: 22
+                },
+                shares: 10,
+                comments: 6,
+                commentsData: [
+                    {
+                        id: 1,
+                        author: "Isabel Torres",
+                        avatar: "/api/placeholder/40/40",
+                        text: "¿Cuál es el horario de trabajo exacto?",
+                        time: "Hace 12 días",
+                        likes: 3
+                    },
+                    {
+                        id: 2,
+                        author: "AgroFrut Perú",
+                        avatar: "/api/placeholder/40/40",
+                        text: "Hola Isabel, el horario es de lunes a viernes de 8:30am a 6:00pm con una hora de almuerzo.",
+                        time: "Hace 12 días",
+                        likes: 2
+                    }
+                ]
+            },
+            {
+                id: 8,
+                title: "Técnico de Riego",
+                company: "AgroFrut Perú",
+                companyLogo: "/api/placeholder/48/48", // Placeholder para logo
+                verified: true,
+                location: "Ica, Perú",
+                type: "Permanente",
+                product: "Varios",
+                category: "Campo",
+                season: "Todo el año",
+                date: "10 feb 2025",
+                dateAgo: "Hace 2 semanas",
+                salary: "S/. 1,700 - 2,100 mensual",
+                status: "Activo",
+                applications: 10,
+                vacancies: 2,
+                views: 112,
+                startDate: "Inmediato",
+                duration: "Indefinido",
+                description: "Se requiere técnico especializado en sistemas de riego por goteo. Realizará instalaciones, mantenimiento y reparaciones de los sistemas de riego, así como programación de riegos según necesidades del cultivo.",
+                requirements: [
+                    "Formación técnica en agronomía o afines",
+                    "Experiencia mínima de 2 años en sistemas de riego tecnificado",
+                    "Conocimiento en fertirriego y programación de riego",
+                    "Manejo de herramientas básicas de medición (conductímetro, manómetros, etc.)",
+                    "Capacidad para trabajar en campo"
+                ],
+                benefits: [
+                    "Contrato estable",
+                    "Remuneración acorde al mercado",
+                    "Capacitación especializada",
+                    "Alimentación",
+                    "Transporte"
+                ],
+                contact: {
+                    department: "Jefe de Riego",
+                    phone: "(056) 901-2345",
+                    email: "riego@agrofrutperu.com",
+                    address: "Km 320 Panamericana Sur, Ica"
+                },
+                tags: ["Riego", "Goteo", "Técnico", "Campo", "Permanente"],
+                reactions: {
+                    like: 6,
+                    love: 3,
+                    interested: 11
+                },
+                shares: 4,
+                comments: 2,
+                commentsData: [
+                    {
+                        id: 1,
+                        author: "Miguel Flores",
+                        avatar: "/api/placeholder/40/40",
+                        text: "¿Se necesita tener conocimientos de programación de controladores de riego?",
+                        time: "Hace 10 días",
+                        likes: 1
+                    }
+                ]
+            }
+        ];
+
+        // Datos para empresas destacadas
+        const featuredCompanies = [
+            {
+                id: 1,
+                name: "AgroFrut Perú",
+                logo: "/api/placeholder/64/64",
+                description: "Líder en producción y exportación de uva de mesa",
+                verified: true,
+                activeJobs: 4,
+                location: "Ica, Perú"
+            },
+            {
+                id: 2,
+                name: "Tropical Fruits",
+                logo: "/api/placeholder/64/64",
+                description: "Producción y exportación de frutas tropicales",
+                verified: true,
+                activeJobs: 8,
+                location: "Piura, Perú"
+            },
+            {
+                id: 3,
+                name: "Green Hass Exportaciones",
+                logo: "/api/placeholder/64/64",
+                description: "Especialistas en producción y procesamiento de palta Hass",
+                verified: true,
+                activeJobs: 3,
+                location: "La Libertad, Perú"
+            }
+        ];
+
+        // Datos para próximas campañas
+        const upcomingCampaigns = [
+            {
+                id: 1,
+                title: "Campaña de Mango",
+                company: "Tropical Fruits",
+                startDate: "Noviembre 2025",
+                endDate: "Febrero 2026",
+                location: "Piura",
+                estimatedJobs: 300
+            },
+            {
+                id: 2,
+                title: "Campaña de Palta",
+                company: "Green Hass Exportaciones",
+                startDate: "Abril 2025",
+                endDate: "Julio 2025",
+                location: "La Libertad",
+                estimatedJobs: 250
+            },
+            {
+                id: 3,
+                title: "Campaña de Cítricos",
+                company: "Valle Verde Agrícola",
+                startDate: "Mayo 2025",
+                endDate: "Agosto 2025",
+                location: "Ica",
+                estimatedJobs: 180
+            }
+        ];
+
+        // Elementos DOM
+        const jobFeed = document.getElementById('job-feed');
+        const jobModal = document.getElementById('job-modal');
+        const modalClose = document.getElementById('modal-close');
+        const jobDetailContent = document.getElementById('job-detail-content');
+        const filterToggle = document.getElementById('filter-toggle');
+        const filterContent = document.getElementById('filter-content');
+        const jobSearch = document.getElementById('job-search');
+        const categoryFilter = document.getElementById('category-filter');
+        const productFilter = document.getElementById('product-filter');
+        const locationFilter = document.getElementById('location-filter');
+        const statusFilter = document.getElementById('status-filter');
+        const clearFilters = document.getElementById('clear-filters');
+        const applyFilters = document.getElementById('apply-filters');
+        const loadMoreBtn = document.getElementById('load-more-btn');
+        const loader = document.getElementById('loader');
+        const trendingJobsList = document.getElementById('trending-jobs');
+        const featuredCompaniesList = document.getElementById('featured-companies');
+        const upcomingCampaignsList = document.getElementById('upcoming-campaigns');
+        const mobileNavToggle = document.getElementById('mobile-nav-toggle');
+        const closeMenu = document.getElementById('close-menu');
+        const navLinks = document.getElementById('nav-links');
+        const themeToggle = document.getElementById('theme-toggle');
+        
+        // Variables para simulación de carga
+        let currentPage = 1;
+        let itemsPerPage = 4;
+        let filteredJobs = [...jobListings];
+        
+        // Función para mostrar/ocultar el contenido de filtros
+        filterToggle.addEventListener('click', () => {
+            filterContent.classList.toggle('active');
+            filterToggle.classList.toggle('active');
+            
+            if (filterToggle.classList.contains('active')) {
+                filterToggle.innerHTML = 'Ocultar filtros <i class="fas fa-chevron-up"></i>';
+            } else {
+                filterToggle.innerHTML = 'Mostrar filtros <i class="fas fa-chevron-down"></i>';
+            }
+        });
+        
+        // Función para limpiar filtros
+        clearFilters.addEventListener('click', () => {
+            jobSearch.value = '';
+            categoryFilter.value = '';
+            productFilter.value = '';
+            locationFilter.value = '';
+            statusFilter.value = '';
+            
+            filterJobs();
+        });
+        
+        // Función para aplicar filtros
+        applyFilters.addEventListener('click', () => {
+            filterJobs();
+        });
+        
+        // Abrir y cerrar menú móvil
+        mobileNavToggle.addEventListener('click', () => {
+            navLinks.classList.add('active');
+        });
+        
+        closeMenu.addEventListener('click', () => {
+            navLinks.classList.remove('active');
+        });
+        
+        // Cambiar entre modo claro y oscuro
+        themeToggle.addEventListener('click', () => {
+            document.body.classList.toggle('dark-mode');
+            
+            if (document.body.classList.contains('dark-mode')) {
+                themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
+            } else {
+                themeToggle.innerHTML = '<i class="fas fa-moon"></i>';
+            }
+        });
+        
+        // Filtrar trabajos
+        function filterJobs() {
+            const searchTerm = jobSearch.value.toLowerCase();
+            const selectedCategory = categoryFilter.value;
+            const selectedProduct = productFilter.value;
+            const selectedLocation = locationFilter.value;
+            const selectedStatus = statusFilter.value;
+            
+            filteredJobs = jobListings.filter(job => {
+                const matchesSearch = 
+                    job.title.toLowerCase().includes(searchTerm) ||
+                    job.company.toLowerCase().includes(searchTerm) ||
+                    job.description.toLowerCase().includes(searchTerm);
+                
+                const matchesCategory = selectedCategory === '' || job.category === selectedCategory;
+                const matchesProduct = selectedProduct === '' || job.product === selectedProduct;
+                const matchesLocation = selectedLocation === '' || job.location.includes(selectedLocation);
+                const matchesStatus = selectedStatus === '' || job.status === selectedStatus;
+                
+                return matchesSearch && matchesCategory && matchesProduct && matchesLocation && matchesStatus;
+            });
+            
+            // Reiniciar paginación
+            currentPage = 1;
+            renderJobs();
+        }
+        
+        // Renderizar trabajos en el feed
+        function renderJobs() {
+            const startIndex = 0;
+            const endIndex = currentPage * itemsPerPage;
+            const currentJobs = filteredJobs.slice(startIndex, endIndex);
+            
+            // Limpiar el contenedor
+            jobFeed.innerHTML = '';
+            
+            if (currentJobs.length === 0) {
+                jobFeed.innerHTML = `
+                    <div class="text-center" style="padding: 40px 0;">
+                        <i class="fas fa-search" style="font-size: 48px; color: #ccc; margin-bottom: 16px;"></i>
+                        <h3>No se encontraron trabajos</h3>
+                        <p>Intenta con otros criterios de búsqueda</p>
+                    </div>
+                `;
+                loadMoreBtn.style.display = 'none';
+                return;
+            }
+            
+            // Mostrar trabajos
+            currentJobs.forEach(job => {
+                const jobCard = document.createElement('div');
+                jobCard.className = 'job-card';
+                jobCard.dataset.id = job.id;
+                
+                // Calcular totales de reacciones
+                const totalReactions = job.reactions.like + job.reactions.love + job.reactions.interested;
+                
+                jobCard.innerHTML = `
+                    <div class="job-card-header">
+                        <div class="company-logo">
+                            <img src="${job.companyLogo}" alt="${job.company}">
+                        </div>
+                        <div class="company-info">
+                            <div class="company-name">
+                                ${job.company}
+                                ${job.verified ? '<span class="company-verified"><i class="fas fa-check-circle"></i></span>' : ''}
+                            </div>
+                            <div class="job-posted">
+                                <i class="fas fa-circle"></i> ${job.dateAgo}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="job-card-content">
+                        <h2 class="job-title">${job.title}</h2>
+                        <p class="job-description">${job.description}</p>
+                        
+                        <div class="job-badges">
+                            <span class="job-badge badge-location"><i class="fas fa-map-marker-alt"></i> ${job.location}</span>
+                            <span class="job-badge badge-type"><i class="fas fa-clock"></i> ${job.type}</span>
+                            <span class="job-badge badge-category"><i class="fas fa-th-large"></i> ${job.category}</span>
+                            <span class="job-badge badge-product"><i class="fas fa-apple-alt"></i> ${job.product}</span>
+                            <span class="job-badge badge-salary"><i class="fas fa-money-bill-wave"></i> ${job.salary}</span>
+                            <span class="badge-urgency urgency-${job.status.toLowerCase()}">${job.status}</span>
+                        </div>
+                        
+                        <div class="job-stats">
+                            <div class="job-stat">
+                                <i class="fas fa-users"></i> ${job.applications} aplicaciones
+                            </div>
+                            <div class="job-stat">
+                                <i class="fas fa-eye"></i> ${job.views} vistas
+                            </div>
+                        </div>
+                    </div>
+                    <div class="job-card-footer">
+                        <div class="job-social-actions">
+                            <div class="job-action action-like ${job.userLiked ? 'active' : ''}" data-action="like" data-id="${job.id}">
+                                <i class="far fa-thumbs-up"></i> ${job.reactions.like}
+                            </div>
+                            <div class="job-action action-love ${job.userLoved ? 'active' : ''}" data-action="love" data-id="${job.id}">
+                                <i class="far fa-heart"></i> ${job.reactions.love}
+                            </div>
+                            <div class="job-action action-interested ${job.userInterested ? 'active' : ''}" data-action="interested" data-id="${job.id}">
+                                <i class="far fa-star"></i> ${job.reactions.interested}
+                            </div>
+                            <div class="job-action" data-action="comment" data-id="${job.id}">
+                                <i class="far fa-comment"></i> ${job.comments}
+                            </div>
+                        </div>
+                        <div class="job-share" data-id="${job.id}">
+                            <i class="fas fa-share-alt"></i>
+                            <div class="share-popup" id="share-popup-${job.id}">
+                                <div class="share-popup-title">Compartir trabajo</div>
+                                <div class="share-options">
+                                    <div class="share-option share-option-facebook">
+                                        <i class="fab fa-facebook"></i> Facebook
+                                    </div>
+                                    <div class="share-option share-option-twitter">
+                                        <i class="fab fa-twitter"></i> Twitter
+                                    </div>
+                                    <div class="share-option share-option-linkedin">
+                                        <i class="fab fa-linkedin"></i> LinkedIn
+                                    </div>
+                                    <div class="share-option share-option-whatsapp">
+                                        <i class="fab fa-whatsapp"></i> WhatsApp
+                                    </div>
+                                    <div class="share-option share-option-copy">
+                                        <i class="fas fa-link"></i> Copiar enlace
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                jobFeed.appendChild(jobCard);
+                
+                // Añadir evento para ver los detalles del trabajo
+                jobCard.addEventListener('click', (e) => {
+                    // Si el clic fue en un botón de acciones sociales o compartir, no abrir el modal
+                    if (
+                        e.target.closest('.job-action') || 
+                        e.target.closest('.job-share') ||
+                        e.target.closest('.share-popup')
+                    ) {
+                        e.stopPropagation();
+                        return;
+                    }
+                    
+                    openJobDetail(job.id);
+                });
+                
+                // Eventos para botones de reacción
+                const actionButtons = jobCard.querySelectorAll('.job-action');
+                actionButtons.forEach(button => {
+                    button.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        
+                        const actionType = button.dataset.action;
+                        const jobId = parseInt(button.dataset.id);
+                        
+                        if (actionType === 'comment') {
+                            openJobDetail(jobId, true);
+                            return;
+                        }
+                        
+                        // Toggle clase active
+                        button.classList.toggle('active');
+                        
+                        // Actualizar ícono y contador
+                        const icon = button.querySelector('i');
+                        let count = parseInt(button.textContent.trim().split(' ')[1]);
+                        
+                        if (button.classList.contains('active')) {
+                            // Activar
+                            if (actionType === 'like') {
+                                icon.className = 'fas fa-thumbs-up';
+                                count++;
+                                job.userLiked = true;
+                                job.reactions.like = count;
+                            } else if (actionType === 'love') {
+                                icon.className = 'fas fa-heart';
+                                count++;
+                                job.userLoved = true;
+                                job.reactions.love = count;
+                            } else if (actionType === 'interested') {
+                                icon.className = 'fas fa-star';
+                                count++;
+                                job.userInterested = true;
+                                job.reactions.interested = count;
+                            }
+                        } else {
+                            // Desactivar
+                            if (actionType === 'like') {
+                                icon.className = 'far fa-thumbs-up';
+                                count--;
+                                job.userLiked = false;
+                                job.reactions.like = count;
+                            } else if (actionType === 'love') {
+                                icon.className = 'far fa-heart';
+                                count--;
+                                job.userLoved = false;
+                                job.reactions.love = count;
+                            } else if (actionType === 'interested') {
+                                icon.className = 'far fa-star';
+                                count--;
+                                job.userInterested = false;
+                                job.reactions.interested = count;
+                            }
+                        }
+                        
+                        button.innerHTML = `${icon.outerHTML} ${count}`;
+                    });
+                });
+                
+                // Evento para botón de compartir
+                const shareButton = jobCard.querySelector('.job-share');
+                shareButton.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    
+                    // Cerrar todos los popups de compartir
+                    document.querySelectorAll('.share-popup.active').forEach(popup => {
+                        if (popup.id !== `share-popup-${job.id}`) {
+                            popup.classList.remove('active');
+                        }
+                    });
+                    
+                    // Toggle popup de compartir actual
+                    const sharePopup = document.getElementById(`share-popup-${job.id}`);
+                    sharePopup.classList.toggle('active');
+                });
+                
+                // Eventos para opciones de compartir
+                const shareOptions = jobCard.querySelectorAll('.share-option');
+                shareOptions.forEach(option => {
+                    option.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        
+                        // Simular compartir
+                        const shareType = option.classList[1].split('-')[2];
+                        
+                        // Mensaje para el usuario
+                        alert(`Compartiendo trabajo "${job.title}" vía ${shareType}`);
+                        
+                        // Cerrar popup
+                        document.getElementById(`share-popup-${job.id}`).classList.remove('active');
+                    });
+                });
+            });
+            
+            // Mostrar/ocultar botón de cargar más
+            if (endIndex >= filteredJobs.length) {
+                loadMoreBtn.style.display = 'none';
+            } else {
+                loadMoreBtn.style.display = 'block';
+            }
+        }
+        
+        // Función para cargar más trabajos
+        loadMoreBtn.addEventListener('click', () => {
+            // Mostrar loader
+            loader.style.display = 'flex';
+            loadMoreBtn.style.display = 'none';
+            
+            // Simular carga
+            setTimeout(() => {
+                currentPage++;
+                renderJobs();
+                
+                // Ocultar loader
+                loader.style.display = 'none';
+                
+                // Si hay más trabajos, mostrar el botón
+                if (currentPage * itemsPerPage < filteredJobs.length) {
+                    loadMoreBtn.style.display = 'block';
+                }
+            }, 800);
+        });
+        
+        // Función para abrir detalle de trabajo
+        function openJobDetail(jobId, scrollToComments = false) {
+            const job = jobListings.find(job => job.id === jobId);
+            if (!job) return;
+            
+            // Preparar contenido para el detalle del trabajo
+            jobDetailContent.innerHTML = `
+                <div class="job-detail">
+                    <div class="job-detail-header">
+                        <div class="job-detail-company">
+                            <div class="job-detail-company-logo">
+                                <img src="${job.companyLogo}" alt="${job.company}">
+                            </div>
+                            <div class="job-detail-company-info">
+                                <div class="job-detail-company-name">
+                                    ${job.company}
+                                    ${job.verified ? '<span class="company-verified"><i class="fas fa-check-circle"></i></span>' : ''}
+                                </div>
+                                <div class="job-detail-posted">${job.dateAgo}</div>
+                            </div>
+                        </div>
+                        
+                        <h1 class="job-detail-title">${job.title}</h1>
+                        
+                        <div class="job-detail-badges">
+                            <span class="job-badge badge-location"><i class="fas fa-map-marker-alt"></i> ${job.location}</span>
+                            <span class="job-badge badge-type"><i class="fas fa-clock"></i> ${job.type}</span>
+                            <span class="job-badge badge-category"><i class="fas fa-th-large"></i> ${job.category}</span>
+                            <span class="job-badge badge-product"><i class="fas fa-apple-alt"></i> ${job.product}</span>
+                            <span class="badge-urgency urgency-${job.status.toLowerCase()}">${job.status}</span>
+                        </div>
+                        
+                        <div class="job-detail-stats">
+                            <div class="job-detail-stat">
+                                <div class="job-detail-stat-label">Salario</div>
+                                <div class="job-detail-stat-value">
+                                    <i class="fas fa-money-bill-wave"></i> ${job.salary}
+                                </div>
+                            </div>
+                            <div class="job-detail-stat">
+                                <div class="job-detail-stat-label">Inicio</div>
+                                <div class="job-detail-stat-value">
+                                    <i class="fas fa-calendar-alt"></i> ${job.startDate}
+                                </div>
+                            </div>
+                            <div class="job-detail-stat">
+                                <div class="job-detail-stat-label">Duración</div>
+                                <div class="job-detail-stat-value">
+                                    <i class="fas fa-hourglass-half"></i> ${job.duration}
+                                </div>
+                            </div>
+                            <div class="job-detail-stat">
+                                <div class="job-detail-stat-label">Vacantes</div>
+                                <div class="job-detail-stat-value">
+                                    <i class="fas fa-users"></i> ${job.vacancies}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="job-detail-description">
+                        <h2 class="job-detail-section-title">
+                            <i class="fas fa-align-left"></i> Descripción
+                        </h2>
+                        <p class="job-detail-text">${job.description}</p>
+                    </div>
+                    
+                    <div class="job-detail-requirements">
+                        <h2 class="job-detail-section-title">
+                            <i class="fas fa-clipboard-list"></i> Requisitos
+                        </h2>
+                        <ul>
+                            ${job.requirements.map(req => `<li class="job-detail-list-item">${req}</li>`).join('')}
+                        </ul>
+                    </div>
+                    
+                    <div class="job-detail-benefits">
+                        <h2 class="job-detail-section-title">
+                            <i class="fas fa-gift"></i> Beneficios
+                        </h2>
+                        <ul>
+                            ${job.benefits.map(benefit => `<li class="job-detail-list-item">${benefit}</li>`).join('')}
+                        </ul>
+                    </div>
+                    
+                    <div class="job-detail-apply">
+                        <h2 class="job-detail-apply-title">
+                            <i class="fas fa-paper-plane"></i> ¿Te interesa esta oferta?
+                        </h2>
+                        <p class="job-detail-apply-text">
+                            Completa tu postulación y forma parte de nuestro equipo. Si tienes alguna pregunta, no dudes en dejar un comentario abajo.
+                        </p>
+                        <button class="job-detail-apply-btn">
+                            <i class="fas fa-paper-plane"></i> Postular ahora
+                        </button>
+                    </div>
+                    
+                    <div class="job-detail-contact">
+                        <h2 class="job-detail-section-title">
+                            <i class="fas fa-address-card"></i> Información de contacto
+                        </h2>
+                        <div class="job-detail-contact-info">
+                            <div class="contact-item">
+                                <i class="fas fa-user-tie"></i> ${job.contact.department}
+                            </div>
+                            <div class="contact-item">
+                                <i class="fas fa-phone"></i> ${job.contact.phone}
+                            </div>
+                            <div class="contact-item">
+                                <i class="fas fa-envelope"></i> ${job.contact.email}
+                            </div>
+                            <div class="contact-item">
+                                <i class="fas fa-map-marker-alt"></i> ${job.contact.address}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="job-detail-social">
+                        <div class="job-detail-reactions">
+                            <div class="reactions-count">
+                                <div class="reactions-icons">
+                                    <span class="reaction-icon like-icon"><i class="fas fa-thumbs-up"></i></span>
+                                    <span class="reaction-icon love-icon"><i class="fas fa-heart"></i></span>
+                                    <span class="reaction-icon interested-icon"><i class="fas fa-star"></i></span>
+                                </div>
+                                ${job.reactions.like + job.reactions.love + job.reactions.interested} personas reaccionaron
+                            </div>
+                            <div class="shares-comments-count">
+                                ${job.comments} comentarios · ${job.shares} compartidos
+                            </div>
+                        </div>
+                        
+                        <div class="job-detail-actions">
+                            <div class="detail-action action-like ${job.userLiked ? 'active' : ''}" data-action="like" data-id="${job.id}">
+                                <i class="${job.userLiked ? 'fas' : 'far'} fa-thumbs-up"></i>
+                                <span class="detail-action-label">Me gusta</span>
+                            </div>
+                            <div class="detail-action action-love ${job.userLoved ? 'active' : ''}" data-action="love" data-id="${job.id}">
+                                <i class="${job.userLoved ? 'fas' : 'far'} fa-heart"></i>
+                                <span class="detail-action-label">Me encanta</span>
+                            </div>
+                            <div class="detail-action action-interested ${job.userInterested ? 'active' : ''}" data-action="interested" data-id="${job.id}">
+                                <i class="${job.userInterested ? 'fas' : 'far'} fa-star"></i>
+                                <span class="detail-action-label">Me interesa</span>
+                            </div>
+                            <div class="detail-action" id="detail-share-btn" data-id="${job.id}">
+                                <i class="fas fa-share-alt"></i>
+                                <span class="detail-action-label">Compartir</span>
+                            </div>
+                        </div>
+                        
+                        <div class="job-detail-comments">
+                            <div class="comment-form">
+                                <div class="comment-avatar">
+                                    <i class="fas fa-user"></i>
+                                </div>
+                                <div class="comment-input-container">
+                                    <textarea class="comment-input" placeholder="Escribe un comentario..."></textarea>
+                                    <button class="comment-submit">
+                                        <i class="fas fa-paper-plane"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="comments-list">
+                                ${job.commentsData.map(comment => `
+                                    <div class="comment-item">
+                                        <div class="comment-avatar">
+                                            <img src="${comment.avatar}" alt="${comment.author}" />
+                                        </div>
+                                        <div class="comment-content">
+                                            <div class="comment-author">${comment.author}</div>
+                                            <div class="comment-text">${comment.text}</div>
+                                            <div class="comment-actions">
+                                                <div class="comment-action">Me gusta · ${comment.likes}</div>
+                                                <div class="comment-action">Responder</div>
+                                                <div class="comment-action">${comment.time}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                            
+                            ${job.comments > job.commentsData.length ? `
+                                <div class="comments-more">
+                                    <button class="comments-more-btn">Ver más comentarios</button>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Mostrar el modal
+            jobModal.classList.add('active');
+            document.body.style.overflow = 'hidden';
+            
+            // Scroll a comentarios si es necesario
+            if (scrollToComments) {
+                setTimeout(() => {
+                    const commentsSection = document.querySelector('.job-detail-comments');
+                    commentsSection.scrollIntoView({ behavior: 'smooth' });
+                    
+                    // Enfocar el textarea
+                    const commentInput = document.querySelector('.comment-input');
+                    commentInput.focus();
+                }, 300);
+            }
+            
+            // Agregar eventos para interacciones
+            const detailActions = document.querySelectorAll('.detail-action');
+            detailActions.forEach(action => {
+                if (action.id === 'detail-share-btn') return;
+                
+                action.addEventListener('click', () => {
+                    const actionType = action.dataset.action;
+                    const jobId = parseInt(action.dataset.id);
+                    const currentJob = jobListings.find(j => j.id === jobId);
+                    
+                    // Toggle clase active
+                    action.classList.toggle('active');
+                    
+                    // Actualizar ícono
+                    const icon = action.querySelector('i');
+                    
+                    if (action.classList.contains('active')) {
+                        // Activar
+                        if (actionType === 'like') {
+                            icon.className = 'fas fa-thumbs-up';
+                            currentJob.reactions.like++;
+                            currentJob.userLiked = true;
+                        } else if (actionType === 'love') {
+                            icon.className = 'fas fa-heart';
+                            currentJob.reactions.love++;
+                            currentJob.userLoved = true;
+                        } else if (actionType === 'interested') {
+                            icon.className = 'fas fa-star';
+                            currentJob.reactions.interested++;
+                            currentJob.userInterested = true;
+                        }
+                    } else {
+                        // Desactivar
+                        if (actionType === 'like') {
+                            icon.className = 'far fa-thumbs-up';
+                            currentJob.reactions.like--;
+                            currentJob.userLiked = false;
+                        } else if (actionType === 'love') {
+                            icon.className = 'far fa-heart';
+                            currentJob.reactions.love--;
+                            currentJob.userLoved = false;
+                        } else if (actionType === 'interested') {
+                            icon.className = 'far fa-star';
+                            currentJob.reactions.interested--;
+                            currentJob.userInterested = false;
+                        }
+                    }
+                    
+                    // Actualizar contador en el feed
+                    renderJobs();
+                    
+                    // Actualizar contador en el detalle
+                    const reactionsCount = document.querySelector('.reactions-count');
+                    const totalReactions = currentJob.reactions.like + currentJob.reactions.love + currentJob.reactions.interested;
+                    reactionsCount.innerHTML = `
+                        <div class="reactions-icons">
+                            <span class="reaction-icon like-icon"><i class="fas fa-thumbs-up"></i></span>
+                            <span class="reaction-icon love-icon"><i class="fas fa-heart"></i></span>
+                            <span class="reaction-icon interested-icon"><i class="fas fa-star"></i></span>
+                        </div>
+                        ${totalReactions} personas reaccionaron
+                    `;
+                });
+            });
+            
+            // Evento para botón de compartir en detalle
+            const detailShareBtn = document.getElementById('detail-share-btn');
+            if (detailShareBtn) {
+                detailShareBtn.addEventListener('click', () => {
+                    // Simular menú de compartir nativo
+                    const shareData = {
+                        title: job.title,
+                        text: `Oferta de trabajo: ${job.title} en ${job.company}, ${job.location}`,
+                        url: window.location.href
+                    };
+                    
+                    if (navigator.share && navigator.canShare(shareData)) {
+                        navigator.share(shareData)
+                            .catch(err => {
+                                console.log('Error al compartir:', err);
+                                alert('Compartiendo trabajo "' + job.title + '"');
+                            });
+                    } else {
+                        alert('Compartiendo trabajo "' + job.title + '"');
+                    }
+                });
+            }
+            
+            // Función para enviar comentario
+            const commentForm = document.querySelector('.comment-form');
+            const commentInput = document.querySelector('.comment-input');
+            const commentSubmit = document.querySelector('.comment-submit');
+            
+            commentForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                submitComment();
+            });
+            
+            commentSubmit.addEventListener('click', submitComment);
+            
+            function submitComment() {
+                const commentText = commentInput.value.trim();
+                if (!commentText) return;
+                
+                // Crear nuevo comentario
+                const newComment = {
+                    id: Date.now(),
+                    author: "Tú",
+                    avatar: "/api/placeholder/40/40",
+                    text: commentText,
+                    time: "Ahora mismo",
+                    likes: 0
+                };
+                
+                // Añadir comentario al trabajo
+                job.commentsData.push(newComment);
+                job.comments++;
+                
+                // Actualizar comentarios en el modal
+                const commentsList = document.querySelector('.comments-list');
+                const commentItem = document.createElement('div');
+                commentItem.className = 'comment-item';
+                commentItem.innerHTML = `
+                    <div class="comment-avatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div class="comment-content">
+                        <div class="comment-author">${newComment.author}</div>
+                        <div class="comment-text">${newComment.text}</div>
+                        <div class="comment-actions">
+                            <div class="comment-action">Me gusta · ${newComment.likes}</div>
+                            <div class="comment-action">Responder</div>
+                            <div class="comment-action">${newComment.time}</div>
+                        </div>
+                    </div>
+                `;
+                
+                commentsList.appendChild(commentItem);
+                
+                // Actualizar contador
+                const sharesCommentsCount = document.querySelector('.shares-comments-count');
+                sharesCommentsCount.textContent = `${job.comments} comentarios · ${job.shares} compartidos`;
+                
+                // Limpiar campo
+                commentInput.value = '';
+                commentInput.style.height = '40px';
+                
+                // Actualizar feed
+                renderJobs();
+            }
+            
+            // Evento para botón de ver más comentarios
+            const moreCommentsBtn = document.querySelector('.comments-more-btn');
+            if (moreCommentsBtn) {
+                moreCommentsBtn.addEventListener('click', () => {
+                    // Simular carga de más comentarios
+                    alert('Cargando más comentarios...');
+                });
+            }
+        }
+        
+        // Cerrar el modal de detalle
+        modalClose.addEventListener('click', () => {
+            jobModal.classList.remove('active');
+            document.body.style.overflow = '';
+        });
+        
+        // Cerrar el modal al hacer clic en el overlay
+        jobModal.addEventListener('click', (e) => {
+            if (e.target === jobModal) {
+                jobModal.classList.remove('active');
+                document.body.style.overflow = '';
+            }
+        });
+        
+        // Renderizar trabajos destacados en la barra lateral
+        function renderTrendingJobs() {
+            // Ordenar trabajos por aplicaciones
+            const trending = [...jobListings]
+                .filter(job => job.status !== 'Cerrado')
+                .sort((a, b) => b.applications - a.applications)
+                .slice(0, 3);
+            
+            trendingJobsList.innerHTML = '';
+            
+            trending.forEach(job => {
+                const jobItem = document.createElement('div');
+                jobItem.className = 'related-job-item';
+                jobItem.dataset.id = job.id;
+                
+                jobItem.innerHTML = `
+                    <div class="related-job-logo">
+                        <img src="${job.companyLogo}" alt="${job.company}">
+                    </div>
+                    <div class="related-job-info">
+                        <h3 class="related-job-title">${job.title}</h3>
+                        <div class="related-job-company">${job.company}</div>
+                        <div class="related-job-badges">
+                            <span class="related-job-badge badge-location">${job.location}</span>
+                            <span class="related-job-badge badge-type">${job.type}</span>
+                        </div>
+                    </div>
+                `;
+                
+                trendingJobsList.appendChild(jobItem);
+                
+                // Evento para abrir detalle
+                jobItem.addEventListener('click', () => {
+                    openJobDetail(job.id);
+                });
+            });
+        }
+        
+        // Renderizar empresas destacadas
+        function renderFeaturedCompanies() {
+            featuredCompaniesList.innerHTML = '';
+            
+            featuredCompanies.forEach(company => {
+                const companyDiv = document.createElement('div');
+                companyDiv.style.display = 'flex';
+                companyDiv.style.alignItems = 'center';
+                companyDiv.style.marginBottom = '16px';
+                companyDiv.style.cursor = 'pointer';
+                
+                companyDiv.innerHTML = `
+                    <div style="width: 50px; height: 50px; border-radius: 8px; overflow: hidden; margin-right: 12px; background-color: #f3f4f6;">
+                        <img src="${company.logo}" alt="${company.name}" style="width: 100%; height: 100%; object-fit: cover;">
+                    </div>
+                    <div>
+                        <div style="font-weight: 600; display: flex; align-items: center;">
+                            ${company.name}
+                            ${company.verified ? '<span style="color: #5cb85c; margin-left: 4px;"><i class="fas fa-check-circle" style="font-size: 12px;"></i></span>' : ''}
+                        </div>
+                        <div style="font-size: 12px; color: #6b7280;">${company.location} · ${company.activeJobs} trabajos</div>
+                    </div>
+                `;
+                
+                featuredCompaniesList.appendChild(companyDiv);
+                
+                // Evento para la empresa
+                companyDiv.addEventListener('click', () => {
+                    alert(`Viendo perfil de ${company.name}`);
+                });
+            });
+        }
+        
+        // Renderizar próximas campañas
+        function renderUpcomingCampaigns() {
+            upcomingCampaignsList.innerHTML = '';
+            
+            upcomingCampaigns.forEach(campaign => {
+                const campaignDiv = document.createElement('div');
+                campaignDiv.style.borderBottom = '1px solid #e5e7eb';
+                campaignDiv.style.paddingBottom = '12px';
+                campaignDiv.style.marginBottom = '12px';
+                campaignDiv.style.cursor = 'pointer';
+                
+                campaignDiv.innerHTML = `
+                    <div style="font-weight: 600; color: #2b6a39; margin-bottom: 4px;">${campaign.title}</div>
+                    <div style="font-size: 14px; color: #4b5563; margin-bottom: 4px;">${campaign.company}</div>
+                    <div style="font-size: 13px; color: #6b7280; display: flex; justify-content: space-between;">
+                        <span><i class="fas fa-calendar-alt" style="margin-right: 4px;"></i>${campaign.startDate}</span>
+                        <span><i class="fas fa-users" style="margin-right: 4px;"></i>~${campaign.estimatedJobs} puestos</span>
+                    </div>
+                `;
+                
+                upcomingCampaignsList.appendChild(campaignDiv);
+                
+                // Evento para la campaña
+                campaignDiv.addEventListener('click', () => {
+                    alert(`Información sobre campaña de ${campaign.title}`);
+                });
+            });
+        }
+        
+        // Inicializar
+        function init() {
+            // Renderizar trabajos
+            renderJobs();
+            
+            // Renderizar secciones de la barra lateral
+            renderTrendingJobs();
+            renderFeaturedCompanies();
+            renderUpcomingCampaigns();
+            
+            // Verificar modo oscuro del sistema
+            if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                document.body.classList.add('dark-mode');
+                themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
+            }
+            
+            // Escuchar eventos de filtro
+            jobSearch.addEventListener('input', () => {
+                if (jobSearch.value.length > 2 || jobSearch.value.length === 0) {
+                    filterJobs();
+                }
+            });
+            
+            categoryFilter.addEventListener('change', filterJobs);
+            productFilter.addEventListener('change', filterJobs);
+            locationFilter.addEventListener('change', filterJobs);
+            statusFilter.addEventListener('change', filterJobs);
+            
+            // Cerrar popups al hacer clic fuera
+            document.addEventListener('click', (e) => {
+                // Cerrar popups de compartir
+                if (!e.target.closest('.job-share') && !e.target.closest('.share-popup')) {
+                    document.querySelectorAll('.share-popup.active').forEach(popup => {
+                        popup.classList.remove('active');
+                    });
+                }
+            });
+        }
+        
+        // Iniciar la aplicación
+        init();
+    </script>
+</body>
+</html>
+                

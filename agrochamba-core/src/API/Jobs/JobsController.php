@@ -315,6 +315,7 @@ class JobsController {
 
         // Vincular empresa automáticamente
         $empresa_term_id = null;
+        $empresa_cpt_id = null; // ID del CPT Empresa
         $is_admin = in_array('administrator', $user->roles);
         $is_employer = in_array('employer', $user->roles);
 
@@ -336,27 +337,98 @@ class JobsController {
                     }
                 }
             }
+            
+            // Obtener el CPT Empresa asociado al usuario
+            $empresa_cpt = agrochamba_get_empresa_by_user_id($user_id);
+            if ($empresa_cpt) {
+                $empresa_cpt_id = $empresa_cpt->ID;
+            }
         } elseif ($is_admin) {
-            // Admin: puede especificar empresa_id o usar la automática
+            // Admin: puede especificar empresa_id (CPT) o empresa_term_id (taxonomía)
             if (isset($params['empresa_id']) && !empty($params['empresa_id'])) {
-                $empresa_term_id = intval($params['empresa_id']);
+                // Si viene empresa_id, es el ID del CPT Empresa
+                $empresa_cpt_id = intval($params['empresa_id']);
+                
+                // Validar que existe
+                $empresa_post = get_post($empresa_cpt_id);
+                if ($empresa_post && $empresa_post->post_type === 'empresa') {
+                    // Obtener el término de taxonomía asociado
+                    $empresa_terms = wp_get_post_terms($empresa_cpt_id, 'empresa');
+                    if (!empty($empresa_terms) && !is_wp_error($empresa_terms)) {
+                        $empresa_term_id = $empresa_terms[0]->term_id;
+                    } else {
+                        // Si no tiene término, crear uno basado en el nombre
+                        $empresa_name = $empresa_post->post_title;
+                        $razon_social = get_post_meta($empresa_cpt_id, '_empresa_razon_social', true);
+                        $empresa_search_name = !empty($razon_social) ? $razon_social : $empresa_name;
+                        
+                        $empresa_term = get_term_by('name', $empresa_search_name, 'empresa');
+                        if (!$empresa_term) {
+                            // Intentar también con el título del post
+                            $empresa_term = get_term_by('name', $empresa_name, 'empresa');
+                        }
+                        
+                        if (!$empresa_term) {
+                            $term_result = wp_insert_term(
+                                $empresa_search_name,
+                                'empresa',
+                                array(
+                                    'description' => 'Empresa: ' . $empresa_search_name,
+                                    'slug' => sanitize_title($empresa_search_name)
+                                )
+                            );
+                            if (!is_wp_error($term_result)) {
+                                $empresa_term_id = $term_result['term_id'];
+                                // Asignar el término al CPT empresa
+                                wp_set_object_terms($empresa_cpt_id, array($empresa_term_id), 'empresa', false);
+                            }
+                        } else {
+                            $empresa_term_id = $empresa_term->term_id;
+                            // Asegurar que el término esté asociado al CPT empresa
+                            wp_set_object_terms($empresa_cpt_id, array($empresa_term_id), 'empresa', false);
+                        }
+                    }
+                } else {
+                    $empresa_cpt_id = null; // Invalidar si no existe
+                }
             } else {
-                // Si no especifica, usar su empresa si es employer también
+                // Si no especifica empresa_id, usar su empresa si es employer también
                 $empresa_term_id_from_user = get_user_meta($user_id, 'empresa_term_id', true);
                 if ($empresa_term_id_from_user) {
                     $empresa_term_id = intval($empresa_term_id_from_user);
+                    // Buscar el CPT empresa asociado
+                    $empresa_cpt = agrochamba_get_empresa_by_user_id($user_id);
+                    if ($empresa_cpt) {
+                        $empresa_cpt_id = $empresa_cpt->ID;
+                    }
                 }
             }
         } else {
             // Usuario normal (trabajador): debe especificar empresa_id
             if (isset($params['empresa_id']) && !empty($params['empresa_id'])) {
-                $empresa_term_id = intval($params['empresa_id']);
+                $empresa_cpt_id = intval($params['empresa_id']);
+                
+                // Validar y obtener término
+                $empresa_post = get_post($empresa_cpt_id);
+                if ($empresa_post && $empresa_post->post_type === 'empresa') {
+                    $empresa_terms = wp_get_post_terms($empresa_cpt_id, 'empresa');
+                    if (!empty($empresa_terms) && !is_wp_error($empresa_terms)) {
+                        $empresa_term_id = $empresa_terms[0]->term_id;
+                    }
+                } else {
+                    $empresa_cpt_id = null;
+                }
             }
         }
 
-        // Asignar la empresa al trabajo
+        // Asignar la empresa al trabajo (taxonomía)
         if ($empresa_term_id) {
             wp_set_post_terms($post_id, array($empresa_term_id), 'empresa', false);
+        }
+        
+        // Guardar el meta field empresa_id (ID del CPT Empresa)
+        if ($empresa_cpt_id) {
+            update_post_meta($post_id, 'empresa_id', $empresa_cpt_id);
         }
 
         // Asignar otras taxonomías
@@ -417,10 +489,13 @@ class JobsController {
         if ($publish_to_facebook && function_exists('agrochamba_post_to_facebook')) {
                 error_log('AgroChamba Facebook Debug - Intentando publicar en Facebook...');
             
-            // Preparar datos para Facebook incluyendo todas las imágenes
+            // Preparar datos para Facebook incluyendo todas las imágenes y preferencias del usuario
                 $job_data_for_facebook = array_merge($params, array(
                     'featured_media' => isset($params['featured_media']) ? $params['featured_media'] : get_post_thumbnail_id($post_id),
-                'gallery_ids' => isset($params['gallery_ids']) && is_array($params['gallery_ids']) ? $params['gallery_ids'] : array(),
+                    'gallery_ids' => isset($params['gallery_ids']) && is_array($params['gallery_ids']) ? $params['gallery_ids'] : array(),
+                    // Incluir preferencias del usuario desde la app
+                    'facebook_use_link_preview' => isset($params['facebook_use_link_preview']) ? filter_var($params['facebook_use_link_preview'], FILTER_VALIDATE_BOOLEAN) : false,
+                    'facebook_shorten_content' => isset($params['facebook_shorten_content']) ? filter_var($params['facebook_shorten_content'], FILTER_VALIDATE_BOOLEAN) : false,
                 ));
             
                 $facebook_result = agrochamba_post_to_facebook($post_id, $job_data_for_facebook);
@@ -669,10 +744,13 @@ class JobsController {
         $publish_to_facebook = isset($params['publish_to_facebook']) && filter_var($params['publish_to_facebook'], FILTER_VALIDATE_BOOLEAN);
         
         if ($publish_to_facebook && function_exists('agrochamba_post_to_facebook')) {
-            // Preparar datos para Facebook incluyendo todas las imágenes
+            // Preparar datos para Facebook incluyendo todas las imágenes y preferencias del usuario
             $job_data_for_facebook = array_merge($params, array(
                 'featured_media' => isset($params['featured_media']) ? $params['featured_media'] : get_post_thumbnail_id($post_id),
                 'gallery_ids' => isset($params['gallery_ids']) && is_array($params['gallery_ids']) ? $params['gallery_ids'] : array(),
+                // Incluir preferencias del usuario desde la app
+                'facebook_use_link_preview' => isset($params['facebook_use_link_preview']) ? filter_var($params['facebook_use_link_preview'], FILTER_VALIDATE_BOOLEAN) : false,
+                'facebook_shorten_content' => isset($params['facebook_shorten_content']) ? filter_var($params['facebook_shorten_content'], FILTER_VALIDATE_BOOLEAN) : false,
             ));
             $facebook_result = agrochamba_post_to_facebook($post_id, $job_data_for_facebook);
         }

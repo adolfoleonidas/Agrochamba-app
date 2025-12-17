@@ -12,6 +12,7 @@ import agrochamba.com.data.AuthManager
 import agrochamba.com.data.Category
 import agrochamba.com.data.SettingsManager
 import agrochamba.com.data.WordPressApi
+import com.squareup.moshi.JsonEncodingException
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -161,6 +162,7 @@ class CreateJobViewModel @Inject constructor() : androidx.lifecycle.ViewModel() 
                 // Validaciones básicas
                 val title = jobData["title"] as? String
                 val content = jobData["content"] as? String
+                val postType = jobData["post_type"] as? String ?: "trabajo" // Por defecto trabajo
                 val ubicacionId = jobData["ubicacion_id"] as? Number
                 
                 if (title.isNullOrBlank()) {
@@ -169,7 +171,9 @@ class CreateJobViewModel @Inject constructor() : androidx.lifecycle.ViewModel() 
                 if (content.isNullOrBlank()) {
                     throw Exception("La descripción es obligatoria.")
                 }
-                if (ubicacionId == null) {
+                
+                // Solo validar ubicación si es un trabajo (no para blogs)
+                if (postType == "trabajo" && ubicacionId == null) {
                     throw Exception("La ubicación es obligatoria.")
                 }
                 
@@ -177,7 +181,15 @@ class CreateJobViewModel @Inject constructor() : androidx.lifecycle.ViewModel() 
                     // Campos obligatorios (no nulos)
                     put("title", title.trim())
                     put("content", content.trim())
-                    put("ubicacion_id", ubicacionId.toInt()) // Obligatorio
+                    
+                    // IMPORTANTE: Siempre enviar post_type para que el backend sepa qué tipo crear
+                    put("post_type", postType)
+                    android.util.Log.d("CreateJobViewModel", "Enviando post_type: $postType")
+                    
+                    // Solo agregar ubicacion_id si es trabajo y está presente
+                    if (postType == "trabajo" && ubicacionId != null) {
+                        put("ubicacion_id", ubicacionId.toInt())
+                    }
 
                     // Convertir valores numéricos
                     val salarioMin = (jobData["salario_min"] as? Number)?.toInt() ?: 0
@@ -201,6 +213,10 @@ class CreateJobViewModel @Inject constructor() : androidx.lifecycle.ViewModel() 
                     if (alojamiento) put("alojamiento", true)
                     if (transporte) put("transporte", true)
                     if (alimentacion) put("alimentacion", true)
+                    
+                    // Comentarios habilitados (por defecto true, siempre enviar)
+                    val comentariosHabilitados = jobData["comentarios_habilitados"] as? Boolean ?: true
+                    put("comentarios_habilitados", comentariosHabilitados)
 
                     // Publicar en Facebook - SIEMPRE enviar el flag (true o false) para que el backend respete la decisión del usuario
                     val publishToFacebook = jobData["publish_to_facebook"] as? Boolean ?: false
@@ -209,6 +225,10 @@ class CreateJobViewModel @Inject constructor() : androidx.lifecycle.ViewModel() 
                     // Enviar preferencia de publicación en Facebook (imágenes adjuntas o link preview)
                     val useLinkPreview = SettingsManager.facebookUseLinkPreview
                     put("facebook_use_link_preview", useLinkPreview)
+                    
+                    // Enviar preferencia de acortar contenido en Facebook
+                    val shortenContent = SettingsManager.facebookShortenContent
+                    put("facebook_shorten_content", shortenContent)
 
                     // Galería de imágenes
                     if (galleryIds.isNotEmpty()) {
@@ -263,7 +283,15 @@ class CreateJobViewModel @Inject constructor() : androidx.lifecycle.ViewModel() 
                     }
                 }
                 uiState = uiState.copy(isLoading = false, error = errorMessage)
+            } catch (e: com.squareup.moshi.JsonEncodingException) {
+                // Error específico de JSON malformado
+                Log.e("CreateJobViewModel", "Error de JSON malformado: ${e.message}", e)
+                uiState = uiState.copy(
+                    isLoading = false, 
+                    error = "Error al procesar la respuesta del servidor. Por favor, intenta nuevamente."
+                )
             } catch (e: Exception) {
+                Log.e("CreateJobViewModel", "Error inesperado: ${e.message}", e)
                 uiState = uiState.copy(isLoading = false, error = e.message ?: "Ocurrió un error inesperado.")
             }
         }

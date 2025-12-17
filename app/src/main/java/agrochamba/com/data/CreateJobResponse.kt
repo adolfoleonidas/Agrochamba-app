@@ -9,6 +9,7 @@ data class CreateJobResponse(
     val success: Boolean,
     val message: String?,
     @Json(name = "post_id") val postId: Int?,
-    val status: String?
+    val status: String?,
+    @Json(name = "post_type") val postType: String? = null // Opcional para compatibilidad
 )
 

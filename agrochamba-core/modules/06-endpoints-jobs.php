@@ -92,12 +92,55 @@ if (!function_exists('agrochamba_create_job')) {
             $post_status = 'publish'; // Los admins pueden publicar directamente
         }
         
+        // Configurar comentarios (por defecto habilitados)
+        $comment_status = 'open'; // Por defecto, comentarios activados
+        if (isset($params['comentarios_habilitados'])) {
+            // Si se especifica el parámetro, respetar la elección del usuario
+            $comentarios = filter_var($params['comentarios_habilitados'], FILTER_VALIDATE_BOOLEAN);
+            $comment_status = $comentarios ? 'open' : 'closed';
+        }
+        
+        // Determinar el tipo de post (trabajo o blog/post)
+        // Solo admins pueden crear posts de blog
+        $post_type = 'trabajo'; // Por defecto
+        
+        // Debug: verificar parámetros recibidos
+        if (function_exists('error_log')) {
+            error_log('AgroChamba: post_type recibido: ' . (isset($params['post_type']) ? $params['post_type'] : 'NO DEFINIDO'));
+            error_log('AgroChamba: Usuario es admin: ' . (in_array('administrator', $user->roles) ? 'SI' : 'NO'));
+            error_log('AgroChamba: Roles del usuario: ' . implode(', ', $user->roles));
+        }
+        
+        if (isset($params['post_type'])) {
+            $requested_type = sanitize_text_field($params['post_type']);
+            
+            // Solo admins pueden crear posts de blog
+            if (in_array('administrator', $user->roles)) {
+                if ($requested_type === 'post' || $requested_type === 'blog') {
+                    $post_type = 'post'; // WordPress post type nativo para blogs
+                    if (function_exists('error_log')) {
+                        error_log('AgroChamba: Cambiando post_type a: post');
+                    }
+                }
+            } else {
+                // Si no es admin, ignorar el parámetro y usar trabajo por defecto
+                if (function_exists('error_log')) {
+                    error_log('AgroChamba: Usuario no es admin, ignorando post_type y usando trabajo');
+                }
+            }
+        }
+        
+        if (function_exists('error_log')) {
+            error_log('AgroChamba: post_type final: ' . $post_type);
+        }
+        
         $post_data = array(
-            'post_type'    => 'trabajo',
-            'post_title'   => sanitize_text_field($params['title']),
-            'post_content' => isset($params['content']) ? wp_kses_post($params['content']) : '',
-            'post_status'  => $post_status,
-            'post_author'  => $user_id,
+            'post_type'       => $post_type,
+            'post_title'      => sanitize_text_field($params['title']),
+            'post_content'    => isset($params['content']) ? wp_kses_post($params['content']) : '',
+            'post_status'     => $post_status,
+            'post_author'     => $user_id,
+            'comment_status'  => $comment_status, // Configurar estado de comentarios
         );
 
         // Si hay excerpt, agregarlo
@@ -181,8 +224,10 @@ if (!function_exists('agrochamba_create_job')) {
             }
         }
 
-        // Asignar empresa_id al trabajo (meta field)
-        if ($empresa_id) {
+        // Solo procesar campos específicos de trabajo si es un trabajo
+        if ($post_type === 'trabajo') {
+            // Asignar empresa_id al trabajo (meta field)
+            if ($empresa_id) {
             // Validar que la empresa existe y es del tipo correcto
             $empresa_post = get_post($empresa_id);
             if (!$empresa_post || $empresa_post->post_type !== 'empresa') {
@@ -211,39 +256,59 @@ if (!function_exists('agrochamba_create_job')) {
             }
         }
 
-        // Asignar otras taxonomías
-        if (isset($params['ubicacion_id']) && !empty($params['ubicacion_id'])) {
-            wp_set_post_terms($post_id, array(intval($params['ubicacion_id'])), 'ubicacion', false);
-        }
+            // Asignar otras taxonomías (solo para trabajos)
+            if (isset($params['ubicacion_id']) && !empty($params['ubicacion_id'])) {
+                wp_set_post_terms($post_id, array(intval($params['ubicacion_id'])), 'ubicacion', false);
+            }
 
-        if (isset($params['cultivo_id']) && !empty($params['cultivo_id'])) {
-            wp_set_post_terms($post_id, array(intval($params['cultivo_id'])), 'cultivo', false);
-        }
+            if (isset($params['cultivo_id']) && !empty($params['cultivo_id'])) {
+                wp_set_post_terms($post_id, array(intval($params['cultivo_id'])), 'cultivo', false);
+            }
 
-        if (isset($params['tipo_puesto_id']) && !empty($params['tipo_puesto_id'])) {
-            wp_set_post_terms($post_id, array(intval($params['tipo_puesto_id'])), 'tipo_puesto', false);
-        }
+            if (isset($params['tipo_puesto_id']) && !empty($params['tipo_puesto_id'])) {
+                wp_set_post_terms($post_id, array(intval($params['tipo_puesto_id'])), 'tipo_puesto', false);
+            }
 
-        // Guardar meta fields
-        $meta_fields = array(
-            'salario_min', 'salario_max', 'vacantes', 'fecha_inicio', 'fecha_fin',
-            'duracion_dias', 'requisitos', 'beneficios', 'tipo_contrato', 'jornada',
-            'contacto_whatsapp', 'contacto_email', 'google_maps_url', 'alojamiento', 'transporte',
-            'alimentacion', 'estado', 'experiencia', 'genero', 'edad_minima', 'edad_maxima'
-        );
+            // Guardar meta fields específicos de trabajos
+            $meta_fields = array(
+                'salario_min', 'salario_max', 'vacantes', 'fecha_inicio', 'fecha_fin',
+                'duracion_dias', 'requisitos', 'beneficios', 'tipo_contrato', 'jornada',
+                'contacto_whatsapp', 'contacto_email', 'google_maps_url', 'alojamiento', 'transporte',
+                'alimentacion', 'estado', 'experiencia', 'genero', 'edad_minima', 'edad_maxima',
+                'empresa_id'
+            );
 
-        foreach ($meta_fields as $field) {
-            if (isset($params[$field])) {
-                $value = $params[$field];
-                // Convertir booleanos
-                if (in_array($field, array('alojamiento', 'transporte', 'alimentacion'))) {
-                    $value = filter_var($value, FILTER_VALIDATE_BOOLEAN);
+            foreach ($meta_fields as $field) {
+                if (isset($params[$field])) {
+                    $value = $params[$field];
+                    // Convertir booleanos
+                    if (in_array($field, array('alojamiento', 'transporte', 'alimentacion'))) {
+                        $value = filter_var($value, FILTER_VALIDATE_BOOLEAN);
+                    }
+                    // Sanitizar URL de Google Maps
+                    if ($field === 'google_maps_url') {
+                        $value = esc_url_raw($value);
+                    }
+                    update_post_meta($post_id, $field, $value);
                 }
-                // Sanitizar URL de Google Maps
-                if ($field === 'google_maps_url') {
-                    $value = esc_url_raw($value);
-                }
-                update_post_meta($post_id, $field, $value);
+            }
+            
+            // Guardar comentarios_habilitados (por defecto true si no se especifica)
+            if (isset($params['comentarios_habilitados'])) {
+                $comentarios = filter_var($params['comentarios_habilitados'], FILTER_VALIDATE_BOOLEAN);
+                update_post_meta($post_id, 'comentarios_habilitados', $comentarios);
+            } else {
+                // Por defecto, comentarios habilitados
+                update_post_meta($post_id, 'comentarios_habilitados', true);
+            }
+        } else {
+            // Para blogs, guardar comentarios_habilitados (por defecto true si no se especifica)
+            if (isset($params['comentarios_habilitados'])) {
+                $comentarios = filter_var($params['comentarios_habilitados'], FILTER_VALIDATE_BOOLEAN);
+                update_post_meta($post_id, 'comentarios_habilitados', $comentarios);
+            } else {
+                // Por defecto, comentarios habilitados
+                update_post_meta($post_id, 'comentarios_habilitados', true);
             }
         }
 
@@ -265,21 +330,27 @@ if (!function_exists('agrochamba_create_job')) {
         $publish_to_facebook = isset($params['publish_to_facebook']) && filter_var($params['publish_to_facebook'], FILTER_VALIDATE_BOOLEAN);
         
         if ($publish_to_facebook && function_exists('agrochamba_post_to_facebook')) {
-            // Preparar datos para Facebook incluyendo todas las imágenes
+            // Preparar datos para Facebook incluyendo todas las imágenes y preferencias del usuario
             $job_data_for_facebook = array_merge($params, array(
                 'featured_media' => isset($params['featured_media']) ? $params['featured_media'] : get_post_thumbnail_id($post_id),
                 'gallery_ids' => !empty($gallery_ids) ? $gallery_ids : array(),
+                // Incluir preferencias del usuario desde la app
+                'facebook_use_link_preview' => isset($params['facebook_use_link_preview']) ? filter_var($params['facebook_use_link_preview'], FILTER_VALIDATE_BOOLEAN) : false,
+                'facebook_shorten_content' => isset($params['facebook_shorten_content']) ? filter_var($params['facebook_shorten_content'], FILTER_VALIDATE_BOOLEAN) : false,
             ));
             $facebook_result = agrochamba_post_to_facebook($post_id, $job_data_for_facebook);
         }
 
+        // Mensaje según el tipo de post
+        $post_type_label = ($post_type === 'post') ? 'Artículo de blog' : 'Trabajo';
         $response_data = array(
             'success' => true,
             'message' => $post_status === 'pending' 
-                ? 'Trabajo creado y enviado para revisión. Será publicado una vez aprobado por un administrador.' 
-                : 'Trabajo creado correctamente.',
+                ? $post_type_label . ' creado y enviado para revisión. Será publicado una vez aprobado por un administrador.' 
+                : $post_type_label . ' creado correctamente.',
             'post_id' => $post_id,
-            'status' => $post_status
+            'status' => $post_status,
+            'post_type' => $post_type
         );
 
         // Agregar información de Facebook si se publicó
@@ -345,8 +416,8 @@ if (!function_exists('agrochamba_update_job')) {
         if (isset($params['title'])) {
             $title_length = strlen($params['title']);
             if ($title_length > 200) {
-                return new WP_Error(
-                    'rest_invalid_param',
+            return new WP_Error(
+                'rest_invalid_param',
                     sprintf(
                         'El título no puede exceder 200 caracteres. Tu título tiene %d caracteres.',
                         $title_length
@@ -357,7 +428,7 @@ if (!function_exists('agrochamba_update_job')) {
                         'current_length' => $title_length,
                         'max_length' => 200
                     )
-                );
+            );
             }
         }
 
@@ -441,7 +512,7 @@ if (!function_exists('agrochamba_update_job')) {
             wp_set_post_terms($post_id, array(intval($params['empresa_id'])), 'empresa', false);
         }
 
-        // Guardar meta fields
+        // Guardar meta fields (excluyendo comentarios_habilitados que se maneja por separado)
         $meta_fields = array(
             'salario_min', 'salario_max', 'vacantes', 'fecha_inicio', 'fecha_fin',
             'duracion_dias', 'requisitos', 'beneficios', 'tipo_contrato', 'jornada',
@@ -473,6 +544,30 @@ if (!function_exists('agrochamba_update_job')) {
                     }
                 }
                 update_post_meta($post_id, $field, $value);
+            }
+        }
+        
+        // Manejar comentarios_habilitados por separado para asegurar que siempre se guarde
+        if (isset($params['comentarios_habilitados'])) {
+            $comentarios = filter_var($params['comentarios_habilitados'], FILTER_VALIDATE_BOOLEAN);
+            update_post_meta($post_id, 'comentarios_habilitados', $comentarios);
+            
+            // Actualizar también el comment_status del post
+            $new_comment_status = $comentarios ? 'open' : 'closed';
+            wp_update_post(array(
+                'ID' => $post_id,
+                'comment_status' => $new_comment_status
+            ));
+        } else {
+            // Si no se especifica, mantener el valor existente o establecer por defecto a true
+            $current_value = get_post_meta($post_id, 'comentarios_habilitados', true);
+            if ($current_value === '' || $current_value === false) {
+                // Si no existe el meta field, establecer por defecto a true
+                update_post_meta($post_id, 'comentarios_habilitados', true);
+                wp_update_post(array(
+                    'ID' => $post_id,
+                    'comment_status' => 'open'
+                ));
             }
         }
 

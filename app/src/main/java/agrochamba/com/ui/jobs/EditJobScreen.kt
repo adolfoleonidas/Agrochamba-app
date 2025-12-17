@@ -121,6 +121,9 @@ fun EditJobScreen(
     // IMPORTANTE: Siempre inicializar en false para que el usuario tenga control explícito
     // No usar facebookPostId como indicador porque puede haber sido publicado automáticamente sin consentimiento
     var publishToFacebook by remember { mutableStateOf(false) }
+    // Comentarios habilitados por defecto (true)
+    // TODO: Cargar desde API cuando esté disponible (comment_status)
+    var comentariosHabilitados by remember { mutableStateOf(true) }
     
     var showMoreOptions by remember { mutableStateOf(false) }
     
@@ -182,17 +185,24 @@ fun EditJobScreen(
                         return@EditBottomActionBar
                     }
                     
-                    // Guardar en variable local para evitar problemas de smart cast
-                    val ubicacionId = selectedUbicacion!!.id
-                    
-                    // Si es empresa normal (no admin), usar automáticamente su empresa
-                    // Si es admin, puede seleccionar cualquier empresa
-                    val empresaIdToUse = if (AuthManager.isUserAdmin()) {
-                        selectedEmpresa?.id
+                    // Validar empresa (requerida)
+                    val isAdmin = AuthManager.isUserAdmin()
+                    val empresaIdToUse = if (isAdmin) {
+                        if (selectedEmpresa == null) {
+                            Toast.makeText(context, "La empresa es obligatoria", Toast.LENGTH_SHORT).show()
+                            return@EditBottomActionBar
+                        }
+                        selectedEmpresa!!.id
                     } else {
                         // Empresa normal: siempre usar su empresa automáticamente
-                        uiState.userCompanyId
+                        uiState.userCompanyId ?: run {
+                            Toast.makeText(context, "No se pudo identificar tu empresa", Toast.LENGTH_SHORT).show()
+                            return@EditBottomActionBar
+                        }
                     }
+                    
+                    // Guardar en variable local para evitar problemas de smart cast
+                    val ubicacionId = selectedUbicacion!!.id
                     
                     val jobData = mutableMapOf<String, Any>(
                         "title" to title.trim(),
@@ -201,13 +211,14 @@ fun EditJobScreen(
                         "salario_max" to (salarioMax.toIntOrNull() ?: 0),
                         "vacantes" to (vacantes.toIntOrNull() ?: 1),
                         "ubicacion_id" to ubicacionId, // Obligatorio
+                        "empresa_id" to empresaIdToUse, // Obligatorio
                         "alojamiento" to alojamiento,
                         "transporte" to transporte,
                         "alimentacion" to alimentacion,
+                        "comentarios_habilitados" to comentariosHabilitados, // Nuevo campo
                         "publish_to_facebook" to publishToFacebook
                     )
                     // Agregar IDs solo si no son null (opcionales)
-                    empresaIdToUse?.let { jobData["empresa_id"] = it } // Usar empresa automática si no es admin
                     selectedCultivo?.id?.let { jobData["cultivo_id"] = it }
                     selectedTipoPuesto?.id?.let { jobData["tipo_puesto_id"] = it }
                     viewModel.updateJob(jobData, context)
@@ -360,17 +371,46 @@ fun EditJobScreen(
                 
                 Spacer(Modifier.height(24.dp))
                 
-                // Ubicación - siempre visible (campo básico más importante)
-                Column(
+                // Ubicación y Empresa - al mismo nivel (campos básicos más importantes)
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
+                        .padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    // Selector de Ubicación
                     CategoryDropdown(
-                        label = "Ubicación *",
+                        label = "📍 Ubicación *",
                         items = uiState.ubicaciones,
-                        selectedItem = selectedUbicacion
+                        selectedItem = selectedUbicacion,
+                        modifier = Modifier.weight(1f)
                     ) { cat -> selectedUbicacion = cat }
+                    
+                    // Selector de Empresa - al mismo nivel
+                    val isAdmin = AuthManager.isUserAdmin()
+                    if (isAdmin) {
+                        // Admin: puede seleccionar cualquier empresa
+                        CategoryDropdown(
+                            label = "🏢 Empresa *",
+                            items = uiState.empresas,
+                            selectedItem = selectedEmpresa,
+                            modifier = Modifier.weight(1f)
+                        ) { cat -> selectedEmpresa = cat }
+                    } else {
+                        // Empresa normal: mostrar su empresa (solo lectura)
+                        OutlinedTextField(
+                            value = selectedEmpresa?.name ?: (uiState.empresas.find { it.id == uiState.userCompanyId }?.name ?: "Tu empresa"),
+                            onValueChange = {},
+                            readOnly = true,
+                            enabled = false,
+                            label = { Text("🏢 Empresa") },
+                            modifier = Modifier.weight(1f),
+                            leadingIcon = { Icon(Icons.Default.Business, contentDescription = null) },
+                            colors = TextFieldDefaults.colors(
+                                disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                            )
+                        )
+                    }
                 }
                 
                 Spacer(Modifier.height(16.dp))
@@ -523,6 +563,13 @@ fun EditJobScreen(
                 
                 // Opciones adicionales
                 Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    // Switch para permitir comentarios (por defecto activado)
+                    BenefitSwitch(
+                        text = "💬 Permitir comentarios",
+                        checked = comentariosHabilitados,
+                        onCheckedChange = { comentariosHabilitados = it }
+                    )
+                    
                     BenefitSwitch(
                         text = "Publicar también en Facebook",
                         checked = publishToFacebook,
@@ -920,6 +967,7 @@ private fun CategoryDropdown(
     label: String, 
     items: List<Category>, 
     selectedItem: Category?,
+    modifier: Modifier = Modifier,
     onItemSelected: (Category) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -931,7 +979,7 @@ private fun CategoryDropdown(
             readOnly = true,
             label = { Text(label) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-            modifier = Modifier.fillMaxWidth().menuAnchor()
+            modifier = modifier.fillMaxWidth().menuAnchor()
         )
         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             items.forEach { item ->

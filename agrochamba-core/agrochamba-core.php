@@ -57,6 +57,11 @@ if (!AGROCHAMBA_USE_MODULE_LOADER) {
             '11-image-optimization.php',      // Optimización de imágenes
             '12-regenerate-thumbnails.php',   // Regeneración de thumbnails
             '13-ai-moderation.php',           // Moderación automática con IA
+            '14-company-notifications.php',    // Notificaciones de empresas seguidas
+            '15-job-views.php',                // Conteo de vistas de trabajos
+            '16-job-comments.php',             // Sistema de comentarios para trabajos
+            '17-custom-auth-pages.php',        // Páginas de autenticación personalizadas
+            '18-custom-user-panel.php',        // Panel de usuario personalizado
         );
 
         // Cargar cada módulo

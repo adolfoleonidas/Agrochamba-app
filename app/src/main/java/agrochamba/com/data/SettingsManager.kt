@@ -14,12 +14,16 @@ import kotlinx.coroutines.withContext
 object SettingsManager {
     private const val PREFS_NAME = "app_settings"
     private const val KEY_FACEBOOK_USE_LINK_PREVIEW = "facebook_use_link_preview"
+    private const val KEY_FACEBOOK_SHORTEN_CONTENT = "facebook_shorten_content"
     
     private var prefs: SharedPreferences? = null
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     
     // Por defecto: usar imágenes adjuntas (false = adjuntar imágenes, true = usar link preview)
     var facebookUseLinkPreview by mutableStateOf(false)
+    
+    // Por defecto: no acortar contenido (false = mostrar contenido completo, true = acortar y agregar link)
+    var facebookShortenContent by mutableStateOf(false)
     
     fun init(context: Context) {
         prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -33,7 +37,9 @@ object SettingsManager {
     private fun loadSettings() {
         // Cargar de forma síncrona para que esté disponible inmediatamente
         val useLinkPreview = prefs?.getBoolean(KEY_FACEBOOK_USE_LINK_PREVIEW, false) ?: false
+        val shortenContent = prefs?.getBoolean(KEY_FACEBOOK_SHORTEN_CONTENT, false) ?: false
         facebookUseLinkPreview = useLinkPreview
+        facebookShortenContent = shortenContent
     }
     
     fun applyFacebookUseLinkPreview(useLinkPreview: Boolean) {
@@ -41,6 +47,16 @@ object SettingsManager {
         scope.launch(Dispatchers.IO) {
             prefs?.edit()?.apply {
                 putBoolean(KEY_FACEBOOK_USE_LINK_PREVIEW, useLinkPreview)
+                apply()
+            }
+        }
+    }
+    
+    fun applyFacebookShortenContent(shortenContent: Boolean) {
+        facebookShortenContent = shortenContent
+        scope.launch(Dispatchers.IO) {
+            prefs?.edit()?.apply {
+                putBoolean(KEY_FACEBOOK_SHORTEN_CONTENT, shortenContent)
                 apply()
             }
         }

@@ -61,7 +61,7 @@ if (!function_exists('agrochamba_registrar_cpt_trabajos')) {
             'menu_icon'           => 'dashicons-businessman',
             'capability_type'     => 'post',
             'hierarchical'        => false,
-            'supports'            => array('title', 'editor', 'thumbnail', 'excerpt', 'author', 'revisions', 'custom-fields'),
+            'supports'            => array('title', 'editor', 'thumbnail', 'excerpt', 'author', 'revisions', 'custom-fields', 'comments'),
             'has_archive'         => true,
             'rewrite'             => array(
                 'slug'       => 'trabajos/%ubicacion%',
@@ -155,6 +155,20 @@ if (!function_exists('agrochamba_load_empresa_template')) {
     add_filter('single_template', 'agrochamba_load_empresa_template');
 }
 
+// Cargar template personalizado para archive de empresas
+if (!function_exists('agrochamba_load_archive_empresa_template')) {
+    function agrochamba_load_archive_empresa_template($template) {
+        if (is_post_type_archive('empresa')) {
+            $custom_template = AGROCHAMBA_TEMPLATES_DIR . '/archive-empresa.php';
+            if (file_exists($custom_template)) {
+                return $custom_template;
+            }
+        }
+        return $template;
+    }
+    add_filter('archive_template', 'agrochamba_load_archive_empresa_template');
+}
+
 // Si el código moderno está disponible, también cargarlo para tener los meta boxes completos
 // IMPORTANTE: No usar 'plugins_loaded' aquí porque este módulo se carga DURANTE 'plugins_loaded'
 // Usar 'init' con prioridad temprana para asegurar que se ejecute después de que WordPress esté listo
@@ -178,6 +192,212 @@ if (!function_exists('agrochamba_load_trabajo_template')) {
         return $template;
     }
     add_filter('single_template', 'agrochamba_load_trabajo_template');
+}
+
+// Cargar template personalizado para archive de trabajos
+if (!function_exists('agrochamba_load_archive_trabajo_template')) {
+    function agrochamba_load_archive_trabajo_template($template) {
+        if (is_post_type_archive('trabajo') || is_tax('ubicacion') || is_tax('cultivo') || is_tax('empresa')) {
+            $custom_template = AGROCHAMBA_TEMPLATES_DIR . '/archive-trabajo.php';
+            if (file_exists($custom_template)) {
+                return $custom_template;
+            }
+        }
+        return $template;
+    }
+    add_filter('archive_template', 'agrochamba_load_archive_trabajo_template');
+}
+
+// Cargar template personalizado para páginas de taxonomía (ubicacion, cultivo, empresa)
+if (!function_exists('agrochamba_load_taxonomy_trabajo_template')) {
+    function agrochamba_load_taxonomy_trabajo_template($template) {
+        // Verificar si es una taxonomía relacionada con trabajos
+        $queried_object = get_queried_object();
+        if ($queried_object && isset($queried_object->taxonomy)) {
+            $taxonomy = $queried_object->taxonomy;
+            if (in_array($taxonomy, array('ubicacion', 'cultivo', 'empresa'))) {
+                // Verificar que los posts sean de tipo 'trabajo'
+                global $wp_query;
+                if ($wp_query && isset($wp_query->query_vars['post_type'])) {
+                    $post_type = $wp_query->query_vars['post_type'];
+                    if ($post_type === 'trabajo' || empty($post_type)) {
+                        // Si no hay post_type especificado, verificar el primer post
+                        if (empty($post_type) && $wp_query->have_posts()) {
+                            $wp_query->the_post();
+                            $post_type_check = get_post_type();
+                            $wp_query->rewind_posts();
+                            if ($post_type_check !== 'trabajo') {
+                                return $template;
+                            }
+                        }
+                        $custom_template = AGROCHAMBA_TEMPLATES_DIR . '/archive-trabajo.php';
+                        if (file_exists($custom_template)) {
+                            return $custom_template;
+                        }
+                    }
+                } else {
+                    // Si no hay query_vars, intentar usar el template de todas formas
+                    // pero solo si estamos seguros de que es para trabajos
+                    $custom_template = AGROCHAMBA_TEMPLATES_DIR . '/archive-trabajo.php';
+                    if (file_exists($custom_template)) {
+                        return $custom_template;
+                    }
+                }
+            }
+        }
+        return $template;
+    }
+    add_filter('taxonomy_template', 'agrochamba_load_taxonomy_trabajo_template', 10);
+}
+
+// Cargar template personalizado para búsqueda de trabajos
+if (!function_exists('agrochamba_load_search_trabajo_template')) {
+    function agrochamba_load_search_trabajo_template($template) {
+        // Verificar si la búsqueda es solo de trabajos
+        if (is_search()) {
+            $post_type = isset($_GET['post_type']) ? sanitize_text_field($_GET['post_type']) : '';
+            
+            // Si se especifica post_type=trabajo o si todos los resultados son trabajos
+            if ($post_type === 'trabajo' || (empty($post_type) && isset($GLOBALS['wp_query']) && $GLOBALS['wp_query']->get('post_type') === 'trabajo')) {
+                $custom_template = AGROCHAMBA_TEMPLATES_DIR . '/search-trabajo.php';
+                if (file_exists($custom_template)) {
+                    return $custom_template;
+                }
+            }
+        }
+        return $template;
+    }
+    add_filter('search_template', 'agrochamba_load_search_trabajo_template');
+}
+
+// Cargar template personalizado para página "Mis Empresas"
+if (!function_exists('agrochamba_load_mis_empresas_template')) {
+    function agrochamba_load_mis_empresas_template($template) {
+        // Verificar si la URL es /mis-empresas/
+        $request_uri = isset($_SERVER['REQUEST_URI']) ? esc_url_raw($_SERVER['REQUEST_URI']) : '';
+        $parsed_url = parse_url($request_uri);
+        $path = isset($parsed_url['path']) ? trim($parsed_url['path'], '/') : '';
+        
+        // Verificar si coincide con /mis-empresas/
+        if ($path === 'mis-empresas' || strpos($path, 'mis-empresas/') === 0) {
+            $custom_template = AGROCHAMBA_TEMPLATES_DIR . '/mis-empresas.php';
+            if (file_exists($custom_template)) {
+                return $custom_template;
+            }
+        }
+        
+        return $template;
+    }
+    add_filter('template_include', 'agrochamba_load_mis_empresas_template', 99);
+}
+
+// Agregar regla de reescritura para /mis-empresas/
+if (!function_exists('agrochamba_add_mis_empresas_rewrite_rule')) {
+    function agrochamba_add_mis_empresas_rewrite_rule() {
+        add_rewrite_rule('^mis-empresas/?$', 'index.php?agrochamba_page=mis-empresas', 'top');
+    }
+    add_action('init', 'agrochamba_add_mis_empresas_rewrite_rule');
+    
+    // Agregar query var
+    function agrochamba_add_mis_empresas_query_var($vars) {
+        $vars[] = 'agrochamba_page';
+        return $vars;
+    }
+    add_filter('query_vars', 'agrochamba_add_mis_empresas_query_var');
+}
+
+// Modificar consulta para aplicar filtros desde URL
+if (!function_exists('agrochamba_modify_trabajo_archive_query')) {
+    function agrochamba_modify_trabajo_archive_query($query) {
+        if (!is_admin() && $query->is_main_query()) {
+            // Para archivos de trabajos y páginas de taxonomía relacionadas
+            if (is_post_type_archive('trabajo') || is_tax('ubicacion') || is_tax('cultivo') || is_tax('empresa')) {
+                // Asegurar que solo se muestren trabajos en páginas de taxonomía
+                if (is_tax('ubicacion') || is_tax('cultivo') || is_tax('empresa')) {
+                    $query->set('post_type', 'trabajo');
+                }
+                
+                // Aplicar búsqueda de texto si existe
+                if (isset($_GET['s']) && !empty($_GET['s'])) {
+                    $search_term = sanitize_text_field($_GET['s']);
+                    $query->set('s', $search_term);
+                }
+                
+                // Aplicar filtros adicionales desde URL (si no es la taxonomía principal de la página)
+                $current_taxonomy = '';
+                if (is_tax('ubicacion')) {
+                    $current_taxonomy = 'ubicacion';
+                } elseif (is_tax('cultivo')) {
+                    $current_taxonomy = 'cultivo';
+                } elseif (is_tax('empresa')) {
+                    $current_taxonomy = 'empresa';
+                }
+                
+                $tax_query = array();
+                
+                // Solo agregar filtro de ubicación si no es la taxonomía actual
+                if (isset($_GET['ubicacion']) && !empty($_GET['ubicacion']) && $current_taxonomy !== 'ubicacion') {
+                    $ubicacion_slug = sanitize_text_field($_GET['ubicacion']);
+                    $tax_query[] = array(
+                        'taxonomy' => 'ubicacion',
+                        'field' => 'slug',
+                        'terms' => $ubicacion_slug,
+                    );
+                }
+                
+                // Solo agregar filtro de cultivo si no es la taxonomía actual
+                if (isset($_GET['cultivo']) && !empty($_GET['cultivo']) && $current_taxonomy !== 'cultivo') {
+                    $cultivo_slug = sanitize_text_field($_GET['cultivo']);
+                    $tax_query[] = array(
+                        'taxonomy' => 'cultivo',
+                        'field' => 'slug',
+                        'terms' => $cultivo_slug,
+                    );
+                }
+                
+                // Solo agregar filtro de empresa si no es la taxonomía actual
+                if (isset($_GET['empresa']) && !empty($_GET['empresa']) && $current_taxonomy !== 'empresa') {
+                    $empresa_slug = sanitize_text_field($_GET['empresa']);
+                    $tax_query[] = array(
+                        'taxonomy' => 'empresa',
+                        'field' => 'slug',
+                        'terms' => $empresa_slug,
+                    );
+                }
+                
+                if (!empty($tax_query)) {
+                    $query->set('tax_query', $tax_query);
+                }
+                
+                // Ordenar por fecha (más recientes primero)
+                $query->set('orderby', 'date');
+                $query->set('order', 'DESC');
+            }
+            
+            // Para búsquedas de trabajos
+            if (is_search() && isset($_GET['post_type']) && $_GET['post_type'] === 'trabajo') {
+                $query->set('post_type', 'trabajo');
+                
+                // Aplicar filtro de ubicación si existe
+                if (isset($_GET['ubicacion']) && !empty($_GET['ubicacion'])) {
+                    $ubicacion_slug = sanitize_text_field($_GET['ubicacion']);
+                    $tax_query = array(
+                        array(
+                            'taxonomy' => 'ubicacion',
+                            'field' => 'slug',
+                            'terms' => $ubicacion_slug,
+                        ),
+                    );
+                    $query->set('tax_query', $tax_query);
+                }
+                
+                // Ordenar por fecha (más recientes primero)
+                $query->set('orderby', 'date');
+                $query->set('order', 'DESC');
+            }
+        }
+    }
+    add_action('pre_get_posts', 'agrochamba_modify_trabajo_archive_query');
 }
 
 // ==========================================

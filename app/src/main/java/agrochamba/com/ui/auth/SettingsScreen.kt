@@ -17,9 +17,10 @@ import agrochamba.com.ui.common.BenefitSwitch
 @Composable
 fun SettingsScreen(navController: NavController) {
     // Leer el estado directamente desde SettingsManager.
-    // Nota: `facebookUseLinkPreview` en SettingsManager es SnapshotState-backed,
+    // Nota: `facebookUseLinkPreview` y `facebookShortenContent` en SettingsManager son SnapshotState-backed,
     // por lo que su lectura dentro de un @Composable causará recomposición automática.
     val facebookUseLinkPreview = SettingsManager.facebookUseLinkPreview
+    val facebookShortenContent = SettingsManager.facebookShortenContent
     
     Scaffold(
         topBar = {
@@ -69,6 +70,27 @@ fun SettingsScreen(navController: NavController) {
                             "Las publicaciones mostrarán un preview del link de tu trabajo, lo que puede generar más visitas a tu sitio web."
                         } else {
                             "Las imágenes se adjuntarán nativamente en Facebook, mostrando el contenido visual directamente en el post."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    BenefitSwitch(
+                        text = "Acortar contenido en Facebook",
+                        checked = facebookShortenContent,
+                        onCheckedChange = { 
+                            SettingsManager.applyFacebookShortenContent(it)
+                        }
+                    )
+                    
+                    Text(
+                        text = if (facebookShortenContent) {
+                            "Solo se mostrará una parte del contenido en Facebook. Al final se agregará un link para leer los detalles completos en el sitio web, generando más tráfico."
+                        } else {
+                            "Se mostrará el contenido completo en la publicación de Facebook."
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
