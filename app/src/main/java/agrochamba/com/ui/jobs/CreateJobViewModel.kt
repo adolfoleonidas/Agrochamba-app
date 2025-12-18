@@ -30,6 +30,7 @@ data class CreateJobScreenState(
     val empresas: List<Category> = emptyList(),
     val cultivos: List<Category> = emptyList(),
     val tiposPuesto: List<Category> = emptyList(),
+    val categorias: List<Category> = emptyList(),
     val selectedImages: List<Uri> = emptyList(),
     val userCompanyId: Int? = null
 )
@@ -53,12 +54,15 @@ class CreateJobViewModel @Inject constructor() : androidx.lifecycle.ViewModel() 
                 val empresas = WordPressApi.retrofitService.getEmpresas()
                 val cultivos = WordPressApi.retrofitService.getCultivos()
                 val tiposPuesto = WordPressApi.retrofitService.getTiposPuesto()
+                // Cargar categorías nativas de WordPress (para blogs)
+                val categorias = WordPressApi.retrofitService.getCategories()
 
                 uiState = uiState.copy(
                     ubicaciones = ubicaciones,
                     empresas = empresas,
                     cultivos = cultivos,
                     tiposPuesto = tiposPuesto,
+                    categorias = categorias,
                     userCompanyId = AuthManager.userCompanyId,
                     isLoading = false
                 )
@@ -204,6 +208,17 @@ class CreateJobViewModel @Inject constructor() : androidx.lifecycle.ViewModel() 
                     (jobData["empresa_id"] as? Number)?.toInt()?.let { put("empresa_id", it) }
                     (jobData["cultivo_id"] as? Number)?.toInt()?.let { put("cultivo_id", it) }
                     (jobData["tipo_puesto_id"] as? Number)?.toInt()?.let { put("tipo_puesto_id", it) }
+                    
+                    // Categorías para blogs (solo si es post y hay categorías seleccionadas)
+                    if (postType == "post" && jobData["categories"] != null) {
+                        val categories = jobData["categories"] as? List<*>
+                        if (categories != null && categories.isNotEmpty()) {
+                            val categoryIds = categories.mapNotNull { (it as? Number)?.toInt() }
+                            if (categoryIds.isNotEmpty()) {
+                                put("categories", categoryIds)
+                            }
+                        }
+                    }
 
                     // Beneficios (solo enviar si son true)
                     val alojamiento = jobData["alojamiento"] as? Boolean ?: false

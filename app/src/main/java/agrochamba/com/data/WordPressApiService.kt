@@ -62,6 +62,9 @@ interface WordPressApiService {
     @GET("wp/v2/cultivo?per_page=100")
     suspend fun getCultivos(): List<Category>
 
+    @GET("wp/v2/categories?per_page=100")
+    suspend fun getCategories(): List<Category>
+
     @GET("wp/v2/media")
     suspend fun getMediaForPost(@Query("parent") postId: Int): List<MediaItem>
 

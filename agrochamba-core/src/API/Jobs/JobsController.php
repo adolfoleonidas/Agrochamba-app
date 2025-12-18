@@ -236,6 +236,48 @@ class JobsController {
             $post_status = 'publish';
         }
 
+        // Configurar comentarios (por defecto habilitados)
+        $comment_status = 'open'; // Por defecto, comentarios activados
+        if (isset($params['comentarios_habilitados'])) {
+            // Si se especifica el parámetro, respetar la elección del usuario
+            $comentarios = filter_var($params['comentarios_habilitados'], FILTER_VALIDATE_BOOLEAN);
+            $comment_status = $comentarios ? 'open' : 'closed';
+        }
+        
+        // Determinar el tipo de post (trabajo o blog/post)
+        // Solo admins pueden crear posts de blog
+        $post_type = 'trabajo'; // Por defecto
+        
+        // Debug: verificar parámetros recibidos
+        if (function_exists('error_log')) {
+            error_log('AgroChamba JobsController: post_type recibido: ' . (isset($params['post_type']) ? $params['post_type'] : 'NO DEFINIDO'));
+            error_log('AgroChamba JobsController: Usuario es admin: ' . (in_array('administrator', $user->roles) ? 'SI' : 'NO'));
+            error_log('AgroChamba JobsController: Roles del usuario: ' . implode(', ', $user->roles));
+        }
+        
+        if (isset($params['post_type'])) {
+            $requested_type = sanitize_text_field($params['post_type']);
+            
+            // Solo admins pueden crear posts de blog
+            if (in_array('administrator', $user->roles)) {
+                if ($requested_type === 'post' || $requested_type === 'blog') {
+                    $post_type = 'post'; // WordPress post type nativo para blogs
+                    if (function_exists('error_log')) {
+                        error_log('AgroChamba JobsController: Cambiando post_type a: post');
+                    }
+                }
+            } else {
+                // Si no es admin, ignorar el parámetro y usar trabajo por defecto
+                if (function_exists('error_log')) {
+                    error_log('AgroChamba JobsController: Usuario no es admin, ignorando post_type y usando trabajo');
+                }
+            }
+        }
+        
+        if (function_exists('error_log')) {
+            error_log('AgroChamba JobsController: post_type final: ' . $post_type);
+        }
+
         // Preparar datos del post
         $post_content = isset($params['content']) ? wp_kses_post($params['content']) : '';
         
@@ -276,11 +318,12 @@ class JobsController {
         }
         
         $post_data = array(
-            'post_type'    => 'trabajo',
-            'post_title'   => sanitize_text_field($params['title']),
-            'post_content' => $post_content,
-            'post_status'  => $post_status,
-            'post_author'  => $user_id,
+            'post_type'       => $post_type,
+            'post_title'      => sanitize_text_field($params['title']),
+            'post_content'    => $post_content,
+            'post_status'     => $post_status,
+            'post_author'     => $user_id,
+            'comment_status'  => $comment_status, // Configurar estado de comentarios
         );
 
         if (isset($params['excerpt'])) {
@@ -313,156 +356,193 @@ class JobsController {
             );
         }
 
-        // Vincular empresa automáticamente
-        $empresa_term_id = null;
-        $empresa_cpt_id = null; // ID del CPT Empresa
-        $is_admin = in_array('administrator', $user->roles);
-        $is_employer = in_array('employer', $user->roles);
+        // Solo procesar campos específicos de trabajo si es un trabajo
+        if ($post_type === 'trabajo') {
+            // Vincular empresa automáticamente
+            $empresa_term_id = null;
+            $empresa_cpt_id = null; // ID del CPT Empresa
+            $is_admin = in_array('administrator', $user->roles);
+            $is_employer = in_array('employer', $user->roles);
 
-        if ($is_employer && !$is_admin) {
-            // Empresa normal: siempre usar su empresa automáticamente (ignorar empresa_id del request)
-            $empresa_term_id_from_user = get_user_meta($user_id, 'empresa_term_id', true);
-            
-            if ($empresa_term_id_from_user) {
-                $empresa_term_id = intval($empresa_term_id_from_user);
-            } else {
-                // Si no tiene empresa_term_id, buscar por display_name (razón social)
-                $company_name = $user->display_name;
-                if (!empty($company_name)) {
-                    $empresa_term = get_term_by('name', $company_name, 'empresa');
-                    if ($empresa_term) {
-                        $empresa_term_id = $empresa_term->term_id;
-                        // Guardar para futuras referencias
-                        update_user_meta($user_id, 'empresa_term_id', $empresa_term_id);
-                    }
-                }
-            }
-            
-            // Obtener el CPT Empresa asociado al usuario
-            $empresa_cpt = agrochamba_get_empresa_by_user_id($user_id);
-            if ($empresa_cpt) {
-                $empresa_cpt_id = $empresa_cpt->ID;
-            }
-        } elseif ($is_admin) {
-            // Admin: puede especificar empresa_id (CPT) o empresa_term_id (taxonomía)
-            if (isset($params['empresa_id']) && !empty($params['empresa_id'])) {
-                // Si viene empresa_id, es el ID del CPT Empresa
-                $empresa_cpt_id = intval($params['empresa_id']);
-                
-                // Validar que existe
-                $empresa_post = get_post($empresa_cpt_id);
-                if ($empresa_post && $empresa_post->post_type === 'empresa') {
-                    // Obtener el término de taxonomía asociado
-                    $empresa_terms = wp_get_post_terms($empresa_cpt_id, 'empresa');
-                    if (!empty($empresa_terms) && !is_wp_error($empresa_terms)) {
-                        $empresa_term_id = $empresa_terms[0]->term_id;
-                    } else {
-                        // Si no tiene término, crear uno basado en el nombre
-                        $empresa_name = $empresa_post->post_title;
-                        $razon_social = get_post_meta($empresa_cpt_id, '_empresa_razon_social', true);
-                        $empresa_search_name = !empty($razon_social) ? $razon_social : $empresa_name;
-                        
-                        $empresa_term = get_term_by('name', $empresa_search_name, 'empresa');
-                        if (!$empresa_term) {
-                            // Intentar también con el título del post
-                            $empresa_term = get_term_by('name', $empresa_name, 'empresa');
-                        }
-                        
-                        if (!$empresa_term) {
-                            $term_result = wp_insert_term(
-                                $empresa_search_name,
-                                'empresa',
-                                array(
-                                    'description' => 'Empresa: ' . $empresa_search_name,
-                                    'slug' => sanitize_title($empresa_search_name)
-                                )
-                            );
-                            if (!is_wp_error($term_result)) {
-                                $empresa_term_id = $term_result['term_id'];
-                                // Asignar el término al CPT empresa
-                                wp_set_object_terms($empresa_cpt_id, array($empresa_term_id), 'empresa', false);
-                            }
-                        } else {
-                            $empresa_term_id = $empresa_term->term_id;
-                            // Asegurar que el término esté asociado al CPT empresa
-                            wp_set_object_terms($empresa_cpt_id, array($empresa_term_id), 'empresa', false);
-                        }
-                    }
-                } else {
-                    $empresa_cpt_id = null; // Invalidar si no existe
-                }
-            } else {
-                // Si no especifica empresa_id, usar su empresa si es employer también
+            if ($is_employer && !$is_admin) {
+                // Empresa normal: siempre usar su empresa automáticamente (ignorar empresa_id del request)
                 $empresa_term_id_from_user = get_user_meta($user_id, 'empresa_term_id', true);
+                
                 if ($empresa_term_id_from_user) {
                     $empresa_term_id = intval($empresa_term_id_from_user);
-                    // Buscar el CPT empresa asociado
-                    $empresa_cpt = agrochamba_get_empresa_by_user_id($user_id);
-                    if ($empresa_cpt) {
-                        $empresa_cpt_id = $empresa_cpt->ID;
+                } else {
+                    // Si no tiene empresa_term_id, buscar por display_name (razón social)
+                    $company_name = $user->display_name;
+                    if (!empty($company_name)) {
+                        $empresa_term = get_term_by('name', $company_name, 'empresa');
+                        if ($empresa_term) {
+                            $empresa_term_id = $empresa_term->term_id;
+                            // Guardar para futuras referencias
+                            update_user_meta($user_id, 'empresa_term_id', $empresa_term_id);
+                        }
                     }
                 }
-            }
-        } else {
-            // Usuario normal (trabajador): debe especificar empresa_id
-            if (isset($params['empresa_id']) && !empty($params['empresa_id'])) {
-                $empresa_cpt_id = intval($params['empresa_id']);
                 
-                // Validar y obtener término
-                $empresa_post = get_post($empresa_cpt_id);
-                if ($empresa_post && $empresa_post->post_type === 'empresa') {
-                    $empresa_terms = wp_get_post_terms($empresa_cpt_id, 'empresa');
-                    if (!empty($empresa_terms) && !is_wp_error($empresa_terms)) {
-                        $empresa_term_id = $empresa_terms[0]->term_id;
+                // Obtener el CPT Empresa asociado al usuario
+                $empresa_cpt = agrochamba_get_empresa_by_user_id($user_id);
+                if ($empresa_cpt) {
+                    $empresa_cpt_id = $empresa_cpt->ID;
+                }
+            } elseif ($is_admin) {
+                // Admin: puede especificar empresa_id (CPT) o empresa_term_id (taxonomía)
+                if (isset($params['empresa_id']) && !empty($params['empresa_id'])) {
+                    // Si viene empresa_id, es el ID del CPT Empresa
+                    $empresa_cpt_id = intval($params['empresa_id']);
+                    
+                    // Validar que existe
+                    $empresa_post = get_post($empresa_cpt_id);
+                    if ($empresa_post && $empresa_post->post_type === 'empresa') {
+                        // Obtener el término de taxonomía asociado
+                        $empresa_terms = wp_get_post_terms($empresa_cpt_id, 'empresa');
+                        if (!empty($empresa_terms) && !is_wp_error($empresa_terms)) {
+                            $empresa_term_id = $empresa_terms[0]->term_id;
+                        } else {
+                            // Si no tiene término, crear uno basado en el nombre
+                            $empresa_name = $empresa_post->post_title;
+                            $razon_social = get_post_meta($empresa_cpt_id, '_empresa_razon_social', true);
+                            $empresa_search_name = !empty($razon_social) ? $razon_social : $empresa_name;
+                            
+                            $empresa_term = get_term_by('name', $empresa_search_name, 'empresa');
+                            if (!$empresa_term) {
+                                // Intentar también con el título del post
+                                $empresa_term = get_term_by('name', $empresa_name, 'empresa');
+                            }
+                            
+                            if (!$empresa_term) {
+                                $term_result = wp_insert_term(
+                                    $empresa_search_name,
+                                    'empresa',
+                                    array(
+                                        'description' => 'Empresa: ' . $empresa_search_name,
+                                        'slug' => sanitize_title($empresa_search_name)
+                                    )
+                                );
+                                if (!is_wp_error($term_result)) {
+                                    $empresa_term_id = $term_result['term_id'];
+                                    // Asignar el término al CPT empresa
+                                    wp_set_object_terms($empresa_cpt_id, array($empresa_term_id), 'empresa', false);
+                                }
+                            } else {
+                                $empresa_term_id = $empresa_term->term_id;
+                                // Asegurar que el término esté asociado al CPT empresa
+                                wp_set_object_terms($empresa_cpt_id, array($empresa_term_id), 'empresa', false);
+                            }
+                        }
+                    } else {
+                        $empresa_cpt_id = null; // Invalidar si no existe
                     }
                 } else {
-                    $empresa_cpt_id = null;
+                    // Si no especifica empresa_id, usar su empresa si es employer también
+                    $empresa_term_id_from_user = get_user_meta($user_id, 'empresa_term_id', true);
+                    if ($empresa_term_id_from_user) {
+                        $empresa_term_id = intval($empresa_term_id_from_user);
+                        // Buscar el CPT empresa asociado
+                        $empresa_cpt = agrochamba_get_empresa_by_user_id($user_id);
+                        if ($empresa_cpt) {
+                            $empresa_cpt_id = $empresa_cpt->ID;
+                        }
+                    }
+                }
+            } else {
+                // Usuario normal (trabajador): debe especificar empresa_id
+                if (isset($params['empresa_id']) && !empty($params['empresa_id'])) {
+                    $empresa_cpt_id = intval($params['empresa_id']);
+                    
+                    // Validar y obtener término
+                    $empresa_post = get_post($empresa_cpt_id);
+                    if ($empresa_post && $empresa_post->post_type === 'empresa') {
+                        $empresa_terms = wp_get_post_terms($empresa_cpt_id, 'empresa');
+                        if (!empty($empresa_terms) && !is_wp_error($empresa_terms)) {
+                            $empresa_term_id = $empresa_terms[0]->term_id;
+                        }
+                    } else {
+                        $empresa_cpt_id = null;
+                    }
                 }
             }
-        }
 
-        // Asignar la empresa al trabajo (taxonomía)
-        if ($empresa_term_id) {
-            wp_set_post_terms($post_id, array($empresa_term_id), 'empresa', false);
-        }
-        
-        // Guardar el meta field empresa_id (ID del CPT Empresa)
-        if ($empresa_cpt_id) {
-            update_post_meta($post_id, 'empresa_id', $empresa_cpt_id);
-        }
+            // Asignar la empresa al trabajo (taxonomía)
+            if ($empresa_term_id) {
+                wp_set_post_terms($post_id, array($empresa_term_id), 'empresa', false);
+            }
+            
+            // Guardar el meta field empresa_id (ID del CPT Empresa)
+            if ($empresa_cpt_id) {
+                update_post_meta($post_id, 'empresa_id', $empresa_cpt_id);
+            }
 
-        // Asignar otras taxonomías
-        if (isset($params['ubicacion_id']) && !empty($params['ubicacion_id'])) {
-            wp_set_post_terms($post_id, array(intval($params['ubicacion_id'])), 'ubicacion', false);
-        }
+            // Asignar otras taxonomías (solo para trabajos)
+            if (isset($params['ubicacion_id']) && !empty($params['ubicacion_id'])) {
+                wp_set_post_terms($post_id, array(intval($params['ubicacion_id'])), 'ubicacion', false);
+            }
 
-        if (isset($params['cultivo_id']) && !empty($params['cultivo_id'])) {
-            wp_set_post_terms($post_id, array(intval($params['cultivo_id'])), 'cultivo', false);
-        }
+            if (isset($params['cultivo_id']) && !empty($params['cultivo_id'])) {
+                wp_set_post_terms($post_id, array(intval($params['cultivo_id'])), 'cultivo', false);
+            }
 
-        if (isset($params['tipo_puesto_id']) && !empty($params['tipo_puesto_id'])) {
-            wp_set_post_terms($post_id, array(intval($params['tipo_puesto_id'])), 'tipo_puesto', false);
-        }
+            if (isset($params['tipo_puesto_id']) && !empty($params['tipo_puesto_id'])) {
+                wp_set_post_terms($post_id, array(intval($params['tipo_puesto_id'])), 'tipo_puesto', false);
+            }
 
-        // Guardar meta fields
-        $meta_fields = array(
-            'salario_min', 'salario_max', 'vacantes', 'fecha_inicio', 'fecha_fin',
-            'duracion_dias', 'requisitos', 'beneficios', 'tipo_contrato', 'jornada',
-            'contacto_whatsapp', 'contacto_email', 'google_maps_url', 'alojamiento',
-            'transporte', 'alimentacion', 'estado', 'experiencia', 'genero',
-            'edad_minima', 'edad_maxima'
-        );
+            // Guardar meta fields específicos de trabajos
+            $meta_fields = array(
+                'salario_min', 'salario_max', 'vacantes', 'fecha_inicio', 'fecha_fin',
+                'duracion_dias', 'requisitos', 'beneficios', 'tipo_contrato', 'jornada',
+                'contacto_whatsapp', 'contacto_email', 'google_maps_url', 'alojamiento',
+                'transporte', 'alimentacion', 'estado', 'experiencia', 'genero',
+                'edad_minima', 'edad_maxima', 'empresa_id'
+            );
 
-        foreach ($meta_fields as $field) {
-            if (isset($params[$field])) {
-                $value = $params[$field];
-                if (in_array($field, array('alojamiento', 'transporte', 'alimentacion'))) {
-                    $value = filter_var($value, FILTER_VALIDATE_BOOLEAN);
+            foreach ($meta_fields as $field) {
+                if (isset($params[$field])) {
+                    $value = $params[$field];
+                    if (in_array($field, array('alojamiento', 'transporte', 'alimentacion'))) {
+                        $value = filter_var($value, FILTER_VALIDATE_BOOLEAN);
+                    }
+                    if ($field === 'google_maps_url') {
+                        $value = esc_url_raw($value);
+                    }
+                    update_post_meta($post_id, $field, $value);
                 }
-                if ($field === 'google_maps_url') {
-                    $value = esc_url_raw($value);
+            }
+            
+            // Guardar comentarios_habilitados (por defecto true si no se especifica)
+            if (isset($params['comentarios_habilitados'])) {
+                $comentarios = filter_var($params['comentarios_habilitados'], FILTER_VALIDATE_BOOLEAN);
+                update_post_meta($post_id, 'comentarios_habilitados', $comentarios);
+            } else {
+                // Por defecto, comentarios habilitados
+                update_post_meta($post_id, 'comentarios_habilitados', true);
+            }
+        } else {
+            // Para blogs, guardar comentarios_habilitados (por defecto true si no se especifica)
+            if (isset($params['comentarios_habilitados'])) {
+                $comentarios = filter_var($params['comentarios_habilitados'], FILTER_VALIDATE_BOOLEAN);
+                update_post_meta($post_id, 'comentarios_habilitados', $comentarios);
+            } else {
+                // Por defecto, comentarios habilitados
+                update_post_meta($post_id, 'comentarios_habilitados', true);
+            }
+            
+            // Asignar categorías nativas de WordPress (solo para blogs)
+            if (isset($params['categories']) && is_array($params['categories']) && !empty($params['categories'])) {
+                $category_ids = array_map('intval', $params['categories']);
+                // Validar que las categorías existen
+                $valid_category_ids = array();
+                foreach ($category_ids as $cat_id) {
+                    $category = get_category($cat_id);
+                    if ($category && !is_wp_error($category)) {
+                        $valid_category_ids[] = $cat_id;
+                    }
                 }
-                update_post_meta($post_id, $field, $value);
+                if (!empty($valid_category_ids)) {
+                    wp_set_post_terms($post_id, $valid_category_ids, 'category', false);
+                }
             }
         }
 
@@ -476,50 +556,46 @@ class JobsController {
             update_post_meta($post_id, 'gallery_ids', array_map('intval', $params['gallery_ids']));
         }
 
-        // Publicar en Facebook SOLO si el usuario lo solicitó explícitamente
+        // Publicar en Facebook SOLO para trabajos y si el usuario lo solicitó explícitamente
         $facebook_result = null;
         $publish_to_facebook = isset($params['publish_to_facebook']) && filter_var($params['publish_to_facebook'], FILTER_VALIDATE_BOOLEAN);
         
-        // Log para debugging
-        error_log('AgroChamba Facebook Debug - publish_to_facebook: ' . ($publish_to_facebook ? 'true' : 'false'));
-        error_log('AgroChamba Facebook Debug - post_status: ' . $post_status);
-        error_log('AgroChamba Facebook Debug - function exists: ' . (function_exists('agrochamba_post_to_facebook') ? 'yes' : 'no'));
-        
-        // Publicar en Facebook SOLO si el usuario lo solicitó explícitamente
-        if ($publish_to_facebook && function_exists('agrochamba_post_to_facebook')) {
-                error_log('AgroChamba Facebook Debug - Intentando publicar en Facebook...');
+        // Solo publicar en Facebook para trabajos, no para blogs
+        if ($post_type === 'trabajo' && $publish_to_facebook && function_exists('agrochamba_post_to_facebook')) {
+            // Log para debugging
+            error_log('AgroChamba Facebook Debug - Intentando publicar trabajo en Facebook...');
             
             // Preparar datos para Facebook incluyendo todas las imágenes y preferencias del usuario
-                $job_data_for_facebook = array_merge($params, array(
-                    'featured_media' => isset($params['featured_media']) ? $params['featured_media'] : get_post_thumbnail_id($post_id),
-                    'gallery_ids' => isset($params['gallery_ids']) && is_array($params['gallery_ids']) ? $params['gallery_ids'] : array(),
-                    // Incluir preferencias del usuario desde la app
-                    'facebook_use_link_preview' => isset($params['facebook_use_link_preview']) ? filter_var($params['facebook_use_link_preview'], FILTER_VALIDATE_BOOLEAN) : false,
-                    'facebook_shorten_content' => isset($params['facebook_shorten_content']) ? filter_var($params['facebook_shorten_content'], FILTER_VALIDATE_BOOLEAN) : false,
-                ));
+            $job_data_for_facebook = array_merge($params, array(
+                'featured_media' => isset($params['featured_media']) ? $params['featured_media'] : get_post_thumbnail_id($post_id),
+                'gallery_ids' => isset($params['gallery_ids']) && is_array($params['gallery_ids']) ? $params['gallery_ids'] : array(),
+                // Incluir preferencias del usuario desde la app
+                'facebook_use_link_preview' => isset($params['facebook_use_link_preview']) ? filter_var($params['facebook_use_link_preview'], FILTER_VALIDATE_BOOLEAN) : false,
+                'facebook_shorten_content' => isset($params['facebook_shorten_content']) ? filter_var($params['facebook_shorten_content'], FILTER_VALIDATE_BOOLEAN) : false,
+            ));
             
-                $facebook_result = agrochamba_post_to_facebook($post_id, $job_data_for_facebook);
-                
-                if (is_wp_error($facebook_result)) {
-                    error_log('AgroChamba Facebook Error: ' . $facebook_result->get_error_message());
-                } else {
-                    error_log('AgroChamba Facebook Success: Post ID ' . $post_id . ' publicado en Facebook');
-                }
-        } else {
-            if (!$publish_to_facebook) {
-                error_log('AgroChamba Facebook Debug - No se publicará en Facebook. El usuario no lo solicitó.');
+            $facebook_result = agrochamba_post_to_facebook($post_id, $job_data_for_facebook);
+            
+            if (is_wp_error($facebook_result)) {
+                error_log('AgroChamba Facebook Error: ' . $facebook_result->get_error_message());
             } else {
-                error_log('AgroChamba Facebook Error: La función agrochamba_post_to_facebook no existe');
+                error_log('AgroChamba Facebook Success: Post ID ' . $post_id . ' publicado en Facebook');
             }
+        } elseif ($post_type === 'post' && $publish_to_facebook) {
+            // Los blogs no se publican en Facebook automáticamente
+            error_log('AgroChamba Facebook Debug - Los blogs no se publican en Facebook automáticamente.');
         }
 
+        // Mensaje según el tipo de post
+        $post_type_label = ($post_type === 'post') ? 'Artículo de blog' : 'Trabajo';
         $response_data = array(
             'success' => true,
-            'message' => $post_status === 'pending'
-                ? 'Trabajo creado y enviado para revisión.'
-                : 'Trabajo creado correctamente.',
+            'message' => $post_status === 'pending' 
+                ? $post_type_label . ' creado y enviado para revisión. Será publicado una vez aprobado por un administrador.' 
+                : $post_type_label . ' creado correctamente.',
             'post_id' => $post_id,
-            'status' => $post_status
+            'status' => $post_status,
+            'post_type' => $post_type
         );
 
         if ($facebook_result && !is_wp_error($facebook_result)) {

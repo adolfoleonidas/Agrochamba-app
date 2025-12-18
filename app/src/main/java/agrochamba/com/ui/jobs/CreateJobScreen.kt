@@ -77,6 +77,7 @@ fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel 
     var selectedEmpresa by remember { mutableStateOf<Category?>(null) }
     var selectedCultivo by remember { mutableStateOf<Category?>(null) }
     var selectedTipoPuesto by remember { mutableStateOf<Category?>(null) }
+    var selectedCategoria by remember { mutableStateOf<Category?>(null) }
     var alojamiento by remember { mutableStateOf(false) }
     var transporte by remember { mutableStateOf(false) }
     var alimentacion by remember { mutableStateOf(false) }
@@ -153,53 +154,55 @@ fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel 
                     if (tipoPublicacion == "trabajo") {
                         android.util.Log.d("CreateJobScreen", "Validando campos de TRABAJO")
                         // Validaciones para trabajos
-                        if (selectedUbicacion == null) {
-                            Toast.makeText(context, "La ubicación es obligatoria", Toast.LENGTH_SHORT).show()
-                            return@BottomActionBar
-                        }
-                        
+                    if (selectedUbicacion == null) {
+                        Toast.makeText(context, "La ubicación es obligatoria", Toast.LENGTH_SHORT).show()
+                        return@BottomActionBar
+                    }
+                    
                         // Empresa es OPCIONAL - usar la seleccionada o la del usuario automáticamente
                         val empresaId = if (isAdmin) {
                             // Admin: puede seleccionar empresa o dejarla vacía
-                            selectedEmpresa?.id
-                        } else {
+                        selectedEmpresa?.id
+                    } else {
                             // Empresa normal: usar su empresa automáticamente si existe
-                            uiState.userCompanyId
-                        }
-                        
+                        uiState.userCompanyId
+                    }
+                    
                         val ubicacionIdValue = selectedUbicacion!!.id
                         
                         val jobData = mutableMapOf<String, Any?>(
                             "post_type" to "trabajo",
-                            "title" to title.trim(),
-                            "content" to description.textToHtml(),
-                            "salario_min" to (salarioMin.toIntOrNull() ?: 0),
-                            "salario_max" to (salarioMax.toIntOrNull() ?: 0),
-                            "vacantes" to (vacantes.toIntOrNull() ?: 1),
+                        "title" to title.trim(),
+                        "content" to description.textToHtml(),
+                        "salario_min" to (salarioMin.toIntOrNull() ?: 0),
+                        "salario_max" to (salarioMax.toIntOrNull() ?: 0),
+                        "vacantes" to (vacantes.toIntOrNull() ?: 1),
                             "ubicacion_id" to ubicacionIdValue,
-                            "cultivo_id" to selectedCultivo?.id,
-                            "tipo_puesto_id" to selectedTipoPuesto?.id,
-                            "alojamiento" to alojamiento,
-                            "transporte" to transporte,
-                            "alimentacion" to alimentacion,
+                        "cultivo_id" to selectedCultivo?.id,
+                        "tipo_puesto_id" to selectedTipoPuesto?.id,
+                        "alojamiento" to alojamiento,
+                        "transporte" to transporte,
+                        "alimentacion" to alimentacion,
                             "comentarios_habilitados" to comentariosHabilitados,
-                            "publish_to_facebook" to publishToFacebook
-                        )
+                        "publish_to_facebook" to publishToFacebook
+                    )
                         
                         // Agregar empresa_id solo si está presente (opcional)
                         empresaId?.let { jobData["empresa_id"] = it }
                         
-                        viewModel.createJob(jobData, context)
+                    viewModel.createJob(jobData, context)
                     } else {
                         // Para blogs (post) - NO requiere ubicación ni empresa
                         android.util.Log.d("CreateJobScreen", "Creando BLOG - sin validar ubicación ni empresa")
-                        val blogData = mapOf(
+                        val blogData = mutableMapOf<String, Any?>(
                             "post_type" to "post",
                             "title" to title.trim(),
                             "content" to description.textToHtml(),
                             "comentarios_habilitados" to comentariosHabilitados,
                             "publish_to_facebook" to publishToFacebook
                         )
+                        // Agregar categoría si está seleccionada
+                        selectedCategoria?.id?.let { blogData["categories"] = listOf(it) }
                         viewModel.createJob(blogData, context)
                     }
                 }
@@ -374,17 +377,31 @@ fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel 
                     Spacer(Modifier.height(16.dp))
                 }
                 
+                // Selector de Categoría (solo para blogs)
+                if (tipoPublicacion == "post") {
+                    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        CategoryDropdown(
+                            label = "Categoría",
+                            items = uiState.categorias,
+                            selectedItem = selectedCategoria,
+                            modifier = Modifier.fillMaxWidth(),
+                            leadingIcon = Icons.Default.Folder
+                        ) { cat -> selectedCategoria = cat }
+                    }
+                    Spacer(Modifier.height(16.dp))
+                }
+                
                 // Ubicación y Empresa - uno debajo del otro (solo para trabajos)
                 if (tipoPublicacion == "trabajo") {
                     Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                         // Selector de Ubicación (arriba)
-                        CategoryDropdown(
-                            label = "Ubicación *",
-                            items = uiState.ubicaciones,
+                    CategoryDropdown(
+                        label = "Ubicación *",
+                        items = uiState.ubicaciones,
                             selectedItem = selectedUbicacion,
                             modifier = Modifier.fillMaxWidth(),
                             leadingIcon = Icons.Default.LocationOn
-                        ) { cat -> selectedUbicacion = cat }
+                    ) { cat -> selectedUbicacion = cat }
                         
                         Spacer(Modifier.height(12.dp))
                         
@@ -399,30 +416,30 @@ fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel 
                             android.util.Log.d("CreateJobScreen", "Empresa seleccionada: ${cat.name}")
                             selectedEmpresa = cat 
                         }
-                    }
-                    
-                    Spacer(Modifier.height(16.dp))
+                }
+                
+                Spacer(Modifier.height(16.dp))
                 }
                 
                 // Botón para mostrar más detalles (solo para trabajos)
                 if (tipoPublicacion == "trabajo") {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        ActionButton(
-                            text = if (showMoreOptions) "Ocultar Detalles" else "Más Detalles",
-                            icon = null,
-                            onClick = { showMoreOptions = !showMoreOptions }
-                        )
-                    }
-                    
-                    Spacer(Modifier.height(16.dp))
-                    
-                    // Opciones avanzadas expandibles
-                    if (showMoreOptions) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    ActionButton(
+                        text = if (showMoreOptions) "Ocultar Detalles" else "Más Detalles",
+                        icon = null,
+                        onClick = { showMoreOptions = !showMoreOptions }
+                    )
+                }
+                
+                Spacer(Modifier.height(16.dp))
+                
+                // Opciones avanzadas expandibles
+                if (showMoreOptions) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()

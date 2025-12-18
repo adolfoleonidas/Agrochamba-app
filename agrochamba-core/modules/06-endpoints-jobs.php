@@ -226,8 +226,8 @@ if (!function_exists('agrochamba_create_job')) {
 
         // Solo procesar campos específicos de trabajo si es un trabajo
         if ($post_type === 'trabajo') {
-            // Asignar empresa_id al trabajo (meta field)
-            if ($empresa_id) {
+        // Asignar empresa_id al trabajo (meta field)
+        if ($empresa_id) {
             // Validar que la empresa existe y es del tipo correcto
             $empresa_post = get_post($empresa_id);
             if (!$empresa_post || $empresa_post->post_type !== 'empresa') {
@@ -257,39 +257,39 @@ if (!function_exists('agrochamba_create_job')) {
         }
 
             // Asignar otras taxonomías (solo para trabajos)
-            if (isset($params['ubicacion_id']) && !empty($params['ubicacion_id'])) {
-                wp_set_post_terms($post_id, array(intval($params['ubicacion_id'])), 'ubicacion', false);
-            }
+        if (isset($params['ubicacion_id']) && !empty($params['ubicacion_id'])) {
+            wp_set_post_terms($post_id, array(intval($params['ubicacion_id'])), 'ubicacion', false);
+        }
 
-            if (isset($params['cultivo_id']) && !empty($params['cultivo_id'])) {
-                wp_set_post_terms($post_id, array(intval($params['cultivo_id'])), 'cultivo', false);
-            }
+        if (isset($params['cultivo_id']) && !empty($params['cultivo_id'])) {
+            wp_set_post_terms($post_id, array(intval($params['cultivo_id'])), 'cultivo', false);
+        }
 
-            if (isset($params['tipo_puesto_id']) && !empty($params['tipo_puesto_id'])) {
-                wp_set_post_terms($post_id, array(intval($params['tipo_puesto_id'])), 'tipo_puesto', false);
-            }
+        if (isset($params['tipo_puesto_id']) && !empty($params['tipo_puesto_id'])) {
+            wp_set_post_terms($post_id, array(intval($params['tipo_puesto_id'])), 'tipo_puesto', false);
+        }
 
             // Guardar meta fields específicos de trabajos
-            $meta_fields = array(
-                'salario_min', 'salario_max', 'vacantes', 'fecha_inicio', 'fecha_fin',
-                'duracion_dias', 'requisitos', 'beneficios', 'tipo_contrato', 'jornada',
-                'contacto_whatsapp', 'contacto_email', 'google_maps_url', 'alojamiento', 'transporte',
+        $meta_fields = array(
+            'salario_min', 'salario_max', 'vacantes', 'fecha_inicio', 'fecha_fin',
+            'duracion_dias', 'requisitos', 'beneficios', 'tipo_contrato', 'jornada',
+            'contacto_whatsapp', 'contacto_email', 'google_maps_url', 'alojamiento', 'transporte',
                 'alimentacion', 'estado', 'experiencia', 'genero', 'edad_minima', 'edad_maxima',
                 'empresa_id'
-            );
+        );
 
-            foreach ($meta_fields as $field) {
-                if (isset($params[$field])) {
-                    $value = $params[$field];
-                    // Convertir booleanos
-                    if (in_array($field, array('alojamiento', 'transporte', 'alimentacion'))) {
-                        $value = filter_var($value, FILTER_VALIDATE_BOOLEAN);
-                    }
-                    // Sanitizar URL de Google Maps
-                    if ($field === 'google_maps_url') {
-                        $value = esc_url_raw($value);
-                    }
-                    update_post_meta($post_id, $field, $value);
+        foreach ($meta_fields as $field) {
+            if (isset($params[$field])) {
+                $value = $params[$field];
+                // Convertir booleanos
+                if (in_array($field, array('alojamiento', 'transporte', 'alimentacion'))) {
+                    $value = filter_var($value, FILTER_VALIDATE_BOOLEAN);
+                }
+                // Sanitizar URL de Google Maps
+                if ($field === 'google_maps_url') {
+                    $value = esc_url_raw($value);
+                }
+                update_post_meta($post_id, $field, $value);
                 }
             }
             
@@ -309,6 +309,22 @@ if (!function_exists('agrochamba_create_job')) {
             } else {
                 // Por defecto, comentarios habilitados
                 update_post_meta($post_id, 'comentarios_habilitados', true);
+            }
+            
+            // Asignar categorías nativas de WordPress (solo para blogs)
+            if (isset($params['categories']) && is_array($params['categories']) && !empty($params['categories'])) {
+                $category_ids = array_map('intval', $params['categories']);
+                // Validar que las categorías existen
+                $valid_category_ids = array();
+                foreach ($category_ids as $cat_id) {
+                    $category = get_category($cat_id);
+                    if ($category && !is_wp_error($category)) {
+                        $valid_category_ids[] = $cat_id;
+                    }
+                }
+                if (!empty($valid_category_ids)) {
+                    wp_set_post_terms($post_id, $valid_category_ids, 'category', false);
+                }
             }
         }
 
