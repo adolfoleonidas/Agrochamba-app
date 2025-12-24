@@ -314,11 +314,31 @@ if (!function_exists('agrochamba_modify_trabajo_archive_query')) {
             return;
         }
         
-        // Para archivos de trabajos y páginas de taxonomía relacionadas
-        if (is_post_type_archive('trabajo') || is_tax('ubicacion') || is_tax('cultivo') || is_tax('empresa')) {
+        // Verificar si estamos en el archivo de trabajos o en una taxonomía relacionada
+        $is_trabajo_archive = is_post_type_archive('trabajo');
+        $is_trabajo_tax = is_tax('ubicacion') || is_tax('cultivo') || is_tax('empresa');
+        
+        // También verificar si hay parámetros GET que indiquen que queremos ver trabajos
+        $has_trabajo_params = isset($_GET['post_type']) && $_GET['post_type'] === 'trabajo';
+        
+        // Verificar URL de forma segura
+        $is_trabajo_url = false;
+        if (isset($_SERVER['REQUEST_URI'])) {
+            $is_trabajo_url = strpos($_SERVER['REQUEST_URI'], '/trabajos') !== false;
+        }
+        
+        // Si estamos en el archivo de trabajos o tenemos parámetros de trabajo, procesar
+        if ($is_trabajo_archive || $is_trabajo_tax || ($has_trabajo_params && $is_trabajo_url)) {
             // Asegurar que solo se muestren trabajos
             $query->set('post_type', 'trabajo');
             $query->set('post_status', 'publish'); // Asegurar que solo se muestren posts publicados
+            
+            // Asegurar que la consulta sea pública y accesible
+            $query->is_archive = true;
+            $query->is_post_type_archive = true;
+            
+            // Asegurar que la consulta sea pública (sin restricciones de permisos)
+            $query->set('perm', 'readable');
             
             // Aplicar búsqueda de texto si existe
             if (isset($_GET['s']) && !empty($_GET['s'])) {
@@ -420,6 +440,18 @@ if (!function_exists('agrochamba_modify_trabajo_archive_query')) {
         }
     }
     add_action('pre_get_posts', 'agrochamba_modify_trabajo_archive_query', 10);
+}
+
+// Asegurar que los archivos de trabajos sean siempre accesibles públicamente
+if (!function_exists('agrochamba_ensure_trabajo_archive_accessible')) {
+    function agrochamba_ensure_trabajo_archive_accessible() {
+        // Verificar si estamos en el archivo de trabajos o en una taxonomía relacionada
+        if (is_post_type_archive('trabajo') || is_tax('ubicacion') || is_tax('cultivo') || is_tax('empresa')) {
+            // Asegurar que la página sea accesible públicamente
+            status_header(200);
+        }
+    }
+    add_action('template_redirect', 'agrochamba_ensure_trabajo_archive_accessible', 1);
 }
 
 // ==========================================

@@ -69,15 +69,14 @@ $show_welcome = isset($_GET['welcome']) && $_GET['welcome'] === '1';
             <!-- Barra de búsqueda -->
             <?php
             // Determinar la URL base del formulario
-            // Si estamos en una página de taxonomía, usar la URL del archivo de trabajos
-            $form_action = is_tax('ubicacion') || is_tax('cultivo') || is_tax('empresa') 
-                ? get_post_type_archive_link('trabajo') 
-                : home_url('/');
+            // Siempre usar la URL del archivo de trabajos para evitar problemas de permisos
+            $form_action = get_post_type_archive_link('trabajo');
+            if (!$form_action) {
+                $form_action = home_url('/trabajos/');
+            }
             ?>
             <form class="archive-search-form" method="get" action="<?php echo esc_url($form_action); ?>">
-                <?php if (!is_post_type_archive('trabajo')): ?>
-                    <input type="hidden" name="post_type" value="trabajo">
-                <?php endif; ?>
+                <input type="hidden" name="post_type" value="trabajo">
                 <div class="search-input-group">
                     <div class="search-input-wrapper">
                         <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

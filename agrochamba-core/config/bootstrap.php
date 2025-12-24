@@ -21,11 +21,11 @@ $autoloader_file = file_exists($autoloader_path) ? $autoloader_path : (file_exis
 
 if ($autoloader_file !== null) {
     require_once $autoloader_file;
-    
-    // Register autoloader
+
+// Register autoloader
     if (class_exists('\AgroChamba\Core\Autoloader')) {
-        $autoloader = new \AgroChamba\Core\Autoloader();
-        $autoloader->register();
+$autoloader = new \AgroChamba\Core\Autoloader();
+$autoloader->register();
     }
 }
 
