@@ -304,9 +304,13 @@ if (!function_exists('agrochamba_post_to_facebook_via_n8n')) {
         $use_link_preview = isset($job_data['facebook_use_link_preview']) && filter_var($job_data['facebook_use_link_preview'], FILTER_VALIDATE_BOOLEAN);
         
         // Preparar payload para n8n
+        $title = get_the_title($post_id);
+        // Decodificar entidades HTML del título (ej: &#8211; -> –)
+        $title = html_entity_decode($title, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        
         $payload = array(
             'post_id' => $post_id,
-            'title' => get_the_title($post_id),
+            'title' => $title,
             'message' => $message,
             'link' => $job_url,
             'image_url' => !empty($image_urls) ? $image_urls[0] : null, // Primera imagen para compatibilidad
@@ -402,6 +406,9 @@ if (!function_exists('agrochamba_get_emoji_for_crop')) {
 if (!function_exists('agrochamba_build_facebook_message')) {
     function agrochamba_build_facebook_message($post_id, $job_data) {
         $title = get_the_title($post_id);
+        // Decodificar entidades HTML del título (ej: &#8211; -> –)
+        $title = html_entity_decode($title, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        
         $content = get_post_field('post_content', $post_id);
         
         // Obtener empresa y ubicación
@@ -436,6 +443,9 @@ if (!function_exists('agrochamba_build_facebook_message')) {
         
         // Remover otros tags HTML pero mantener el texto
         $content = wp_strip_all_tags($content);
+        
+        // Decodificar entidades HTML del contenido (ej: &#8211; -> –)
+        $content = html_entity_decode($content, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         
         // Limpiar espacios múltiples y saltos de línea excesivos (máximo 2 saltos seguidos)
         $content = preg_replace('/\n{3,}/', "\n\n", $content);
