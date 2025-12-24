@@ -67,7 +67,7 @@ $show_welcome = isset($_GET['welcome']) && $_GET['welcome'] === '1';
                         <input type="text" 
                                name="s" 
                                class="search-input" 
-                               placeholder="Puesto o palabra clave"
+                               placeholder="Buscar por empresa, puesto o palabra clave"
                                value="<?php echo isset($_GET['s']) ? esc_attr($_GET['s']) : ''; ?>">
                     </div>
                     
@@ -77,7 +77,7 @@ $show_welcome = isset($_GET['welcome']) && $_GET['welcome'] === '1';
                             <circle cx="12" cy="10" r="3"/>
                         </svg>
                         <select name="ubicacion" class="search-input search-select" onchange="this.form.submit()">
-                            <option value="">Seleccionando todas las ubicaciones</option>
+                            <option value="">Todas las ubicaciones</option>
                             <?php
                             $ubicaciones = get_terms(array(
                                 'taxonomy' => 'ubicacion',
@@ -459,15 +459,54 @@ $show_welcome = isset($_GET['welcome']) && $_GET['welcome'] === '1';
         </div>
         
         <!-- Paginación -->
-        <?php if (paginate_links()): ?>
+        <?php 
+        // Preservar parámetros GET en la paginación
+        $pagination_args = array(
+            'prev_text' => '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg> Anterior',
+            'next_text' => 'Siguiente <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>',
+            'type' => 'list',
+        );
+        
+        // Agregar parámetros GET actuales a la paginación
+        // Esto asegura que los filtros se preserven al navegar entre páginas
+        $current_url_params = array();
+        
+        // Siempre incluir post_type para mantener la consistencia
+        $current_url_params['post_type'] = 'trabajo';
+        
+        // Incluir parámetros solo si tienen valor (no vacíos)
+        if (isset($_GET['ubicacion']) && $_GET['ubicacion'] !== '') {
+            $current_url_params['ubicacion'] = sanitize_text_field($_GET['ubicacion']);
+        }
+        if (isset($_GET['cultivo']) && $_GET['cultivo'] !== '') {
+            $current_url_params['cultivo'] = sanitize_text_field($_GET['cultivo']);
+        }
+        if (isset($_GET['empresa']) && $_GET['empresa'] !== '') {
+            $current_url_params['empresa'] = sanitize_text_field($_GET['empresa']);
+        }
+        if (isset($_GET['s']) && $_GET['s'] !== '') {
+            $current_url_params['s'] = sanitize_text_field($_GET['s']);
+        }
+        
+        // Usar base URL correcta para la paginación
+        // Si estamos en el archivo de trabajos, usar su URL base
+        if (is_post_type_archive('trabajo')) {
+            $pagination_base = get_post_type_archive_link('trabajo');
+            // Remover parámetros de página si existen en la URL base
+            $pagination_base = remove_query_arg('paged', $pagination_base);
+            $pagination_args['base'] = $pagination_base . '%_%';
+        } else {
+            // Para búsquedas o taxonomías, usar la URL actual sin paged
+            $current_url = remove_query_arg('paged');
+            $pagination_args['base'] = $current_url . '%_%';
+        }
+        
+        // Agregar parámetros a la paginación
+        $pagination_args['add_args'] = $current_url_params;
+        
+        if (paginate_links($pagination_args)): ?>
             <div class="trabajos-pagination">
-                <?php
-                echo paginate_links(array(
-                    'prev_text' => '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg> Anterior',
-                    'next_text' => 'Siguiente <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>',
-                    'type' => 'list',
-                ));
-                ?>
+                <?php echo paginate_links($pagination_args); ?>
             </div>
         <?php endif; ?>
     </div>
