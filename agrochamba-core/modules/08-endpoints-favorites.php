@@ -589,8 +589,14 @@ if (!function_exists('agrochamba_get_job_counters')) {
         $comments_count = get_comments_number($job_id);
 
         // Contar vistas
+        // IMPORTANTE: Las vistas siempre deben ser el valor total almacenado en la BD
+        // No deben verse afectadas por filtros o consultas
         $views = get_post_meta($job_id, '_trabajo_views', true);
         $views_count = intval($views);
+        // Asegurar que siempre sea un número válido (mínimo 0)
+        if ($views_count < 0) {
+            $views_count = 0;
+        }
 
         // Estado del usuario actual (si está logueado)
         $is_favorite = false;

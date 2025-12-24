@@ -179,8 +179,13 @@ $show_welcome = isset($_GET['welcome']) && $_GET['welcome'] === '1';
                     }
                     
                     // Obtener contadores
+                    // Las vistas siempre deben ser el valor total almacenado en la BD, independiente de filtros
                     $views = get_post_meta($trabajo_id, '_trabajo_views', true);
                     $views_count = intval($views);
+                    // Asegurar que siempre sea un número válido (mínimo 0)
+                    if ($views_count < 0) {
+                        $views_count = 0;
+                    }
                     
                     // Contar favoritos (likes)
                     $favorites_count = 0;
@@ -1534,12 +1539,17 @@ function toggleSave(jobId, button) {
         const cards = document.querySelectorAll(`[data-job-id="${jobId}"]`);
         cards.forEach(function(card) {
             // Actualizar contador de vistas
+            // IMPORTANTE: Solo actualizar si el valor del servidor es mayor o igual al actual
+            // Esto evita que filtros o caché incorrecto sobrescriban el valor correcto
             if (data.views !== undefined) {
                 const viewsCounter = card.querySelector('[data-counter="views"]');
                 if (viewsCounter) {
                     const currentViews = parseInt(viewsCounter.textContent) || 0;
-                    if (data.views !== currentViews) {
-                        viewsCounter.textContent = data.views;
+                    const serverViews = parseInt(data.views) || 0;
+                    // Solo actualizar si el valor del servidor es válido y mayor o igual al actual
+                    // Esto previene que valores incorrectos sobrescriban el contador correcto
+                    if (serverViews >= currentViews && serverViews !== currentViews) {
+                        viewsCounter.textContent = serverViews;
                         // Animación sutil solo si cambió
                         viewsCounter.style.transition = 'all 0.3s';
                         viewsCounter.style.transform = 'scale(1.1)';
