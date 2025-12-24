@@ -15,7 +15,18 @@ $paged = get_query_var('paged') ? get_query_var('paged') : 1;
 $posts_per_page = get_option('posts_per_page', 12);
 
 // Obtener filtros de URL
-$ubicacion_filter = isset($_GET['ubicacion']) ? sanitize_text_field($_GET['ubicacion']) : '';
+// Si estamos en una página de taxonomía, obtener el slug del término actual
+$ubicacion_filter = '';
+if (is_tax('ubicacion')) {
+    $queried_object = get_queried_object();
+    if ($queried_object && isset($queried_object->slug)) {
+        $ubicacion_filter = $queried_object->slug;
+    }
+} elseif (isset($_GET['ubicacion']) && $_GET['ubicacion'] !== '') {
+    // Solo usar el filtro si no está vacío (vacío significa "todas las ubicaciones")
+    $ubicacion_filter = sanitize_text_field($_GET['ubicacion']);
+}
+
 $cultivo_filter = isset($_GET['cultivo']) ? sanitize_text_field($_GET['cultivo']) : '';
 $empresa_filter = isset($_GET['empresa']) ? sanitize_text_field($_GET['empresa']) : '';
 
@@ -56,7 +67,14 @@ $show_welcome = isset($_GET['welcome']) && $_GET['welcome'] === '1';
             <p class="archive-subtitle">Explora nuestro directorio completo de ofertas en el sector agroindustrial</p>
             
             <!-- Barra de búsqueda -->
-            <form class="archive-search-form" method="get" action="<?php echo esc_url(home_url('/')); ?>">
+            <?php
+            // Determinar la URL base del formulario
+            // Si estamos en una página de taxonomía, usar la URL del archivo de trabajos
+            $form_action = is_tax('ubicacion') || is_tax('cultivo') || is_tax('empresa') 
+                ? get_post_type_archive_link('trabajo') 
+                : home_url('/');
+            ?>
+            <form class="archive-search-form" method="get" action="<?php echo esc_url($form_action); ?>">
                 <input type="hidden" name="post_type" value="trabajo">
                 <div class="search-input-group">
                     <div class="search-input-wrapper">
@@ -77,7 +95,7 @@ $show_welcome = isset($_GET['welcome']) && $_GET['welcome'] === '1';
                             <circle cx="12" cy="10" r="3"/>
                         </svg>
                         <select name="ubicacion" class="search-input search-select" onchange="this.form.submit()">
-                            <option value="">Todas las ubicaciones</option>
+                            <option value="" <?php echo empty($ubicacion_filter) ? 'selected' : ''; ?>>Todas las ubicaciones</option>
                             <?php
                             $ubicaciones = get_terms(array(
                                 'taxonomy' => 'ubicacion',
