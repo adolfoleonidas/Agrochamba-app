@@ -75,7 +75,9 @@ $show_welcome = isset($_GET['welcome']) && $_GET['welcome'] === '1';
                 : home_url('/');
             ?>
             <form class="archive-search-form" method="get" action="<?php echo esc_url($form_action); ?>">
-                <input type="hidden" name="post_type" value="trabajo">
+                <?php if (!is_post_type_archive('trabajo')): ?>
+                    <input type="hidden" name="post_type" value="trabajo">
+                <?php endif; ?>
                 <div class="search-input-group">
                     <div class="search-input-wrapper">
                         <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

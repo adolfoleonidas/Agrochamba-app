@@ -309,78 +309,100 @@ if (!function_exists('agrochamba_add_mis_empresas_rewrite_rule')) {
 // Modificar consulta para aplicar filtros desde URL
 if (!function_exists('agrochamba_modify_trabajo_archive_query')) {
     function agrochamba_modify_trabajo_archive_query($query) {
-        if (!is_admin() && $query->is_main_query()) {
-            // Para archivos de trabajos y páginas de taxonomía relacionadas
-            if (is_post_type_archive('trabajo') || is_tax('ubicacion') || is_tax('cultivo') || is_tax('empresa')) {
-                // Asegurar que solo se muestren trabajos en páginas de taxonomía
-                if (is_tax('ubicacion') || is_tax('cultivo') || is_tax('empresa')) {
-                    $query->set('post_type', 'trabajo');
-                }
-                
-                // Aplicar búsqueda de texto si existe
-                if (isset($_GET['s']) && !empty($_GET['s'])) {
-                    $search_term = sanitize_text_field($_GET['s']);
-                    $query->set('s', $search_term);
-                }
-                
-                // Aplicar filtros adicionales desde URL (si no es la taxonomía principal de la página)
-                $current_taxonomy = '';
-                if (is_tax('ubicacion')) {
-                    $current_taxonomy = 'ubicacion';
-                } elseif (is_tax('cultivo')) {
-                    $current_taxonomy = 'cultivo';
-                } elseif (is_tax('empresa')) {
-                    $current_taxonomy = 'empresa';
-                }
-                
-                $tax_query = array();
-                
-                // Solo agregar filtro de ubicación si no es la taxonomía actual
-                if (isset($_GET['ubicacion']) && !empty($_GET['ubicacion']) && $current_taxonomy !== 'ubicacion') {
-                    $ubicacion_slug = sanitize_text_field($_GET['ubicacion']);
+        // Solo modificar consultas principales en el frontend
+        if (is_admin() || !$query->is_main_query() || is_feed()) {
+            return;
+        }
+        
+        // Para archivos de trabajos y páginas de taxonomía relacionadas
+        if (is_post_type_archive('trabajo') || is_tax('ubicacion') || is_tax('cultivo') || is_tax('empresa')) {
+            // Asegurar que solo se muestren trabajos
+            $query->set('post_type', 'trabajo');
+            $query->set('post_status', 'publish'); // Asegurar que solo se muestren posts publicados
+            
+            // Aplicar búsqueda de texto si existe
+            if (isset($_GET['s']) && !empty($_GET['s'])) {
+                $search_term = sanitize_text_field($_GET['s']);
+                $query->set('s', $search_term);
+            }
+            
+            // Aplicar filtros adicionales desde URL (si no es la taxonomía principal de la página)
+            $current_taxonomy = '';
+            if (is_tax('ubicacion')) {
+                $current_taxonomy = 'ubicacion';
+            } elseif (is_tax('cultivo')) {
+                $current_taxonomy = 'cultivo';
+            } elseif (is_tax('empresa')) {
+                $current_taxonomy = 'empresa';
+            }
+            
+            // Construir tax_query solo si hay filtros desde GET
+            $tax_query = array();
+            $has_tax_filters = false;
+            
+            // Solo agregar filtro de ubicación si no es la taxonomía actual y hay un valor en GET
+            if (isset($_GET['ubicacion']) && $_GET['ubicacion'] !== '' && $current_taxonomy !== 'ubicacion') {
+                $ubicacion_slug = sanitize_text_field($_GET['ubicacion']);
+                // Verificar que el término existe antes de agregarlo
+                $term = get_term_by('slug', $ubicacion_slug, 'ubicacion');
+                if ($term && !is_wp_error($term)) {
                     $tax_query[] = array(
                         'taxonomy' => 'ubicacion',
                         'field' => 'slug',
                         'terms' => $ubicacion_slug,
                     );
+                    $has_tax_filters = true;
                 }
-                
-                // Solo agregar filtro de cultivo si no es la taxonomía actual
-                if (isset($_GET['cultivo']) && !empty($_GET['cultivo']) && $current_taxonomy !== 'cultivo') {
-                    $cultivo_slug = sanitize_text_field($_GET['cultivo']);
+            }
+            
+            // Solo agregar filtro de cultivo si no es la taxonomía actual
+            if (isset($_GET['cultivo']) && $_GET['cultivo'] !== '' && $current_taxonomy !== 'cultivo') {
+                $cultivo_slug = sanitize_text_field($_GET['cultivo']);
+                $term = get_term_by('slug', $cultivo_slug, 'cultivo');
+                if ($term && !is_wp_error($term)) {
                     $tax_query[] = array(
                         'taxonomy' => 'cultivo',
                         'field' => 'slug',
                         'terms' => $cultivo_slug,
                     );
+                    $has_tax_filters = true;
                 }
-                
-                // Solo agregar filtro de empresa si no es la taxonomía actual
-                if (isset($_GET['empresa']) && !empty($_GET['empresa']) && $current_taxonomy !== 'empresa') {
-                    $empresa_slug = sanitize_text_field($_GET['empresa']);
+            }
+            
+            // Solo agregar filtro de empresa si no es la taxonomía actual
+            if (isset($_GET['empresa']) && $_GET['empresa'] !== '' && $current_taxonomy !== 'empresa') {
+                $empresa_slug = sanitize_text_field($_GET['empresa']);
+                $term = get_term_by('slug', $empresa_slug, 'empresa');
+                if ($term && !is_wp_error($term)) {
                     $tax_query[] = array(
                         'taxonomy' => 'empresa',
                         'field' => 'slug',
                         'terms' => $empresa_slug,
                     );
+                    $has_tax_filters = true;
                 }
-                
-                if (!empty($tax_query)) {
-                    $query->set('tax_query', $tax_query);
-                }
-                
-                // Ordenar por fecha (más recientes primero)
-                $query->set('orderby', 'date');
-                $query->set('order', 'DESC');
             }
             
-            // Para búsquedas de trabajos
-            if (is_search() && isset($_GET['post_type']) && $_GET['post_type'] === 'trabajo') {
-                $query->set('post_type', 'trabajo');
-                
-                // Aplicar filtro de ubicación si existe
-                if (isset($_GET['ubicacion']) && !empty($_GET['ubicacion'])) {
-                    $ubicacion_slug = sanitize_text_field($_GET['ubicacion']);
+            // Solo aplicar tax_query si hay filtros válidos
+            if ($has_tax_filters && !empty($tax_query)) {
+                $query->set('tax_query', $tax_query);
+            }
+            
+            // Ordenar por fecha (más recientes primero)
+            $query->set('orderby', 'date');
+            $query->set('order', 'DESC');
+        }
+        
+        // Para búsquedas de trabajos
+        if (is_search() && isset($_GET['post_type']) && $_GET['post_type'] === 'trabajo') {
+            $query->set('post_type', 'trabajo');
+            $query->set('post_status', 'publish');
+            
+            // Aplicar filtro de ubicación si existe
+            if (isset($_GET['ubicacion']) && $_GET['ubicacion'] !== '') {
+                $ubicacion_slug = sanitize_text_field($_GET['ubicacion']);
+                $term = get_term_by('slug', $ubicacion_slug, 'ubicacion');
+                if ($term && !is_wp_error($term)) {
                     $tax_query = array(
                         array(
                             'taxonomy' => 'ubicacion',
@@ -390,14 +412,14 @@ if (!function_exists('agrochamba_modify_trabajo_archive_query')) {
                     );
                     $query->set('tax_query', $tax_query);
                 }
-                
-                // Ordenar por fecha (más recientes primero)
-                $query->set('orderby', 'date');
-                $query->set('order', 'DESC');
             }
+            
+            // Ordenar por fecha (más recientes primero)
+            $query->set('orderby', 'date');
+            $query->set('order', 'DESC');
         }
     }
-    add_action('pre_get_posts', 'agrochamba_modify_trabajo_archive_query');
+    add_action('pre_get_posts', 'agrochamba_modify_trabajo_archive_query', 10);
 }
 
 // ==========================================
