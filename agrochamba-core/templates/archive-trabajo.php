@@ -95,23 +95,34 @@ $show_welcome = isset($_GET['welcome']) && $_GET['welcome'] === '1';
                             <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
                             <circle cx="12" cy="10" r="3"/>
                         </svg>
-                        <select name="ubicacion" class="search-input search-select" onchange="this.form.submit()">
-                            <option value="" <?php echo empty($ubicacion_filter) ? 'selected' : ''; ?>>Todas las ubicaciones</option>
+                        <?php
+                        // Obtener URL base de trabajos
+                        $trabajos_archive_url = get_post_type_archive_link('trabajo');
+                        if (!$trabajos_archive_url) {
+                            $trabajos_archive_url = home_url('/trabajos/');
+                        }
+                        
+                        // Obtener ubicaciones
+                        $ubicaciones = get_terms(array(
+                            'taxonomy' => 'ubicacion',
+                            'hide_empty' => true,
+                            'number' => 50,
+                        ));
+                        ?>
+                        <select id="ubicacion-filter" class="search-input search-select" onchange="handleUbicacionChange(this)">
+                            <option value="<?php echo esc_url($trabajos_archive_url); ?>" <?php echo empty($ubicacion_filter) ? 'selected' : ''; ?>>Todas las ubicaciones</option>
                             <?php
-                            $ubicaciones = get_terms(array(
-                                'taxonomy' => 'ubicacion',
-                                'hide_empty' => true,
-                                'number' => 50,
-                            ));
-                            
                             if (!empty($ubicaciones) && !is_wp_error($ubicaciones)):
                                 foreach ($ubicaciones as $ubicacion):
+                                    $term_link = get_term_link($ubicacion);
+                                    if (!is_wp_error($term_link)):
                             ?>
-                                <option value="<?php echo esc_attr($ubicacion->slug); ?>" 
+                                <option value="<?php echo esc_url($term_link); ?>" 
                                         <?php selected($ubicacion_filter, $ubicacion->slug); ?>>
                                     <?php echo esc_html($ubicacion->name); ?>
                                 </option>
                             <?php 
+                                    endif;
                                 endforeach;
                             endif;
                             ?>
@@ -119,6 +130,20 @@ $show_welcome = isset($_GET['welcome']) && $_GET['welcome'] === '1';
                         <svg class="dropdown-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <polyline points="6 9 12 15 18 9"/>
                         </svg>
+                        <script>
+                        function handleUbicacionChange(select) {
+                            var url = select.value;
+                            if (url) {
+                                // Si hay un término de búsqueda, agregarlo a la URL
+                                var searchInput = document.querySelector('input[name="s"]');
+                                if (searchInput && searchInput.value.trim() !== '') {
+                                    var separator = url.indexOf('?') !== -1 ? '&' : '?';
+                                    url += separator + 's=' + encodeURIComponent(searchInput.value.trim()) + '&post_type=trabajo';
+                                }
+                                window.location.href = url;
+                            }
+                        }
+                        </script>
                     </div>
                     
                     <button type="submit" class="search-submit-btn">
