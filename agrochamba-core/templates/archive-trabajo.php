@@ -1721,6 +1721,29 @@ function toggleSave(jobId, button) {
 // La búsqueda ahora se maneja con el formulario HTML estándar
 // No necesitamos funciones JavaScript adicionales para los filtros
 
+// Asegurar que el selector de ubicación muestre el texto correcto
+document.addEventListener('DOMContentLoaded', function() {
+    const ubicacionSelect = document.querySelector('select[name="ubicacion"]');
+    if (ubicacionSelect) {
+        // Si el valor está vacío, asegurar que muestre "Todas las ubicaciones"
+        if (ubicacionSelect.value === '') {
+            const option = ubicacionSelect.querySelector('option[value=""]');
+            if (option) {
+                option.textContent = 'Todas las ubicaciones';
+            }
+        }
+        
+        // Asegurar que los botones de compartir y tres puntos siempre sean visibles
+        const shareButtons = document.querySelectorAll('.share-btn, .more-options-btn');
+        shareButtons.forEach(function(btn) {
+            if (btn) {
+                btn.style.display = '';
+                btn.style.visibility = 'visible';
+            }
+        });
+    }
+});
+
 // Función para compartir trabajo
 function shareJob(jobId, button) {
     const jobTitle = button.getAttribute('data-job-title');
