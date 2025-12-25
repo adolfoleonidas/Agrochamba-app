@@ -64,6 +64,8 @@ if (!AGROCHAMBA_USE_MODULE_LOADER) {
             '18-custom-user-panel.php',        // Panel de usuario personalizado
             '19-job-relevance-scoring.php',    // Sistema de scoring de relevancia
             '20-smart-job-sorting.php',        // Ordenamiento inteligente de trabajos
+            '21-personalized-recommendations.php', // Sistema de recomendaciones personalizadas
+            '22-company-analytics-dashboard.php',   // Dashboard de analytics para empresas
         );
 
         // Cargar cada módulo
