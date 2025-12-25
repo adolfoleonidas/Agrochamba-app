@@ -1636,10 +1636,10 @@ if (!function_exists('agrochamba_modify_ubicacion_term_link')) {
 }
 
 // ==========================================
-// 5.2. MANEJAR URLS /trabajos/{ubicacion}/ CORRECTAMENTE Y PREVENIR REDIRECCIONES
+// 5.2. PREVENIR REDIRECCIONES INCORRECTAS DE /trabajos/
 // ==========================================
-if (!function_exists('agrochamba_handle_trabajos_ubicacion_url')) {
-    function agrochamba_handle_trabajos_ubicacion_url() {
+if (!function_exists('agrochamba_prevent_trabajos_redirect')) {
+    function agrochamba_prevent_trabajos_redirect($wp) {
         // Solo en el frontend
         if (is_admin()) {
             return;
@@ -1652,24 +1652,35 @@ if (!function_exists('agrochamba_handle_trabajos_ubicacion_url')) {
         
         // Si es exactamente /trabajos/, asegurar que sea el archivo del post type
         if ($path === 'trabajos') {
-            // Verificar que realmente sea el archivo del post type
-            global $wp_query;
-            if (!$wp_query->is_post_type_archive('trabajo')) {
-                // Forzar que sea el archivo del post type
-                $wp_query->is_post_type_archive = true;
-                $wp_query->is_archive = true;
-                $wp_query->is_home = false;
-                $wp_query->is_tax = false;
-                $wp_query->is_singular = false;
-                $wp_query->set('post_type', 'trabajo');
-                $wp_query->set('post_status', 'publish');
-                // Limpiar cualquier query var de taxonomía
-                $wp_query->set('ubicacion', '');
-                $wp_query->set('taxonomy', '');
-                $wp_query->set('term', '');
-            }
+            // Forzar que sea el archivo del post type
+            $wp->query_vars['post_type'] = 'trabajo';
+            $wp->query_vars['post_status'] = 'publish';
+            // Limpiar cualquier query var que pueda causar redirección
+            unset($wp->query_vars['name']);
+            unset($wp->query_vars['p']);
+            unset($wp->query_vars['page_id']);
+            unset($wp->query_vars['ubicacion']);
+            unset($wp->query_vars['taxonomy']);
+            unset($wp->query_vars['term']);
+        }
+    }
+    add_action('parse_request', 'agrochamba_prevent_trabajos_redirect', 1);
+}
+
+// ==========================================
+// 5.3. MANEJAR URLS /trabajos/{ubicacion}/ CORRECTAMENTE
+// ==========================================
+if (!function_exists('agrochamba_handle_trabajos_ubicacion_url')) {
+    function agrochamba_handle_trabajos_ubicacion_url() {
+        // Solo en el frontend
+        if (is_admin()) {
             return;
         }
+        
+        // Obtener la URL actual
+        $request_uri = isset($_SERVER['REQUEST_URI']) ? esc_url_raw($_SERVER['REQUEST_URI']) : '';
+        $parsed_uri = parse_url($request_uri);
+        $path = isset($parsed_uri['path']) ? trim($parsed_uri['path'], '/') : '';
         
         // Si es /trabajos/{algo}/, verificar si es una ubicación válida
         if (strpos($path, 'trabajos/') === 0 && $path !== 'trabajos') {
@@ -1697,9 +1708,6 @@ if (!function_exists('agrochamba_handle_trabajos_ubicacion_url')) {
                     $wp_query->set('post_status', 'publish');
                     $wp_query->set('taxonomy', 'ubicacion');
                     $wp_query->set('term', $second_part);
-                } else {
-                    // No es una ubicación válida, podría ser un trabajo individual sin ubicación
-                    // Dejar que WordPress lo maneje normalmente
                 }
             }
         }
