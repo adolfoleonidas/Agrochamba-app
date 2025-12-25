@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowForwardIos
 import androidx.compose.material.icons.filled.Business
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Settings
@@ -372,29 +373,29 @@ fun EditJobScreen(
                 Spacer(Modifier.height(24.dp))
                 
                 // Ubicación y Empresa - al mismo nivel (campos básicos más importantes)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    // Selector de Ubicación
+                // Ubicación y Empresa - uno debajo del otro (igual que CreateJobScreen)
+                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    // Selector de Ubicación (arriba)
                     CategoryDropdown(
-                        label = "📍 Ubicación *",
+                        label = "Ubicación *",
                         items = uiState.ubicaciones,
                         selectedItem = selectedUbicacion,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.fillMaxWidth(),
+                        leadingIcon = Icons.Default.LocationOn
                     ) { cat -> selectedUbicacion = cat }
                     
-                    // Selector de Empresa - al mismo nivel
+                    Spacer(Modifier.height(12.dp))
+                    
+                    // Selector de Empresa (abajo) - SIEMPRE VISIBLE
                     val isAdmin = AuthManager.isUserAdmin()
                     if (isAdmin) {
                         // Admin: puede seleccionar cualquier empresa
                         CategoryDropdown(
-                            label = "🏢 Empresa *",
+                            label = "Empresa",
                             items = uiState.empresas,
                             selectedItem = selectedEmpresa,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.fillMaxWidth(),
+                            leadingIcon = Icons.Default.Business
                         ) { cat -> selectedEmpresa = cat }
                     } else {
                         // Empresa normal: mostrar su empresa (solo lectura)
@@ -403,8 +404,8 @@ fun EditJobScreen(
                             onValueChange = {},
                             readOnly = true,
                             enabled = false,
-                            label = { Text("🏢 Empresa") },
-                            modifier = Modifier.weight(1f),
+                            label = { Text("Empresa") },
+                            modifier = Modifier.fillMaxWidth(),
                             leadingIcon = { Icon(Icons.Default.Business, contentDescription = null) },
                             colors = TextFieldDefaults.colors(
                                 disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
