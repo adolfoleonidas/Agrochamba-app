@@ -64,7 +64,7 @@ if (!function_exists('agrochamba_registrar_cpt_trabajos')) {
             'supports'            => array('title', 'editor', 'thumbnail', 'excerpt', 'author', 'revisions', 'custom-fields', 'comments'),
             'has_archive'         => true,
             'rewrite'             => array(
-                'slug'       => 'trabajos/%ubicacion%',
+                'slug'       => 'trabajos',
                 'with_front' => false,
             ),
             'query_var'           => true,
@@ -195,8 +195,10 @@ if (!function_exists('agrochamba_load_trabajo_template')) {
 }
 
 // Cargar template personalizado para archive de trabajos
+// Prioridad alta para asegurar que se ejecute antes que Bricks Builder
 if (!function_exists('agrochamba_load_archive_trabajo_template')) {
     function agrochamba_load_archive_trabajo_template($template) {
+        // Verificar si es el archivo de trabajos o una taxonomía relacionada
         if (is_post_type_archive('trabajo') || is_tax('ubicacion') || is_tax('cultivo') || is_tax('empresa')) {
             $custom_template = AGROCHAMBA_TEMPLATES_DIR . '/archive-trabajo.php';
             if (file_exists($custom_template)) {
@@ -205,7 +207,24 @@ if (!function_exists('agrochamba_load_archive_trabajo_template')) {
         }
         return $template;
     }
-    add_filter('archive_template', 'agrochamba_load_archive_trabajo_template');
+    // Prioridad muy alta (1) para ejecutarse ANTES que otros temas/builders como Bricks
+    add_filter('archive_template', 'agrochamba_load_archive_trabajo_template', 1);
+}
+
+// Hook adicional para template_include (compatibilidad con Bricks Builder y otros builders)
+if (!function_exists('agrochamba_force_archive_trabajo_template')) {
+    function agrochamba_force_archive_trabajo_template($template) {
+        // Verificar si es el archivo de trabajos o una taxonomía relacionada
+        if (is_post_type_archive('trabajo') || is_tax('ubicacion') || is_tax('cultivo') || is_tax('empresa')) {
+            $custom_template = AGROCHAMBA_TEMPLATES_DIR . '/archive-trabajo.php';
+            if (file_exists($custom_template)) {
+                return $custom_template;
+            }
+        }
+        return $template;
+    }
+    // Prioridad muy alta (1) para ejecutarse ANTES que Bricks Builder
+    add_filter('template_include', 'agrochamba_force_archive_trabajo_template', 1);
 }
 
 // Cargar template personalizado para páginas de taxonomía (ubicacion, cultivo, empresa)
