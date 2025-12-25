@@ -219,13 +219,21 @@ if (!function_exists('agrochamba_force_archive_trabajo_template')) {
         $is_trabajo_archive = is_post_type_archive('trabajo');
         $is_trabajo_tax = is_tax('ubicacion') || is_tax('cultivo') || is_tax('empresa');
         
-        // Verificación adicional por URL
+        // Verificación adicional por URL (para casos donde WordPress no detecta correctamente)
         $request_uri = isset($_SERVER['REQUEST_URI']) ? esc_url_raw($_SERVER['REQUEST_URI']) : '';
-        $is_trabajos_url = (strpos($request_uri, '/trabajos/') !== false || $request_uri === '/trabajos');
+        $parsed_uri = parse_url($request_uri);
+        $path = isset($parsed_uri['path']) ? trim($parsed_uri['path'], '/') : '';
+        $is_trabajos_url = ($path === 'trabajos' || strpos($path, 'trabajos/') === 0);
         
         if ($is_trabajo_archive || $is_trabajo_tax || $is_trabajos_url) {
             $custom_template = AGROCHAMBA_TEMPLATES_DIR . '/archive-trabajo.php';
             if (file_exists($custom_template)) {
+                // Si Bricks Builder está activo, desactivar su template para esta página
+                if (defined('BRICKS_VERSION') || class_exists('Bricks\Builder')) {
+                    // Remover filtros de Bricks que puedan interferir
+                    remove_all_filters('bricks/builder/template');
+                    remove_all_filters('bricks/template');
+                }
                 return $custom_template;
             }
         }
@@ -337,8 +345,25 @@ if (!function_exists('agrochamba_add_mis_empresas_rewrite_rule')) {
 if (!function_exists('agrochamba_modify_trabajo_archive_query')) {
     function agrochamba_modify_trabajo_archive_query($query) {
         if (!is_admin() && $query->is_main_query()) {
+            // Verificación adicional por URL para detectar /trabajos/
+            $request_uri = isset($_SERVER['REQUEST_URI']) ? esc_url_raw($_SERVER['REQUEST_URI']) : '';
+            $parsed_uri = parse_url($request_uri);
+            $path = isset($parsed_uri['path']) ? trim($parsed_uri['path'], '/') : '';
+            $is_trabajos_url = ($path === 'trabajos' || strpos($path, 'trabajos/') === 0);
+            
             // Para archivos de trabajos y páginas de taxonomía relacionadas
-            if (is_post_type_archive('trabajo') || is_tax('ubicacion') || is_tax('cultivo') || is_tax('empresa')) {
+            if (is_post_type_archive('trabajo') || is_tax('ubicacion') || is_tax('cultivo') || is_tax('empresa') || $is_trabajos_url) {
+                // Si es /trabajos/ sin filtros, asegurar que se detecte como archivo de trabajos
+                if ($is_trabajos_url && !is_tax()) {
+                    $query->set('post_type', 'trabajo');
+                    $query->set('post_status', 'publish');
+                    // Sin filtros, no mostrar resultados (se mostrará la pantalla de búsqueda)
+                    if (empty($_GET['ubicacion']) && empty($_GET['cultivo']) && empty($_GET['empresa']) && empty($_GET['s'])) {
+                        // Establecer posts_per_page a 0 para no mostrar resultados
+                        // El template mostrará la pantalla de búsqueda
+                        $query->set('posts_per_page', 0);
+                    }
+                }
                 // Asegurar que solo se muestren trabajos en páginas de taxonomía
                 // IMPORTANTE: Esto debe hacerse ANTES de cualquier otra modificación
                 if (is_tax('ubicacion') || is_tax('cultivo') || is_tax('empresa')) {
