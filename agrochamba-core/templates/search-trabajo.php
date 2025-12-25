@@ -514,7 +514,18 @@ $orderby_filter = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']
         </div>
         
         <!-- Paginación -->
-        <?php if (paginate_links()): ?>
+        <?php 
+        global $wp_query;
+        $max_pages = $wp_query->max_num_pages;
+        $current_page = max(1, get_query_var('paged'));
+        
+        // Obtener filtros actuales
+        $ubicacion_filter = isset($_GET['ubicacion']) ? sanitize_text_field($_GET['ubicacion']) : '';
+        $cultivo_filter = isset($_GET['cultivo']) ? sanitize_text_field($_GET['cultivo']) : '';
+        $empresa_filter = isset($_GET['empresa']) ? sanitize_text_field($_GET['empresa']) : '';
+        $orderby_filter = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']) : 'date';
+        
+        if (paginate_links()): ?>
             <div class="trabajos-pagination">
                 <?php
                 echo paginate_links(array(
@@ -523,6 +534,27 @@ $orderby_filter = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']
                     'type' => 'list',
                 ));
                 ?>
+            </div>
+        <?php endif; ?>
+        
+        <!-- Botón Cargar Más -->
+        <?php if ($current_page < $max_pages): ?>
+            <div class="load-more-wrapper" style="text-align: center; margin-top: 30px;">
+                <button id="load-more-btn" class="load-more-btn" 
+                        data-current-page="<?php echo esc_attr($current_page); ?>"
+                        data-max-pages="<?php echo esc_attr($max_pages); ?>"
+                        data-ubicacion="<?php echo esc_attr($ubicacion_filter); ?>"
+                        data-cultivo="<?php echo esc_attr($cultivo_filter); ?>"
+                        data-empresa="<?php echo esc_attr($empresa_filter); ?>"
+                        data-search="<?php echo esc_attr(isset($_GET['s']) ? sanitize_text_field($_GET['s']) : ''); ?>"
+                        data-orderby="<?php echo esc_attr($orderby_filter); ?>">
+                    <span class="load-more-text">Cargar más trabajos</span>
+                    <span class="load-more-spinner" style="display: none;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                        </svg>
+                    </span>
+                </button>
             </div>
         <?php endif; ?>
     </div>
@@ -1056,9 +1088,75 @@ $orderby_filter = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']
     border-color: #0066cc;
 }
 
+/* Botón Cargar Más */
+.load-more-wrapper {
+    text-align: center;
+    margin-top: 40px;
+    margin-bottom: 40px;
+}
+
+.load-more-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 32px;
+    background: #4CAF50;
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+}
+
+.load-more-btn:hover:not(:disabled) {
+    background: #45a049;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(76, 175, 80, 0.4);
+}
+
+.load-more-btn:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.load-more-btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.load-more-text {
+    display: inline;
+}
+
+.load-more-spinner {
+    display: none;
+    animation: spin 1s linear infinite;
+}
+
+.load-more-spinner svg {
+    width: 20px;
+    height: 20px;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 @media (max-width: 768px) {
     .archive-title {
         font-size: 36px;
+    }
+    
+    .load-more-btn {
+        padding: 12px 24px;
+        font-size: 15px;
     }
     
     .archive-subtitle {
@@ -2180,6 +2278,118 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             }, 15000); // Actualizar cada 15 segundos para mejor sincronización
         }
+    });
+})();
+
+// Función para cargar más trabajos
+(function() {
+    const loadMoreBtn = document.getElementById('load-more-btn');
+    if (!loadMoreBtn) return;
+    
+    let isLoading = false;
+    
+    loadMoreBtn.addEventListener('click', function() {
+        if (isLoading) return;
+        
+        const currentPage = parseInt(this.getAttribute('data-current-page')) || 1;
+        const maxPages = parseInt(this.getAttribute('data-max-pages')) || 1;
+        const nextPage = currentPage + 1;
+        
+        if (nextPage > maxPages) {
+            this.style.display = 'none';
+            return;
+        }
+        
+        isLoading = true;
+        const btnText = this.querySelector('.load-more-text');
+        const btnSpinner = this.querySelector('.load-more-spinner');
+        
+        // Mostrar spinner
+        btnText.style.display = 'none';
+        btnSpinner.style.display = 'inline-block';
+        this.disabled = true;
+        
+        // Construir URL de la API
+        const params = new URLSearchParams({
+            page: nextPage
+        });
+        
+        const ubicacion = this.getAttribute('data-ubicacion');
+        const cultivo = this.getAttribute('data-cultivo');
+        const empresa = this.getAttribute('data-empresa');
+        const search = this.getAttribute('data-search');
+        const orderby = this.getAttribute('data-orderby');
+        
+        if (ubicacion) params.append('ubicacion', ubicacion);
+        if (cultivo) params.append('cultivo', cultivo);
+        if (empresa) params.append('empresa', empresa);
+        if (search) params.append('s', search);
+        if (orderby) params.append('orderby', orderby);
+        
+        const apiUrl = '<?php echo esc_url(rest_url('agrochamba/v1/jobs/load-more')); ?>?' + params.toString();
+        
+        fetch(apiUrl, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-WP-Nonce': '<?php echo wp_create_nonce('wp_rest'); ?>'
+            },
+            credentials: 'same-origin'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.html) {
+                // Insertar nuevo contenido en el grid
+                const grid = document.querySelector('.trabajos-grid');
+                if (grid) {
+                    // Crear un contenedor temporal para parsear el HTML
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = data.html;
+                    
+                    // Agregar cada card al grid
+                    const cards = tempDiv.querySelectorAll('.trabajo-card');
+                    cards.forEach(card => {
+                        grid.appendChild(card);
+                    });
+                    
+                    // Actualizar contadores de todas las cards nuevas
+                    cards.forEach(card => {
+                        const jobId = card.getAttribute('data-job-id');
+                        if (jobId) {
+                            refreshAllCounters(parseInt(jobId));
+                        }
+                    });
+                }
+                
+                // Actualizar página actual
+                this.setAttribute('data-current-page', nextPage);
+                
+                // Ocultar botón si no hay más páginas
+                if (!data.has_more || nextPage >= maxPages) {
+                    this.style.display = 'none';
+                } else {
+                    // Restaurar botón
+                    btnText.style.display = 'inline';
+                    btnSpinner.style.display = 'none';
+                    this.disabled = false;
+                }
+            } else {
+                // Ocultar botón si no hay más contenido
+                this.style.display = 'none';
+            }
+            
+            isLoading = false;
+        })
+        .catch(error => {
+            console.error('Error al cargar más trabajos:', error);
+            btnText.style.display = 'inline';
+            btnSpinner.style.display = 'none';
+            this.disabled = false;
+            isLoading = false;
+            
+            // Mostrar mensaje de error
+            alert('Error al cargar más trabajos. Por favor, intenta de nuevo.');
+        });
     });
 })();
 </script>

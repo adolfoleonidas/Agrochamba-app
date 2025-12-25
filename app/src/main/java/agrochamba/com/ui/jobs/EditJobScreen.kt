@@ -254,7 +254,9 @@ fun EditJobScreen(
                         // Agregar empresa_id solo si está presente (opcional)
                         empresaId?.let { jobData["empresa_id"] = it }
                         
-                        viewModel.updateJob(jobData, context)
+                        // Filtrar valores null y convertir a Map<String, Any>
+                        val finalJobData = jobData.filterValues { it != null }.mapValues { it.value!! }
+                        viewModel.updateJob(finalJobData, context)
                     } else {
                         // Para blogs (post) - NO requiere ubicación ni empresa
                         android.util.Log.d("EditJobScreen", "Actualizando BLOG - sin validar ubicación ni empresa")
@@ -267,7 +269,10 @@ fun EditJobScreen(
                         )
                         // Agregar categoría si está seleccionada
                         selectedCategoria?.id?.let { blogData["categories"] = listOf(it) }
-                        viewModel.updateJob(blogData, context)
+                        
+                        // Filtrar valores null y convertir a Map<String, Any>
+                        val finalBlogData = blogData.filterValues { it != null }.mapValues { it.value!! }
+                        viewModel.updateJob(finalBlogData, context)
                     }
                 },
                 onDelete = {
@@ -655,6 +660,7 @@ fun EditJobScreen(
                             checked = alimentacion,
                             onCheckedChange = { alimentacion = it }
                         )
+                    }
                     }
                 }
                 

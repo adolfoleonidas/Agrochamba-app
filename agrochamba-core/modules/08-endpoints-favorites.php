@@ -684,3 +684,404 @@ if (!function_exists('agrochamba_track_job_share')) {
     }
 }
 
+// ==========================================
+// ENDPOINT PARA CARGAR MÁS TRABAJOS (AJAX)
+// ==========================================
+if (!function_exists('agrochamba_register_load_more_endpoint')) {
+    function agrochamba_register_load_more_endpoint() {
+        register_rest_route('agrochamba/v1', '/jobs/load-more', array(
+            'methods' => 'GET',
+            'callback' => 'agrochamba_load_more_jobs',
+            'permission_callback' => '__return_true',
+            'args' => array(
+                'page' => array(
+                    'required' => true,
+                    'validate_callback' => function($param) {
+                        return is_numeric($param) && $param > 0;
+                    }
+                ),
+                'ubicacion' => array(
+                    'required' => false,
+                    'sanitize_callback' => 'sanitize_text_field',
+                ),
+                'cultivo' => array(
+                    'required' => false,
+                    'sanitize_callback' => 'sanitize_text_field',
+                ),
+                'empresa' => array(
+                    'required' => false,
+                    'sanitize_callback' => 'sanitize_text_field',
+                ),
+                's' => array(
+                    'required' => false,
+                    'sanitize_callback' => 'sanitize_text_field',
+                ),
+                'orderby' => array(
+                    'required' => false,
+                    'sanitize_callback' => 'sanitize_text_field',
+                    'default' => 'date',
+                ),
+            ),
+        ));
+    }
+    add_action('rest_api_init', 'agrochamba_register_load_more_endpoint');
+}
+
+if (!function_exists('agrochamba_load_more_jobs')) {
+    /**
+     * Endpoint para cargar más trabajos vía AJAX
+     */
+    function agrochamba_load_more_jobs($request) {
+        $page = intval($request->get_param('page'));
+        $ubicacion = $request->get_param('ubicacion');
+        $cultivo = $request->get_param('cultivo');
+        $empresa = $request->get_param('empresa');
+        $search = $request->get_param('s');
+        $orderby = $request->get_param('orderby') ?: 'date';
+        
+        // Configurar query args similar a archive-trabajo.php
+        $args = array(
+            'post_type' => 'trabajo',
+            'post_status' => 'publish',
+            'paged' => $page,
+            'posts_per_page' => get_option('posts_per_page', 12),
+        );
+        
+        // Aplicar filtros de taxonomía
+        $tax_query = array('relation' => 'AND');
+        
+        if (!empty($ubicacion)) {
+            $tax_query[] = array(
+                'taxonomy' => 'ubicacion',
+                'field' => 'slug',
+                'terms' => $ubicacion,
+            );
+        }
+        
+        if (!empty($cultivo)) {
+            $tax_query[] = array(
+                'taxonomy' => 'cultivo',
+                'field' => 'slug',
+                'terms' => $cultivo,
+            );
+        }
+        
+        if (!empty($empresa)) {
+            $tax_query[] = array(
+                'taxonomy' => 'empresa',
+                'field' => 'slug',
+                'terms' => $empresa,
+            );
+        }
+        
+        if (count($tax_query) > 1) {
+            $args['tax_query'] = $tax_query;
+        }
+        
+        // Búsqueda
+        if (!empty($search)) {
+            $args['s'] = $search;
+        }
+        
+        // Ordenamiento
+        if ($orderby === 'relevance') {
+            $args['meta_key'] = '_trabajo_relevance_score';
+            $args['orderby'] = 'meta_value_num';
+            $args['order'] = 'DESC';
+        } elseif ($orderby === 'smart') {
+            $args['meta_key'] = '_trabajo_smart_score';
+            $args['orderby'] = 'meta_value_num';
+            $args['order'] = 'DESC';
+        } else {
+            // Por defecto: más recientes
+            $args['orderby'] = 'date';
+            $args['order'] = 'DESC';
+        }
+        
+        $query = new WP_Query($args);
+        
+        if (!$query->have_posts()) {
+            return new WP_REST_Response(array(
+                'success' => false,
+                'html' => '',
+                'has_more' => false,
+                'message' => 'No hay más trabajos disponibles.'
+            ), 200);
+        }
+        
+        // Capturar el HTML de las cards
+        ob_start();
+        
+        while ($query->have_posts()): $query->the_post();
+            $trabajo_id = get_the_ID();
+            
+            // Obtener datos del trabajo (mismo código que archive-trabajo.php)
+            $salario_min = get_post_meta($trabajo_id, 'salario_min', true);
+            $salario_max = get_post_meta($trabajo_id, 'salario_max', true);
+            $vacantes = get_post_meta($trabajo_id, 'vacantes', true);
+            $alojamiento = get_post_meta($trabajo_id, 'alojamiento', true);
+            $transporte = get_post_meta($trabajo_id, 'transporte', true);
+            $alimentacion = get_post_meta($trabajo_id, 'alimentacion', true);
+            
+            // Obtener taxonomías
+            $ubicaciones = wp_get_post_terms($trabajo_id, 'ubicacion', array('fields' => 'names'));
+            $cultivos = wp_get_post_terms($trabajo_id, 'cultivo', array('fields' => 'names'));
+            $empresas = wp_get_post_terms($trabajo_id, 'empresa', array('fields' => 'names'));
+            
+            $ubicacion = !empty($ubicaciones) ? $ubicaciones[0] : '';
+            $cultivo = !empty($cultivos) ? $cultivos[0] : '';
+            $empresa = !empty($empresas) ? $empresas[0] : '';
+            
+            // Imagen destacada
+            $featured_image_id = get_post_thumbnail_id($trabajo_id);
+            $featured_image_url = $featured_image_id ? wp_get_attachment_image_url($featured_image_id, 'large') : null;
+            $featured_image_srcset = $featured_image_id ? wp_get_attachment_image_srcset($featured_image_id, 'large') : null;
+            $featured_image_sizes = $featured_image_id ? wp_get_attachment_image_sizes($featured_image_id, 'large') : null;
+            
+            // Calcular salario
+            $salario_text = '';
+            if ($salario_min && $salario_max) {
+                $salario_text = 'S/ ' . number_format($salario_min, 0, '.', ',') . ' - S/ ' . number_format($salario_max, 0, '.', ',');
+            } elseif ($salario_min) {
+                $salario_text = 'Desde S/ ' . number_format($salario_min, 0, '.', ',');
+            }
+            
+            // Badge
+            $badge = '';
+            $badge_class = '';
+            $post_date = get_the_date('U');
+            $days_old = (current_time('timestamp') - $post_date) / (60 * 60 * 24);
+            
+            if ($days_old <= 7) {
+                $badge = 'Nuevo';
+                $badge_class = 'badge-new';
+            } elseif (($vacantes && intval($vacantes) >= 5) || ($salario_min && intval($salario_min) >= 3000)) {
+                $badge = 'Urgente';
+                $badge_class = 'badge-urgent';
+            } elseif ($alojamiento || $transporte || $alimentacion) {
+                $badge = 'Con beneficios';
+                $badge_class = 'badge-benefits';
+            } elseif ($salario_min && intval($salario_min) >= 2000) {
+                $badge = 'Buen salario';
+                $badge_class = 'badge-salary';
+            }
+            
+            // Excerpt
+            $excerpt = get_the_excerpt();
+            if (empty($excerpt)) {
+                $excerpt = wp_trim_words(get_the_content(), 20);
+            }
+            
+            // Obtener contadores
+            $views = get_post_meta($trabajo_id, '_trabajo_views', true);
+            $views_count = intval($views);
+            if ($views_count < 0) {
+                $views_count = 0;
+            }
+            
+            // Contar favoritos
+            $favorites_count = 0;
+            $users = get_users(array('fields' => 'ID'));
+            foreach ($users as $user_id) {
+                $favorites = get_user_meta($user_id, 'favorite_jobs', true);
+                if (is_array($favorites) && in_array($trabajo_id, $favorites)) {
+                    $favorites_count++;
+                }
+            }
+            
+            // Contar guardados
+            $saved_count = 0;
+            foreach ($users as $user_id) {
+                $saved = get_user_meta($user_id, 'saved_jobs', true);
+                if (is_array($saved) && in_array($trabajo_id, $saved)) {
+                    $saved_count++;
+                }
+            }
+            
+            // Contar comentarios
+            $comments_count = get_comments_number($trabajo_id);
+            
+            // Contar compartidos
+            $shared_count = intval(get_post_meta($trabajo_id, '_trabajo_shared_count', true) ?: 0);
+            
+            // Estado del usuario actual
+            $is_favorite = false;
+            $is_saved = false;
+            if (is_user_logged_in()) {
+                $current_user_id = get_current_user_id();
+                $user_favorites = get_user_meta($current_user_id, 'favorite_jobs', true);
+                $user_saved = get_user_meta($current_user_id, 'saved_jobs', true);
+                
+                if (is_array($user_favorites) && in_array($trabajo_id, $user_favorites)) {
+                    $is_favorite = true;
+                }
+                if (is_array($user_saved) && in_array($trabajo_id, $user_saved)) {
+                    $is_saved = true;
+                }
+            }
+            
+            // Renderizar card HTML directamente
+            $job_title = get_the_title();
+            $job_permalink = get_permalink();
+            $job_time = human_time_diff(get_the_time('U'), current_time('timestamp')) . ' atrás';
+            
+            // Generar HTML de la card
+            $card_html = '<article class="trabajo-card" data-job-id="' . esc_attr($trabajo_id) . '">';
+            $card_html .= '<a href="' . esc_url($job_permalink) . '" class="trabajo-card-link">';
+            
+            // Imagen
+            if ($featured_image_url) {
+                $card_html .= '<div class="trabajo-card-image">';
+                $card_html .= '<img src="' . esc_url($featured_image_url) . '" alt="' . esc_attr($job_title) . '"';
+                if ($featured_image_srcset) {
+                    $card_html .= ' srcset="' . esc_attr($featured_image_srcset) . '"';
+                }
+                if ($featured_image_sizes) {
+                    $card_html .= ' sizes="' . esc_attr($featured_image_sizes) . '"';
+                }
+                $card_html .= ' loading="lazy">';
+                if ($badge) {
+                    $card_html .= '<span class="trabajo-badge ' . esc_attr($badge_class) . '">' . esc_html($badge) . '</span>';
+                }
+                $card_html .= '</div>';
+            } else {
+                $card_html .= '<div class="trabajo-card-image-placeholder">';
+                $card_html .= '<svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>';
+                if ($badge) {
+                    $card_html .= '<span class="trabajo-badge ' . esc_attr($badge_class) . '">' . esc_html($badge) . '</span>';
+                }
+                $card_html .= '</div>';
+            }
+            
+            // Contenido
+            $card_html .= '<div class="trabajo-card-content">';
+            $card_html .= '<h2 class="trabajo-card-title">' . esc_html($job_title) . '</h2>';
+            
+            if ($empresa) {
+                $card_html .= '<div class="trabajo-card-empresa">';
+                $card_html .= '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>';
+                $card_html .= '<span>' . esc_html($empresa) . '</span></div>';
+            }
+            
+            $card_html .= '<div class="trabajo-card-info">';
+            if ($ubicacion) {
+                $card_html .= '<div class="info-item">';
+                $card_html .= '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>';
+                $card_html .= '<span>' . esc_html($ubicacion) . '</span></div>';
+            }
+            if ($salario_text) {
+                $card_html .= '<div class="info-item">';
+                $card_html .= '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>';
+                $card_html .= '<span>' . esc_html($salario_text) . '</span></div>';
+            }
+            $card_html .= '</div>';
+            
+            if ($excerpt) {
+                $card_html .= '<p class="trabajo-card-excerpt">' . esc_html(wp_trim_words($excerpt, 15)) . '</p>';
+            }
+            
+            $card_html .= '<div class="trabajo-card-footer">';
+            $card_html .= '<span class="trabajo-card-date">' . esc_html($job_time) . '</span>';
+            if ($vacantes && intval($vacantes) > 1) {
+                $card_html .= '<span class="trabajo-card-vacantes">' . esc_html($vacantes) . ' vacantes</span>';
+            }
+            $card_html .= '</div></div></a>';
+            
+            // Interacciones
+            $card_html .= '<div class="trabajo-card-interactions">';
+            $card_html .= '<div class="interaction-counters">';
+            $card_html .= '<div class="counter-group">';
+            $card_html .= '<span class="counter-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>';
+            $card_html .= '<span class="counter-value" data-counter="likes">' . esc_html($favorites_count) . '</span></span>';
+            $card_html .= '<span class="counter-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
+            $card_html .= '<span class="counter-value" data-counter="comments">' . esc_html($comments_count) . '</span></span>';
+            if ($shared_count > 0) {
+                $card_html .= '<span class="counter-item"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>';
+                $card_html .= '<span class="counter-value" data-counter="shared">' . esc_html($shared_count) . '</span></span>';
+            }
+            $card_html .= '</div>';
+            $card_html .= '<div class="counter-group">';
+            $card_html .= '<span class="counter-item views-counter"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+            $card_html .= '<span class="counter-value" data-counter="views">' . esc_html($views_count) . '</span></span>';
+            $card_html .= '</div></div>';
+            
+            // Botones de acción
+            $card_html .= '<div class="interaction-buttons">';
+            if (is_user_logged_in()) {
+                $like_class = $is_favorite ? 'active' : '';
+                $like_fill = $is_favorite ? 'currentColor' : 'none';
+                $card_html .= '<button class="interaction-btn like-btn ' . $like_class . '" data-job-id="' . esc_attr($trabajo_id) . '" onclick="event.preventDefault(); toggleLike(' . esc_js($trabajo_id) . ', this);">';
+                $card_html .= '<svg width="20" height="20" viewBox="0 0 24 24" fill="' . $like_fill . '" stroke="currentColor" stroke-width="2"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>';
+                $card_html .= '<span class="btn-text">Me gusta</span>';
+                if ($favorites_count > 0) {
+                    $card_html .= '<span class="btn-count" data-count="' . esc_attr($favorites_count) . '">' . esc_html($favorites_count) . '</span>';
+                }
+                $card_html .= '</button>';
+                
+                $card_html .= '<a href="' . esc_url($job_permalink . '#comments') . '" class="interaction-btn comment-btn">';
+                $card_html .= '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
+                $card_html .= '<span class="btn-text">Comentar</span>';
+                if ($comments_count > 0) {
+                    $card_html .= '<span class="btn-count">' . esc_html($comments_count) . '</span>';
+                }
+                $card_html .= '</a>';
+                
+                $card_html .= '<button class="interaction-btn share-btn" data-job-id="' . esc_attr($trabajo_id) . '" data-job-title="' . esc_attr($job_title) . '" data-job-url="' . esc_url($job_permalink) . '" onclick="event.preventDefault(); shareJob(' . esc_js($trabajo_id) . ', this);">';
+                $card_html .= '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M15 14l4 -4l-4 -4" /><path d="M19 10h-11a4 4 0 1 0 0 8h1" /></svg>';
+                $card_html .= '<span class="btn-text">Compartir</span></button>';
+                
+                $save_class = $is_saved ? 'active' : '';
+                $save_fill = $is_saved ? 'currentColor' : 'none';
+                $card_html .= '<div class="more-options-wrapper">';
+                $card_html .= '<button class="interaction-btn more-options-btn" onclick="event.preventDefault(); toggleMoreOptions(this);">';
+                $card_html .= '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>';
+                $card_html .= '</button>';
+                $card_html .= '<div class="more-options-menu" style="display: none;">';
+                $card_html .= '<button class="more-options-item save-btn-menu ' . $save_class . '" data-job-id="' . esc_attr($trabajo_id) . '" onclick="event.preventDefault(); toggleSave(' . esc_js($trabajo_id) . ', this);">';
+                $card_html .= '<svg width="18" height="18" viewBox="0 0 24 24" fill="' . $save_fill . '" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>';
+                $card_html .= '<span>' . ($is_saved ? 'Guardado' : 'Guardar') . '</span></button></div></div>';
+            } else {
+                $card_html .= '<a href="' . esc_url(wp_login_url($job_permalink)) . '" class="interaction-btn like-btn">';
+                $card_html .= '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>';
+                $card_html .= '<span class="btn-text">Me gusta</span>';
+                if ($favorites_count > 0) {
+                    $card_html .= '<span class="btn-count" data-count="' . esc_attr($favorites_count) . '">' . esc_html($favorites_count) . '</span>';
+                }
+                $card_html .= '</a>';
+                
+                $card_html .= '<a href="' . esc_url(wp_login_url($job_permalink . '#comments')) . '" class="interaction-btn comment-btn">';
+                $card_html .= '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
+                $card_html .= '<span class="btn-text">Comentar</span>';
+                if ($comments_count > 0) {
+                    $card_html .= '<span class="btn-count">' . esc_html($comments_count) . '</span>';
+                }
+                $card_html .= '</a>';
+                
+                $card_html .= '<button class="interaction-btn share-btn" data-job-id="' . esc_attr($trabajo_id) . '" data-job-title="' . esc_attr($job_title) . '" data-job-url="' . esc_url($job_permalink) . '" onclick="event.preventDefault(); shareJob(' . esc_js($trabajo_id) . ', this);">';
+                $card_html .= '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M15 14l4 -4l-4 -4" /><path d="M19 10h-11a4 4 0 1 0 0 8h1" /></svg>';
+                $card_html .= '<span class="btn-text">Compartir</span></button>';
+                
+                $card_html .= '<div class="more-options-wrapper">';
+                $card_html .= '<a href="' . esc_url(wp_login_url($job_permalink)) . '" class="interaction-btn more-options-btn">';
+                $card_html .= '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>';
+                $card_html .= '</a></div>';
+            }
+            $card_html .= '</div></div></article>';
+            
+            echo $card_html;
+        endwhile;
+        
+        wp_reset_postdata();
+        
+        $html = ob_get_clean();
+        
+        return new WP_REST_Response(array(
+            'success' => true,
+            'html' => $html,
+            'has_more' => $page < $query->max_num_pages,
+            'current_page' => $page,
+            'max_pages' => $query->max_num_pages,
+        ), 200);
+    }
+}
+
