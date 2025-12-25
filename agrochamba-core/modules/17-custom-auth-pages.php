@@ -263,12 +263,9 @@ if (!function_exists('agrochamba_handle_custom_registration')) {
         $user_pass = isset($_POST['user_pass']) ? $_POST['user_pass'] : '';
         $user_role = isset($_POST['user_role']) ? sanitize_text_field($_POST['user_role']) : 'subscriber';
         
-        // Campos adicionales para empresas
+        // Campos adicionales para empresas (simplificados como en la app móvil)
+        $ruc = isset($_POST['ruc']) ? sanitize_text_field($_POST['ruc']) : '';
         $company_name = isset($_POST['company_name']) ? sanitize_text_field($_POST['company_name']) : '';
-        $company_description = isset($_POST['company_description']) ? sanitize_textarea_field($_POST['company_description']) : '';
-        $company_phone = isset($_POST['company_phone']) ? sanitize_text_field($_POST['company_phone']) : '';
-        $company_address = isset($_POST['company_address']) ? sanitize_text_field($_POST['company_address']) : '';
-        $company_website = isset($_POST['company_website']) ? esc_url_raw($_POST['company_website']) : '';
 
         // Validaciones
         if (empty($user_login) || empty($user_email) || empty($user_pass)) {
@@ -304,10 +301,17 @@ if (!function_exists('agrochamba_handle_custom_registration')) {
         }
         
         // Validar campos adicionales para empresas
-        if ($user_role === 'employer' && empty($company_name)) {
-            $register_url = get_page_by_path('registro') ? get_permalink(get_page_by_path('registro')->ID) : wp_registration_url();
-            wp_redirect(add_query_arg('registration', 'failed', $register_url));
-            exit;
+        if ($user_role === 'employer') {
+            if (empty($ruc) || strlen($ruc) !== 11 || !is_numeric($ruc)) {
+                $register_url = get_page_by_path('registro') ? get_permalink(get_page_by_path('registro')->ID) : wp_registration_url();
+                wp_redirect(add_query_arg('registration', 'failed', $register_url));
+                exit;
+            }
+            if (empty($company_name)) {
+                $register_url = get_page_by_path('registro') ? get_permalink(get_page_by_path('registro')->ID) : wp_registration_url();
+                wp_redirect(add_query_arg('registration', 'failed', $register_url));
+                exit;
+            }
         }
 
         // Crear usuario
@@ -348,18 +352,12 @@ if (!function_exists('agrochamba_handle_custom_registration')) {
                 update_post_meta($empresa_id, '_empresa_user_id', $user_id);
                 update_user_meta($user_id, 'empresa_cpt_id', $empresa_id);
                 
-                // Guardar información adicional de la empresa en user meta
-                if (!empty($company_description)) {
-                    update_user_meta($user_id, 'company_description', $company_description);
+                // Guardar información adicional de la empresa en user meta (RUC y Razón Social)
+                if (!empty($ruc)) {
+                    update_user_meta($user_id, 'ruc', $ruc);
                 }
-                if (!empty($company_phone)) {
-                    update_user_meta($user_id, 'company_phone', $company_phone);
-                }
-                if (!empty($company_address)) {
-                    update_user_meta($user_id, 'company_address', $company_address);
-                }
-                if (!empty($company_website)) {
-                    update_user_meta($user_id, 'company_website', $company_website);
+                if (!empty($company_name)) {
+                    update_user_meta($user_id, 'razon_social', $company_name);
                 }
                 
                 // Crear término de taxonomía empresa

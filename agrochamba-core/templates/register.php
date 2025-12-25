@@ -546,10 +546,51 @@ html.bricks-html {
             </div>
         </div>
 
-        <h1 class="auth-title">Crea tu cuenta</h1>
-        <p class="auth-subtitle">Únete a AgroChamba y encuentra tu próximo trabajo</p>
+        <!-- Modal de selección de tipo de cuenta -->
+        <div id="account-type-modal" class="account-type-modal">
+            <div class="modal-overlay" onclick="closeAccountTypeModal()"></div>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title">Únete a AgroChamba</h2>
+                    <p class="modal-subtitle">Elige tu tipo de cuenta para empezar</p>
+                </div>
+                <div class="modal-options">
+                    <button class="modal-option-btn" onclick="selectAccountType('subscriber')">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                            <circle cx="12" cy="7" r="4"/>
+                        </svg>
+                        <div class="option-content">
+                            <span class="option-title">Busco Chamba</span>
+                            <small class="option-subtitle">Soy trabajador</small>
+                        </div>
+                    </button>
+                    <button class="modal-option-btn" onclick="selectAccountType('employer')">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                            <line x1="9" y1="3" x2="9" y2="21"/>
+                        </svg>
+                        <div class="option-content">
+                            <span class="option-title">Busco Talentos</span>
+                            <small class="option-subtitle">Soy empresa</small>
+                        </div>
+                    </button>
+                </div>
+                <button class="modal-close-btn" onclick="closeAccountTypeModal()">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
 
-        <div class="auth-form-wrapper">
+        <!-- Formulario de registro (oculto inicialmente) -->
+        <div id="register-form-container" class="register-form-container" style="display: none;">
+            <h1 class="auth-title" id="register-title">Crea tu cuenta</h1>
+            <p class="auth-subtitle" id="register-subtitle">Únete a AgroChamba y encuentra tu próximo trabajo</p>
+
+            <div class="auth-form-wrapper">
             <?php if ($register_error): ?>
                 <div class="auth-error-message">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -620,43 +661,27 @@ html.bricks-html {
                     </button>
                 </div>
 
-                <div class="form-group">
-                    <label for="user_role" class="form-label">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                            <circle cx="9" cy="7" r="4"/>
-                            <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
-                        </svg>
-                        Tipo de cuenta
-                    </label>
-                    <div class="role-selector">
-                        <label class="role-option">
-                            <input type="radio" name="user_role" value="subscriber" checked id="role_subscriber">
-                            <div class="role-card">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                                    <circle cx="12" cy="7" r="4"/>
-                                </svg>
-                                <span>Trabajador</span>
-                                <small>Busco trabajo</small>
-                            </div>
-                        </label>
-                        <label class="role-option">
-                            <input type="radio" name="user_role" value="employer" id="role_employer">
-                            <div class="role-card">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                                    <line x1="9" y1="3" x2="9" y2="21"/>
-                                </svg>
-                                <span>Empresa</span>
-                                <small>Publico ofertas</small>
-                            </div>
-                        </label>
-                    </div>
-                </div>
+                <!-- Campo oculto para el rol seleccionado -->
+                <input type="hidden" name="user_role" id="user_role" value="">
 
-                <!-- Campos adicionales para empresas -->
+                <!-- Campos adicionales para empresas (simplificados como en la app móvil) -->
                 <div id="company-fields" class="company-fields" style="display: none;">
+                    <div class="form-group">
+                        <svg class="form-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                            <line x1="9" y1="3" x2="9" y2="21"/>
+                        </svg>
+                        <input 
+                            type="text" 
+                            name="ruc" 
+                            id="ruc" 
+                            class="form-input" 
+                            placeholder="RUC"
+                            autocomplete="off"
+                            pattern="[0-9]{11}"
+                            maxlength="11">
+                    </div>
+
                     <div class="form-group">
                         <svg class="form-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
@@ -667,67 +692,8 @@ html.bricks-html {
                             name="company_name" 
                             id="company_name" 
                             class="form-input" 
-                            placeholder="Nombre de la empresa"
+                            placeholder="Razón Social"
                             autocomplete="organization">
-                    </div>
-
-                    <div class="form-group">
-                        <svg class="form-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                            <polyline points="14 2 14 8 20 8"/>
-                            <line x1="16" y1="13" x2="8" y2="13"/>
-                            <line x1="16" y1="17" x2="8" y2="17"/>
-                            <polyline points="10 9 9 9 8 9"/>
-                        </svg>
-                        <textarea 
-                            name="company_description" 
-                            id="company_description" 
-                            class="form-input" 
-                            placeholder="Descripción de la empresa (opcional)"
-                            rows="3"
-                            style="min-height: 80px; resize: vertical;"></textarea>
-                    </div>
-
-                    <div class="form-group">
-                        <svg class="form-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
-                        </svg>
-                        <input 
-                            type="tel" 
-                            name="company_phone" 
-                            id="company_phone" 
-                            class="form-input" 
-                            placeholder="Teléfono de contacto (opcional)"
-                            autocomplete="tel">
-                    </div>
-
-                    <div class="form-group">
-                        <svg class="form-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
-                            <circle cx="12" cy="10" r="3"/>
-                        </svg>
-                        <input 
-                            type="text" 
-                            name="company_address" 
-                            id="company_address" 
-                            class="form-input" 
-                            placeholder="Dirección (opcional)"
-                            autocomplete="street-address">
-                    </div>
-
-                    <div class="form-group">
-                        <svg class="form-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="10"/>
-                            <line x1="2" y1="12" x2="22" y2="12"/>
-                            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-                        </svg>
-                        <input 
-                            type="url" 
-                            name="company_website" 
-                            id="company_website" 
-                            class="form-input" 
-                            placeholder="Sitio web (opcional)"
-                            autocomplete="url">
                     </div>
                 </div>
 
@@ -748,6 +714,7 @@ html.bricks-html {
 
             <div class="auth-footer">
                 <p>¿Ya tienes una cuenta? <a href="<?php echo esc_url(wp_login_url()); ?>" class="auth-link">Inicia sesión</a></p>
+            </div>
             </div>
         </div>
     </div>
@@ -836,9 +803,171 @@ html.bricks-html {
     line-height: 1.5;
 }
 
+/* Modal de selección de tipo de cuenta */
+.account-type-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 100000;
+    align-items: center;
+    justify-content: center;
+}
+
+.account-type-modal.active {
+    display: flex;
+}
+
+.modal-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+}
+
+.modal-content {
+    position: relative;
+    background: #fff;
+    border-radius: 20px;
+    padding: 32px;
+    max-width: 420px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    animation: modalSlideUp 0.3s ease-out;
+}
+
+@keyframes modalSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.modal-header {
+    text-align: center;
+    margin-bottom: 32px;
+}
+
+.modal-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: #000;
+    margin: 0 0 8px 0;
+}
+
+.modal-subtitle {
+    font-size: 16px;
+    color: #666;
+    margin: 0;
+}
+
+.modal-options {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.modal-option-btn {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 20px;
+    border: 2px solid #e0e0e0;
+    border-radius: 16px;
+    background: #fff;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+    width: 100%;
+}
+
+.modal-option-btn:hover {
+    border-color: #2d5016;
+    background: rgba(45, 80, 22, 0.05);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(45, 80, 22, 0.15);
+}
+
+.modal-option-btn svg {
+    color: #2d5016;
+    flex-shrink: 0;
+}
+
+.option-content {
+    flex: 1;
+}
+
+.option-title {
+    display: block;
+    font-size: 18px;
+    font-weight: 600;
+    color: #000;
+    margin-bottom: 4px;
+}
+
+.option-subtitle {
+    display: block;
+    font-size: 14px;
+    color: #666;
+}
+
+.modal-close-btn {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 36px;
+    height: 36px;
+    border: none;
+    background: #f5f5f5;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: #666;
+}
+
+.modal-close-btn:hover {
+    background: #e0e0e0;
+    color: #000;
+}
+
+.register-form-container {
+    width: 100%;
+}
+
 @media (max-width: 480px) {
-    .role-selector {
-        grid-template-columns: 1fr;
+    .modal-content {
+        padding: 24px;
+        border-radius: 16px;
+    }
+    
+    .modal-title {
+        font-size: 24px;
+    }
+    
+    .modal-subtitle {
+        font-size: 14px;
+    }
+    
+    .modal-option-btn {
+        padding: 16px;
+    }
+    
+    .option-title {
+        font-size: 16px;
     }
     
     .company-fields {
@@ -908,40 +1037,89 @@ function togglePassword(inputId, button) {
     }
 }
 
-// Mostrar/ocultar campos de empresa según el tipo de cuenta seleccionado
-document.addEventListener('DOMContentLoaded', function() {
-    const roleInputs = document.querySelectorAll('input[name="user_role"]');
+// Funciones para manejar el modal de selección de tipo de cuenta
+function showAccountTypeModal() {
+    const modal = document.getElementById('account-type-modal');
+    if (modal) {
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+}
+
+function closeAccountTypeModal() {
+    const modal = document.getElementById('account-type-modal');
+    if (modal) {
+        modal.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+}
+
+function selectAccountType(role) {
+    const roleInput = document.getElementById('user_role');
+    const registerFormContainer = document.getElementById('register-form-container');
     const companyFields = document.getElementById('company-fields');
+    const registerTitle = document.getElementById('register-title');
+    const registerSubtitle = document.getElementById('register-subtitle');
+    const companyNameInput = document.getElementById('company_name');
+    const rucInput = document.getElementById('ruc');
     
-    function toggleCompanyFields() {
-        const selectedRole = document.querySelector('input[name="user_role"]:checked')?.value;
-        if (selectedRole === 'employer') {
+    if (roleInput && registerFormContainer) {
+        roleInput.value = role;
+        
+        // Mostrar formulario
+        registerFormContainer.style.display = 'block';
+        
+        // Cerrar modal
+        closeAccountTypeModal();
+        
+        // Scroll al formulario
+        setTimeout(() => {
+            registerFormContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+        
+        if (role === 'employer') {
+            // Configurar para empresa
+            registerTitle.textContent = 'Registro para Empresas';
+            registerSubtitle.textContent = 'Completa los datos para crear tu cuenta empresarial';
             companyFields.style.display = 'block';
-            // Hacer campos requeridos si es empresa
-            const companyNameInput = document.getElementById('company_name');
-            if (companyNameInput) {
-                companyNameInput.required = true;
-            }
+            if (companyNameInput) companyNameInput.required = true;
+            if (rucInput) rucInput.required = true;
         } else {
+            // Configurar para trabajador
+            registerTitle.textContent = 'Crea tu cuenta';
+            registerSubtitle.textContent = 'Únete a AgroChamba y encuentra tu próximo trabajo';
             companyFields.style.display = 'none';
-            // Remover requerido si no es empresa
-            const companyNameInput = document.getElementById('company_name');
-            if (companyNameInput) {
-                companyNameInput.required = false;
-            }
+            if (companyNameInput) companyNameInput.required = false;
+            if (rucInput) rucInput.required = false;
         }
     }
-    
-    roleInputs.forEach(input => {
-        input.addEventListener('change', toggleCompanyFields);
-    });
-    
-    // Ejecutar al cargar la página
-    toggleCompanyFields();
-});
+}
 
-// Manejar envío del formulario
+// Manejar envío del formulario y mostrar modal
 document.addEventListener('DOMContentLoaded', function() {
+    // Verificar si hay parámetro en URL para mostrar directamente el formulario
+    const urlParams = new URLSearchParams(window.location.search);
+    const roleParam = urlParams.get('role');
+    
+    if (roleParam === 'subscriber' || roleParam === 'employer') {
+        // Mostrar formulario directamente
+        selectAccountType(roleParam);
+    } else {
+        // Mostrar modal de selección
+        showAccountTypeModal();
+    }
+    
+    // Cerrar modal al hacer clic fuera
+    const modal = document.getElementById('account-type-modal');
+    if (modal) {
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal || e.target.classList.contains('modal-overlay')) {
+                closeAccountTypeModal();
+            }
+        });
+    }
+    
+    // Manejar envío del formulario
     const form = document.getElementById('registerform');
     if (form) {
         form.addEventListener('submit', function(e) {
@@ -951,8 +1129,17 @@ document.addEventListener('DOMContentLoaded', function() {
             const userPass = document.getElementById('user_pass').value.trim();
             const terms = document.getElementById('terms').checked;
             
-            const userRole = document.querySelector('input[name="user_role"]:checked')?.value;
+            const userRole = document.getElementById('user_role').value;
             const companyName = document.getElementById('company_name')?.value.trim();
+            const ruc = document.getElementById('ruc')?.value.trim();
+            
+            // Validar que se haya seleccionado un tipo de cuenta
+            if (!userRole) {
+                e.preventDefault();
+                alert('Por favor, selecciona un tipo de cuenta.');
+                showAccountTypeModal();
+                return false;
+            }
             
             // Validaciones básicas
             if (!userLogin || !userEmail || !userPass) {
@@ -974,10 +1161,17 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             // Validaciones adicionales para empresas
-            if (userRole === 'employer' && !companyName) {
-                e.preventDefault();
-                alert('Por favor, ingresa el nombre de la empresa.');
-                return false;
+            if (userRole === 'employer') {
+                if (!ruc || ruc.length !== 11 || !/^\d+$/.test(ruc)) {
+                    e.preventDefault();
+                    alert('Por favor, ingresa un RUC válido (11 dígitos).');
+                    return false;
+                }
+                if (!companyName) {
+                    e.preventDefault();
+                    alert('Por favor, ingresa la razón social de la empresa.');
+                    return false;
+                }
             }
             
             // Mostrar estado de carga
