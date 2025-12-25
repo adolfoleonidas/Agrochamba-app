@@ -2133,7 +2133,7 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(response => response.json())
         .then(data => {
-            if (data.likes !== undefined || data.comments !== undefined || data.views !== undefined) {
+            if (data.likes !== undefined || data.comments !== undefined || data.views !== undefined || data.shared !== undefined) {
                 updateAllCounters(jobId, data);
             }
         })
