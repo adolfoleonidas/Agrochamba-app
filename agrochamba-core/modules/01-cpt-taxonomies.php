@@ -215,7 +215,15 @@ if (!function_exists('agrochamba_load_archive_trabajo_template')) {
 if (!function_exists('agrochamba_force_archive_trabajo_template')) {
     function agrochamba_force_archive_trabajo_template($template) {
         // Verificar si es el archivo de trabajos o una taxonomía relacionada
-        if (is_post_type_archive('trabajo') || is_tax('ubicacion') || is_tax('cultivo') || is_tax('empresa')) {
+        // Usar múltiples métodos de detección para asegurar compatibilidad
+        $is_trabajo_archive = is_post_type_archive('trabajo');
+        $is_trabajo_tax = is_tax('ubicacion') || is_tax('cultivo') || is_tax('empresa');
+        
+        // Verificación adicional por URL
+        $request_uri = isset($_SERVER['REQUEST_URI']) ? esc_url_raw($_SERVER['REQUEST_URI']) : '';
+        $is_trabajos_url = (strpos($request_uri, '/trabajos/') !== false || $request_uri === '/trabajos');
+        
+        if ($is_trabajo_archive || $is_trabajo_tax || $is_trabajos_url) {
             $custom_template = AGROCHAMBA_TEMPLATES_DIR . '/archive-trabajo.php';
             if (file_exists($custom_template)) {
                 return $custom_template;
