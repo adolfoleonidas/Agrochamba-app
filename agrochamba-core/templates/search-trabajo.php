@@ -40,7 +40,7 @@ $ubicacion_filter = isset($_GET['ubicacion']) ? sanitize_text_field($_GET['ubica
                         <input type="text" 
                                name="s" 
                                class="search-input" 
-                               placeholder="Puesto o palabra clave"
+                               placeholder="Busca por empresa, puesto o palabra clave"
                                value="<?php echo esc_attr($search_query); ?>">
                     </div>
                     
@@ -50,7 +50,7 @@ $ubicacion_filter = isset($_GET['ubicacion']) ? sanitize_text_field($_GET['ubica
                             <circle cx="12" cy="10" r="3"/>
                         </svg>
                         <select name="ubicacion" class="search-input search-select" onchange="this.form.submit()">
-                            <option value="">Seleccionando todas las ubicaciones</option>
+                            <option value="">Todas las ubicaciones</option>
                             <?php
                             $ubicaciones = get_terms(array(
                                 'taxonomy' => 'ubicacion',
