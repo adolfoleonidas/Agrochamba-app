@@ -1467,6 +1467,9 @@ function toggleLike(jobId, button) {
     });
 }
 
+// Variable global para almacenar listeners de menús
+const menuClickListeners = new Map();
+
 function toggleSave(jobId, button) {
     <?php if (!is_user_logged_in()): ?>
         alert('Debes iniciar sesión para guardar trabajos');
@@ -1536,6 +1539,12 @@ function toggleSave(jobId, button) {
                 const menu = btn.closest('.more-options-menu');
                 if (menu) {
                     menu.style.display = 'none';
+                    // Eliminar listener cuando se cierra desde toggleSave
+                    if (menuClickListeners.has(menu)) {
+                        const listener = menuClickListeners.get(menu);
+                        document.removeEventListener('click', listener);
+                        menuClickListeners.delete(menu);
+                    }
                 }
             }
         } else {
@@ -1895,17 +1904,37 @@ function toggleMoreOptions(button) {
     if (menu.style.display === 'none' || !menu.style.display) {
         menu.style.display = 'block';
         
+        // Eliminar listener anterior si existe
+        if (menuClickListeners.has(menu)) {
+            const oldListener = menuClickListeners.get(menu);
+            document.removeEventListener('click', oldListener);
+            menuClickListeners.delete(menu);
+        }
+        
         // Cerrar menú al hacer clic fuera
+        const closeMenuOnClickOutside = function(e) {
+            // No cerrar si el clic es dentro del menú o en el botón
+            if (!menu.contains(e.target) && e.target !== button && !button.contains(e.target)) {
+                menu.style.display = 'none';
+                document.removeEventListener('click', closeMenuOnClickOutside);
+                menuClickListeners.delete(menu);
+            }
+        };
+        
+        // Guardar referencia al listener
+        menuClickListeners.set(menu, closeMenuOnClickOutside);
+        
         setTimeout(() => {
-            document.addEventListener('click', function closeMenuOnClickOutside(e) {
-                if (!menu.contains(e.target) && e.target !== button) {
-                    menu.style.display = 'none';
-                    document.removeEventListener('click', closeMenuOnClickOutside);
-                }
-            });
+            document.addEventListener('click', closeMenuOnClickOutside);
         }, 100);
     } else {
         menu.style.display = 'none';
+        // Eliminar listener cuando se cierra manualmente
+        if (menuClickListeners.has(menu)) {
+            const listener = menuClickListeners.get(menu);
+            document.removeEventListener('click', listener);
+            menuClickListeners.delete(menu);
+        }
     }
 }
 
@@ -1916,9 +1945,15 @@ function closeAllMenus() {
         menu.remove();
     });
     
-    // Cerrar menús de tres puntos
+    // Cerrar menús de tres puntos y eliminar listeners
     document.querySelectorAll('.more-options-menu').forEach(menu => {
         menu.style.display = 'none';
+        // Eliminar listener si existe
+        if (menuClickListeners.has(menu)) {
+            const listener = menuClickListeners.get(menu);
+            document.removeEventListener('click', listener);
+            menuClickListeners.delete(menu);
+        }
     });
 }
 </script>
