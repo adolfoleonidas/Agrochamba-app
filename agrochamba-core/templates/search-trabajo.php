@@ -39,9 +39,20 @@ $ubicacion_filter = isset($_GET['ubicacion']) ? sanitize_text_field($_GET['ubica
                         </svg>
                         <input type="text" 
                                name="s" 
+                               id="search-input-field"
                                class="search-input" 
                                placeholder="Busca por empresa, puesto o palabra clave"
                                value="<?php echo esc_attr($search_query); ?>">
+                        <button type="button" 
+                                class="search-clear-btn" 
+                                id="search-clear-btn"
+                                onclick="clearSearchInput()"
+                                style="<?php echo !empty($search_query) ? 'display: flex;' : 'display: none;'; ?>">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="18" y1="6" x2="6" y2="18"/>
+                                <line x1="6" y1="6" x2="18" y2="18"/>
+                            </svg>
+                        </button>
                     </div>
                     
                     <div class="search-input-wrapper location-wrapper">
@@ -577,7 +588,7 @@ $ubicacion_filter = isset($_GET['ubicacion']) ? sanitize_text_field($_GET['ubica
 
 .search-input {
     width: 100%;
-    padding: 16px 16px 16px 48px;
+    padding: 16px 40px 16px 48px;
     border: 2px solid #e0e0e0;
     border-radius: 12px;
     font-size: 16px;
@@ -585,6 +596,36 @@ $ubicacion_filter = isset($_GET['ubicacion']) ? sanitize_text_field($_GET['ubica
     color: #333;
     transition: all 0.3s;
     outline: none;
+}
+
+.search-clear-btn {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #999;
+    transition: color 0.2s;
+    z-index: 2;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+}
+
+.search-clear-btn:hover {
+    background: #f0f0f0;
+    color: #333;
+}
+
+.search-clear-btn svg {
+    width: 16px;
+    height: 16px;
 }
 
 .search-input:focus {
@@ -1664,8 +1705,57 @@ function closeAllMenus() {
     });
 }
 
+// Función para limpiar el campo de búsqueda
+function clearSearchInput() {
+    const searchInput = document.getElementById('search-input-field');
+    const clearBtn = document.getElementById('search-clear-btn');
+    
+    if (searchInput) {
+        searchInput.value = '';
+        searchInput.focus();
+        
+        // Ocultar botón de limpiar
+        if (clearBtn) {
+            clearBtn.style.display = 'none';
+        }
+        
+        // Enviar formulario para limpiar resultados
+        const form = searchInput.closest('form');
+        if (form) {
+            form.submit();
+        }
+    }
+}
+
+// Función para mostrar/ocultar botón de limpiar según el contenido
+function toggleClearButton() {
+    const searchInput = document.getElementById('search-input-field');
+    const clearBtn = document.getElementById('search-clear-btn');
+    
+    if (searchInput && clearBtn) {
+        if (searchInput.value.trim() !== '') {
+            clearBtn.style.display = 'flex';
+        } else {
+            clearBtn.style.display = 'none';
+        }
+    }
+}
+
 // Asegurar que los botones de compartir y menú de tres puntos siempre sean visibles
 document.addEventListener('DOMContentLoaded', function() {
+    // Configurar campo de búsqueda
+    const searchInput = document.getElementById('search-input-field');
+    const clearBtn = document.getElementById('search-clear-btn');
+    
+    if (searchInput && clearBtn) {
+        // Mostrar/ocultar botón según contenido inicial
+        toggleClearButton();
+        
+        // Escuchar cambios en el campo de búsqueda
+        searchInput.addEventListener('input', toggleClearButton);
+        searchInput.addEventListener('keyup', toggleClearButton);
+    }
+    
     // Forzar visibilidad de botones de interacción
     const interactionButtons = document.querySelectorAll('.interaction-buttons');
     interactionButtons.forEach(function(container) {
