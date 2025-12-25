@@ -2605,19 +2605,276 @@ $rest_url = rest_url('agrochamba/v1/');
             if (response.ok) {
                 const job = await response.json();
                 
-                // Llenar formulario de edición (simplificado - copiar campos del formulario de crear)
-                document.getElementById('edit-job-id').value = jobId;
+                // Cambiar a tab de editar
+                showTab('editar-trabajo');
                 
-                // Por ahora, redirigir a crear trabajo con datos precargados
-                // TODO: Implementar formulario de edición completo
-                showTab('crear-trabajo');
-                alert('Funcionalidad de edición en desarrollo. Por ahora, puedes crear un nuevo trabajo.');
+                // Clonar el formulario de crear trabajo para editar
+                const createForm = document.getElementById('publicar-trabajo-form');
+                const editFormContent = document.getElementById('edit-job-form-content');
+                
+                if (createForm && editFormContent) {
+                    // Clonar el formulario completo
+                    const formClone = createForm.cloneNode(true);
+                    formClone.id = 'edit-trabajo-form-clone';
+                    
+                    // Llenar con datos del trabajo
+                    const titleInput = formClone.querySelector('#job-title');
+                    if (titleInput) {
+                        titleInput.value = job.title?.rendered || job.title || '';
+                        // Disparar evento para actualizar contador
+                        titleInput.dispatchEvent(new Event('input'));
+                    }
+                    
+                    // Llenar descripción en TipTap (se inicializará después)
+                    const descriptionTextarea = formClone.querySelector('#job-description');
+                    if (descriptionTextarea) {
+                        descriptionTextarea.value = job.content?.rendered || job.content || '';
+                    }
+                    
+                    // Llenar selectores
+                    if (job.ubicacion?.id) {
+                        const ubicacionSelect = formClone.querySelector('#job-ubicacion');
+                        if (ubicacionSelect) ubicacionSelect.value = job.ubicacion.id;
+                    }
+                    
+                    if (job.empresa?.id) {
+                        const empresaSelect = formClone.querySelector('#job-empresa');
+                        if (empresaSelect) empresaSelect.value = job.empresa.id;
+                    }
+                    
+                    if (job.cultivo?.id) {
+                        const cultivoSelect = formClone.querySelector('#job-cultivo');
+                        if (cultivoSelect) cultivoSelect.value = job.cultivo.id;
+                    }
+                    
+                    if (job.tipo_puesto?.id) {
+                        const tipoPuestoSelect = formClone.querySelector('#job-tipo-puesto');
+                        if (tipoPuestoSelect) tipoPuestoSelect.value = job.tipo_puesto.id;
+                    }
+                    
+                    // Llenar campos numéricos
+                    if (job.salario_min) {
+                        const salarioMinInput = formClone.querySelector('#job-salario-min');
+                        if (salarioMinInput) salarioMinInput.value = job.salario_min;
+                    }
+                    
+                    if (job.salario_max) {
+                        const salarioMaxInput = formClone.querySelector('#job-salario-max');
+                        if (salarioMaxInput) salarioMaxInput.value = job.salario_max;
+                    }
+                    
+                    if (job.vacantes) {
+                        const vacantesInput = formClone.querySelector('#job-vacantes');
+                        if (vacantesInput) vacantesInput.value = job.vacantes;
+                    }
+                    
+                    // Llenar checkboxes de beneficios
+                    if (job.alojamiento) {
+                        const alojamientoCheck = formClone.querySelector('input[name="alojamiento"]');
+                        if (alojamientoCheck) alojamientoCheck.checked = true;
+                    }
+                    
+                    if (job.transporte) {
+                        const transporteCheck = formClone.querySelector('input[name="transporte"]');
+                        if (transporteCheck) transporteCheck.checked = true;
+                    }
+                    
+                    if (job.alimentacion) {
+                        const alimentacionCheck = formClone.querySelector('input[name="alimentacion"]');
+                        if (alimentacionCheck) alimentacionCheck.checked = true;
+                    }
+                    
+                    // Comentarios habilitados
+                    const comentariosCheck = formClone.querySelector('input[name="comentarios_habilitados"]');
+                    if (comentariosCheck) {
+                        comentariosCheck.checked = job.comentarios_habilitados !== false;
+                    }
+                    
+                    // Reemplazar contenido del formulario de edición
+                    editFormContent.innerHTML = '';
+                    editFormContent.appendChild(formClone);
+                    
+                    // Inicializar TipTap para el editor clonado
+                    const clonedTiptapEditor = formClone.querySelector('#tiptap-editor');
+                    const clonedDescriptionTextarea = formClone.querySelector('#job-description');
+                    
+                    if (clonedTiptapEditor && clonedDescriptionTextarea && window.tiptap) {
+                        // Inicializar TipTap con el contenido existente
+                        setTimeout(() => {
+                            initializeTipTapEditor(clonedTiptapEditor, clonedDescriptionTextarea, job.content?.rendered || job.content || '');
+                        }, 100);
+                    }
+                    
+                    // Configurar submit del formulario de edición
+                    formClone.addEventListener('submit', async function(e) {
+                        e.preventDefault();
+                        
+                        const submitBtn = document.getElementById('update-submit-btn');
+                        const btnText = submitBtn.querySelector('.btn-text');
+                        const btnSpinner = submitBtn.querySelector('.btn-spinner');
+                        const errorMsg = document.getElementById('update-error-message');
+                        const successMsg = document.getElementById('update-success-message');
+                        
+                        errorMsg.style.display = 'none';
+                        successMsg.style.display = 'none';
+                        
+                        // Obtener datos del formulario clonado
+                        const title = formClone.querySelector('#job-title').value.trim();
+                        let description = '';
+                        
+                        // Obtener contenido de TipTap si está disponible
+                        const clonedEditor = window.editJobEditor;
+                        if (clonedEditor) {
+                            description = clonedEditor.getHTML().trim();
+                        } else {
+                            description = clonedDescriptionTextarea.value.trim();
+                        }
+                        
+                        if (!title || !description) {
+                            errorMsg.textContent = 'Título y descripción son obligatorios';
+                            errorMsg.style.display = 'block';
+                            return;
+                        }
+                        
+                        submitBtn.disabled = true;
+                        btnText.style.display = 'none';
+                        btnSpinner.style.display = 'inline-block';
+                        
+                        try {
+                            const formData = new FormData(formClone);
+                            const updateData = {
+                                title: title,
+                                content: description,
+                                ubicacion_id: formClone.querySelector('#job-ubicacion')?.value || null,
+                                empresa_id: formClone.querySelector('#job-empresa')?.value || null,
+                                salario_min: parseInt(formData.get('salario_min')) || 0,
+                                salario_max: parseInt(formData.get('salario_max')) || 0,
+                                vacantes: parseInt(formData.get('vacantes')) || 1,
+                                cultivo_id: formClone.querySelector('#job-cultivo')?.value || null,
+                                tipo_puesto_id: formClone.querySelector('#job-tipo-puesto')?.value || null,
+                                alojamiento: formData.get('alojamiento') === '1' ? 1 : 0,
+                                transporte: formData.get('transporte') === '1' ? 1 : 0,
+                                alimentacion: formData.get('alimentacion') === '1' ? 1 : 0,
+                                comentarios_habilitados: formData.get('comentarios_habilitados') === '1' ? 1 : 0
+                            };
+                            
+                            const updateResponse = await fetch(restUrl + 'jobs/' + jobId, {
+                                method: 'PUT',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-WP-Nonce': restNonce
+                                },
+                                credentials: 'same-origin',
+                                body: JSON.stringify(updateData)
+                            });
+                            
+                            const result = await updateResponse.json();
+                            
+                            if (result.success || updateResponse.ok) {
+                                successMsg.textContent = 'Trabajo actualizado exitosamente';
+                                successMsg.style.display = 'block';
+                                
+                                // Recargar lista y estadísticas
+                                setTimeout(() => {
+                                    loadMyJobs();
+                                    loadDashboardStats();
+                                    showTab('mis-trabajos');
+                                }, 1500);
+                            } else {
+                                errorMsg.textContent = result.message || 'Error al actualizar el trabajo';
+                                errorMsg.style.display = 'block';
+                            }
+                        } catch (error) {
+                            console.error('Error:', error);
+                            errorMsg.textContent = 'Error de conexión. Por favor, intenta nuevamente.';
+                            errorMsg.style.display = 'block';
+                        } finally {
+                            submitBtn.disabled = false;
+                            btnText.style.display = 'inline';
+                            btnSpinner.style.display = 'none';
+                        }
+                    });
+                }
+            } else {
+                alert('Error al cargar el trabajo');
             }
         } catch (error) {
             console.error('Error loading job:', error);
-            alert('Error al cargar el trabajo');
+            alert('Error de conexión');
         }
     };
+    
+    // Función auxiliar para inicializar TipTap en el editor de edición
+    function initializeTipTapEditor(element, textarea, initialContent) {
+        if (!window.tiptap || !window.tiptap.Editor) {
+            // Si TipTap no está cargado, usar textarea normal
+            textarea.style.display = 'block';
+            return;
+        }
+        
+        const Editor = window.tiptap?.Editor || window.Editor;
+        const StarterKit = window.tiptapStarterKit?.StarterKit || window.StarterKit;
+        const Underline = window.tiptapUnderline?.Underline || window.Underline;
+        
+        if (!Editor || !StarterKit) return;
+        
+        const extensions = [StarterKit.configure({
+            heading: false,
+            code: false,
+            codeBlock: false,
+            blockquote: false,
+            horizontalRule: false,
+        })];
+        
+        if (Underline) {
+            extensions.push(Underline);
+        }
+        
+        window.editJobEditor = new Editor({
+            element: element,
+            extensions: extensions,
+            content: initialContent,
+            editorProps: {
+                attributes: {
+                    class: 'tiptap-content',
+                    'data-placeholder': 'Una descripción detallada permite obtener más visitas...',
+                },
+            },
+            onUpdate: ({ editor }) => {
+                textarea.value = editor.getHTML();
+            },
+        });
+        
+        // Configurar toolbar del editor clonado
+        const toolbar = element.parentElement.querySelector('.tiptap-toolbar');
+        if (toolbar) {
+            const toolbarButtons = toolbar.querySelectorAll('.tiptap-btn');
+            toolbarButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const action = btn.getAttribute('data-action');
+                    switch (action) {
+                        case 'bold':
+                            window.editJobEditor.chain().focus().toggleBold().run();
+                            break;
+                        case 'italic':
+                            window.editJobEditor.chain().focus().toggleItalic().run();
+                            break;
+                        case 'underline':
+                            if (window.editJobEditor.can().toggleUnderline()) {
+                                window.editJobEditor.chain().focus().toggleUnderline().run();
+                            }
+                            break;
+                        case 'bulletList':
+                            window.editJobEditor.chain().focus().toggleBulletList().run();
+                            break;
+                        case 'orderedList':
+                            window.editJobEditor.chain().focus().toggleOrderedList().run();
+                            break;
+                    }
+                });
+            });
+        }
+    }
     
     // Eliminar trabajo
     window.deleteJob = async function(jobId) {
