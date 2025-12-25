@@ -57,6 +57,9 @@ if (!function_exists('agrochamba_track_job_view')) {
             add_post_meta($post_id, '_trabajo_views', $views, true);
         }
         
+        // Disparar hook para recalcular score de relevancia
+        do_action('agrochamba_job_view_counted', $post_id);
+        
         return $views;
     }
     

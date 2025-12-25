@@ -83,6 +83,9 @@ if (!function_exists('agrochamba_toggle_favorite')) {
         }
 
         update_user_meta($user_id, 'favorite_jobs', $favorites);
+        
+        // Disparar hook para recalcular score de relevancia
+        do_action('agrochamba_favorite_toggled', $job_id);
 
         return new WP_REST_Response(array(
             'success' => true,
@@ -166,6 +169,9 @@ if (!function_exists('agrochamba_toggle_saved')) {
         }
 
         update_user_meta($user_id, 'saved_jobs', $saved);
+        
+        // Disparar hook para recalcular score de relevancia
+        do_action('agrochamba_saved_toggled', $job_id);
 
         return new WP_REST_Response(array(
             'success' => true,
