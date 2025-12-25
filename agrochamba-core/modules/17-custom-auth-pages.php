@@ -262,6 +262,13 @@ if (!function_exists('agrochamba_handle_custom_registration')) {
         $user_email = isset($_POST['user_email']) ? sanitize_email($_POST['user_email']) : '';
         $user_pass = isset($_POST['user_pass']) ? $_POST['user_pass'] : '';
         $user_role = isset($_POST['user_role']) ? sanitize_text_field($_POST['user_role']) : 'subscriber';
+        
+        // Campos adicionales para empresas
+        $company_name = isset($_POST['company_name']) ? sanitize_text_field($_POST['company_name']) : '';
+        $company_description = isset($_POST['company_description']) ? sanitize_textarea_field($_POST['company_description']) : '';
+        $company_phone = isset($_POST['company_phone']) ? sanitize_text_field($_POST['company_phone']) : '';
+        $company_address = isset($_POST['company_address']) ? sanitize_text_field($_POST['company_address']) : '';
+        $company_website = isset($_POST['company_website']) ? esc_url_raw($_POST['company_website']) : '';
 
         // Validaciones
         if (empty($user_login) || empty($user_email) || empty($user_pass)) {
@@ -295,6 +302,13 @@ if (!function_exists('agrochamba_handle_custom_registration')) {
         if (!in_array($user_role, $allowed_roles)) {
             $user_role = 'subscriber'; // Por defecto
         }
+        
+        // Validar campos adicionales para empresas
+        if ($user_role === 'employer' && empty($company_name)) {
+            $register_url = get_page_by_path('registro') ? get_permalink(get_page_by_path('registro')->ID) : wp_registration_url();
+            wp_redirect(add_query_arg('registration', 'failed', $register_url));
+            exit;
+        }
 
         // Crear usuario
         $user_id = wp_create_user($user_login, $user_pass, $user_email);
@@ -310,9 +324,18 @@ if (!function_exists('agrochamba_handle_custom_registration')) {
 
         // Si es employer, crear perfil de empresa automáticamente
         if ($user_role === 'employer') {
+            // Usar nombre de empresa si está disponible, sino usar user_login
+            $empresa_display_name = !empty($company_name) ? $company_name : $user_login;
+            
+            // Actualizar display_name del usuario con el nombre de la empresa
+            wp_update_user(array(
+                'ID' => $user_id,
+                'display_name' => $empresa_display_name
+            ));
+            
             // Crear CPT Empresa asociado
             $empresa_post = array(
-                'post_title' => $user_login,
+                'post_title' => $empresa_display_name,
                 'post_type' => 'empresa',
                 'post_status' => 'publish',
                 'post_author' => $user_id,
@@ -325,13 +348,27 @@ if (!function_exists('agrochamba_handle_custom_registration')) {
                 update_post_meta($empresa_id, '_empresa_user_id', $user_id);
                 update_user_meta($user_id, 'empresa_cpt_id', $empresa_id);
                 
+                // Guardar información adicional de la empresa en user meta
+                if (!empty($company_description)) {
+                    update_user_meta($user_id, 'company_description', $company_description);
+                }
+                if (!empty($company_phone)) {
+                    update_user_meta($user_id, 'company_phone', $company_phone);
+                }
+                if (!empty($company_address)) {
+                    update_user_meta($user_id, 'company_address', $company_address);
+                }
+                if (!empty($company_website)) {
+                    update_user_meta($user_id, 'company_website', $company_website);
+                }
+                
                 // Crear término de taxonomía empresa
                 $empresa_term = wp_insert_term(
-                    $user_login,
+                    $empresa_display_name,
                     'empresa',
                     array(
-                        'description' => 'Empresa: ' . $user_login,
-                        'slug' => sanitize_title($user_login)
+                        'description' => !empty($company_description) ? $company_description : 'Empresa: ' . $empresa_display_name,
+                        'slug' => sanitize_title($empresa_display_name)
                     )
                 );
                 

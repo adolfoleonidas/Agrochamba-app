@@ -631,7 +631,7 @@ html.bricks-html {
                     </label>
                     <div class="role-selector">
                         <label class="role-option">
-                            <input type="radio" name="user_role" value="subscriber" checked>
+                            <input type="radio" name="user_role" value="subscriber" checked id="role_subscriber">
                             <div class="role-card">
                                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
@@ -642,7 +642,7 @@ html.bricks-html {
                             </div>
                         </label>
                         <label class="role-option">
-                            <input type="radio" name="user_role" value="employer">
+                            <input type="radio" name="user_role" value="employer" id="role_employer">
                             <div class="role-card">
                                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
@@ -652,6 +652,82 @@ html.bricks-html {
                                 <small>Publico ofertas</small>
                             </div>
                         </label>
+                    </div>
+                </div>
+
+                <!-- Campos adicionales para empresas -->
+                <div id="company-fields" class="company-fields" style="display: none;">
+                    <div class="form-group">
+                        <svg class="form-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                            <line x1="9" y1="3" x2="9" y2="21"/>
+                        </svg>
+                        <input 
+                            type="text" 
+                            name="company_name" 
+                            id="company_name" 
+                            class="form-input" 
+                            placeholder="Nombre de la empresa"
+                            autocomplete="organization">
+                    </div>
+
+                    <div class="form-group">
+                        <svg class="form-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                            <line x1="16" y1="13" x2="8" y2="13"/>
+                            <line x1="16" y1="17" x2="8" y2="17"/>
+                            <polyline points="10 9 9 9 8 9"/>
+                        </svg>
+                        <textarea 
+                            name="company_description" 
+                            id="company_description" 
+                            class="form-input" 
+                            placeholder="Descripción de la empresa (opcional)"
+                            rows="3"
+                            style="min-height: 80px; resize: vertical;"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <svg class="form-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                        </svg>
+                        <input 
+                            type="tel" 
+                            name="company_phone" 
+                            id="company_phone" 
+                            class="form-input" 
+                            placeholder="Teléfono de contacto (opcional)"
+                            autocomplete="tel">
+                    </div>
+
+                    <div class="form-group">
+                        <svg class="form-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                            <circle cx="12" cy="10" r="3"/>
+                        </svg>
+                        <input 
+                            type="text" 
+                            name="company_address" 
+                            id="company_address" 
+                            class="form-input" 
+                            placeholder="Dirección (opcional)"
+                            autocomplete="street-address">
+                    </div>
+
+                    <div class="form-group">
+                        <svg class="form-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <line x1="2" y1="12" x2="22" y2="12"/>
+                            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                        </svg>
+                        <input 
+                            type="url" 
+                            name="company_website" 
+                            id="company_website" 
+                            class="form-input" 
+                            placeholder="Sitio web (opcional)"
+                            autocomplete="url">
                     </div>
                 </div>
 
@@ -731,9 +807,43 @@ html.bricks-html {
     border-color: #2d5016;
 }
 
+.company-fields {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 2px solid #e0e0e0;
+    animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.company-fields .form-group {
+    margin-bottom: 18px;
+}
+
+.company-fields textarea.form-input {
+    padding-top: 16px;
+    padding-bottom: 16px;
+    font-family: inherit;
+    line-height: 1.5;
+}
+
 @media (max-width: 480px) {
     .role-selector {
         grid-template-columns: 1fr;
+    }
+    
+    .company-fields {
+        margin-top: 16px;
+        padding-top: 16px;
     }
 }
 </style>
@@ -798,6 +908,38 @@ function togglePassword(inputId, button) {
     }
 }
 
+// Mostrar/ocultar campos de empresa según el tipo de cuenta seleccionado
+document.addEventListener('DOMContentLoaded', function() {
+    const roleInputs = document.querySelectorAll('input[name="user_role"]');
+    const companyFields = document.getElementById('company-fields');
+    
+    function toggleCompanyFields() {
+        const selectedRole = document.querySelector('input[name="user_role"]:checked')?.value;
+        if (selectedRole === 'employer') {
+            companyFields.style.display = 'block';
+            // Hacer campos requeridos si es empresa
+            const companyNameInput = document.getElementById('company_name');
+            if (companyNameInput) {
+                companyNameInput.required = true;
+            }
+        } else {
+            companyFields.style.display = 'none';
+            // Remover requerido si no es empresa
+            const companyNameInput = document.getElementById('company_name');
+            if (companyNameInput) {
+                companyNameInput.required = false;
+            }
+        }
+    }
+    
+    roleInputs.forEach(input => {
+        input.addEventListener('change', toggleCompanyFields);
+    });
+    
+    // Ejecutar al cargar la página
+    toggleCompanyFields();
+});
+
 // Manejar envío del formulario
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('registerform');
@@ -809,10 +951,13 @@ document.addEventListener('DOMContentLoaded', function() {
             const userPass = document.getElementById('user_pass').value.trim();
             const terms = document.getElementById('terms').checked;
             
-            // Validaciones
+            const userRole = document.querySelector('input[name="user_role"]:checked')?.value;
+            const companyName = document.getElementById('company_name')?.value.trim();
+            
+            // Validaciones básicas
             if (!userLogin || !userEmail || !userPass) {
                 e.preventDefault();
-                alert('Por favor, completa todos los campos.');
+                alert('Por favor, completa todos los campos obligatorios.');
                 return false;
             }
             
@@ -825,6 +970,13 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!terms) {
                 e.preventDefault();
                 alert('Debes aceptar los términos y condiciones.');
+                return false;
+            }
+            
+            // Validaciones adicionales para empresas
+            if (userRole === 'employer' && !companyName) {
+                e.preventDefault();
+                alert('Por favor, ingresa el nombre de la empresa.');
                 return false;
             }
             
