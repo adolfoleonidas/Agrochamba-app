@@ -2080,14 +2080,22 @@ function shareJob(jobId, button) {
         .then(() => {
             console.log('Compartido exitosamente');
             trackShare(); // Registrar el compartido
+            // NO mostrar el modal del plugin si el sistema nativo funcionó
         })
         .catch((error) => {
-            console.log('Error al compartir:', error);
-            // Si falla, mostrar menú de opciones
-            showShareMenu(button, jobTitle, jobUrl, jobText, trackShare);
+            // Solo mostrar el modal si el usuario canceló explícitamente (error.name === 'AbortError')
+            // o si hay un error real (no es solo cancelación)
+            if (error.name !== 'AbortError') {
+                console.log('Error al compartir:', error);
+                // Si falla por un error real (no cancelación), mostrar menú de opciones
+                showShareMenu(button, jobTitle, jobUrl, jobText, trackShare);
+            } else {
+                // Si el usuario canceló, solo registrar silenciosamente
+                console.log('Usuario canceló el compartido');
+            }
         });
     } else {
-        // Fallback: mostrar menú de opciones de compartir
+        // Fallback: mostrar menú de opciones de compartir solo si Web Share API no está disponible
         showShareMenu(button, jobTitle, jobUrl, jobText, trackShare);
     }
 }
@@ -2107,7 +2115,7 @@ function showShareMenu(button, jobTitle, jobUrl, jobText, trackShareCallback) {
                target="_blank" 
                rel="noopener noreferrer"
                class="share-option"
-               onclick="closeAllMenus(); ${trackShareCallback ? trackShareCallback.toString() + '();' : ''}">
+               onclick="closeAllMenus();">
                 <div class="share-option-icon facebook">f</div>
                 <div class="share-option-label">Facebook</div>
             </a>
@@ -2115,7 +2123,7 @@ function showShareMenu(button, jobTitle, jobUrl, jobText, trackShareCallback) {
                target="_blank" 
                rel="noopener noreferrer"
                class="share-option"
-               onclick="closeAllMenus(); ${trackShareCallback ? trackShareCallback.toString() + '();' : ''}">
+               onclick="closeAllMenus();">
                 <div class="share-option-icon whatsapp">W</div>
                 <div class="share-option-label">WhatsApp</div>
             </a>
@@ -2123,12 +2131,12 @@ function showShareMenu(button, jobTitle, jobUrl, jobText, trackShareCallback) {
                target="_blank" 
                rel="noopener noreferrer"
                class="share-option"
-               onclick="closeAllMenus(); ${trackShareCallback ? trackShareCallback.toString() + '();' : ''}">
+               onclick="closeAllMenus();">
                 <div class="share-option-icon twitter">t</div>
                 <div class="share-option-label">Twitter</div>
             </a>
             <button class="share-option" 
-                    onclick="copyToClipboard('${jobUrl.replace(/'/g, "\\'")}'); closeAllMenus(); ${trackShareCallback ? trackShareCallback.toString() + '();' : ''}">
+                    onclick="copyToClipboard('${jobUrl.replace(/'/g, "\\'")}'); closeAllMenus();">
                 <div class="share-option-icon link">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>

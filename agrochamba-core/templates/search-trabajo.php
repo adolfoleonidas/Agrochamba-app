@@ -1711,14 +1711,22 @@ function shareJob(jobId, button) {
         .then(() => {
             console.log('Compartido exitosamente');
             trackShare(); // Registrar el compartido
+            // NO mostrar el modal del plugin si el sistema nativo funcionó
         })
         .catch((error) => {
-            console.log('Error al compartir:', error);
-            // Si falla, mostrar menú de opciones
-            showShareMenu(button, jobTitle, jobUrl, jobText, trackShare);
+            // Solo mostrar el modal si el usuario canceló explícitamente (error.name === 'AbortError')
+            // o si hay un error real (no es solo cancelación)
+            if (error.name !== 'AbortError') {
+                console.log('Error al compartir:', error);
+                // Si falla por un error real (no cancelación), mostrar menú de opciones
+                showShareMenu(button, jobTitle, jobUrl, jobText, trackShare);
+            } else {
+                // Si el usuario canceló, solo registrar silenciosamente
+                console.log('Usuario canceló el compartido');
+            }
         });
     } else {
-        // Fallback: mostrar menú de opciones de compartir
+        // Fallback: mostrar menú de opciones de compartir solo si Web Share API no está disponible
         showShareMenu(button, jobTitle, jobUrl, jobText, trackShare);
     }
 }
@@ -1774,6 +1782,15 @@ function showShareMenu(button, jobTitle, jobUrl, jobText, trackShareCallback) {
     const buttonWrapper = button.closest('.interaction-btn');
     buttonWrapper.style.position = 'relative';
     buttonWrapper.appendChild(shareMenu);
+    
+    // Registrar compartido cuando se hace clic en cualquier opción
+    if (trackShareCallback) {
+        shareMenu.querySelectorAll('.share-option').forEach(option => {
+            option.addEventListener('click', function() {
+                setTimeout(trackShareCallback, 500); // Pequeño delay para asegurar que se abrió la ventana
+            });
+        });
+    }
     
     // Cerrar menú al hacer clic fuera
     setTimeout(() => {
