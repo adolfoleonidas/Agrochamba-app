@@ -145,6 +145,10 @@ if (!function_exists('agrochamba_update_job_relevance_score')) {
     function agrochamba_update_job_relevance_score($job_id) {
         $score = agrochamba_calculate_relevance_score($job_id);
         update_post_meta($job_id, '_trabajo_relevance_score', $score);
+        
+        // Disparar hook para actualizar score inteligente
+        do_action('agrochamba_relevance_score_updated', $job_id);
+        
         return $score;
     }
 }

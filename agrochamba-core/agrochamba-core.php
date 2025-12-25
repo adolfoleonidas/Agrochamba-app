@@ -63,6 +63,7 @@ if (!AGROCHAMBA_USE_MODULE_LOADER) {
             '17-custom-auth-pages.php',        // Páginas de autenticación personalizadas
             '18-custom-user-panel.php',        // Panel de usuario personalizado
             '19-job-relevance-scoring.php',    // Sistema de scoring de relevancia
+            '20-smart-job-sorting.php',        // Ordenamiento inteligente de trabajos
         );
 
         // Cargar cada módulo

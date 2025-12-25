@@ -369,11 +369,15 @@ if (!function_exists('agrochamba_modify_trabajo_archive_query')) {
                     $query->set('tax_query', $tax_query);
                 }
                 
-                // Ordenar por fecha o relevancia según parámetro
-                $order_by = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']) : 'date';
+                // Ordenar según parámetro (smart, relevance, date)
+                $order_by = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']) : 'smart';
                 if ($order_by === 'relevance') {
                     // Ordenar por score de relevancia
                     $query->set('orderby', 'relevance');
+                    $query->set('order', 'DESC');
+                } elseif ($order_by === 'smart') {
+                    // Ordenar por score inteligente (combinado)
+                    $query->set('orderby', 'smart');
                     $query->set('order', 'DESC');
                 } else {
                     // Ordenar por fecha (más recientes primero)
@@ -399,11 +403,15 @@ if (!function_exists('agrochamba_modify_trabajo_archive_query')) {
                     $query->set('tax_query', $tax_query);
                 }
                 
-                // Ordenar por fecha o relevancia según parámetro
-                $order_by = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']) : 'date';
+                // Ordenar según parámetro (smart, relevance, date)
+                $order_by = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']) : 'smart';
                 if ($order_by === 'relevance') {
                     // Ordenar por score de relevancia
                     $query->set('orderby', 'relevance');
+                    $query->set('order', 'DESC');
+                } elseif ($order_by === 'smart') {
+                    // Ordenar por score inteligente (combinado)
+                    $query->set('orderby', 'smart');
                     $query->set('order', 'DESC');
                 } else {
                     // Ordenar por fecha (más recientes primero)

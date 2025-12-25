@@ -18,6 +18,7 @@ $posts_per_page = get_option('posts_per_page', 12);
 $ubicacion_filter = isset($_GET['ubicacion']) ? sanitize_text_field($_GET['ubicacion']) : '';
 $cultivo_filter = isset($_GET['cultivo']) ? sanitize_text_field($_GET['cultivo']) : '';
 $empresa_filter = isset($_GET['empresa']) ? sanitize_text_field($_GET['empresa']) : '';
+$orderby_filter = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']) : 'smart'; // Por defecto: ordenamiento inteligente
 
 // Verificar si es un nuevo usuario
 $show_welcome = isset($_GET['welcome']) && $_GET['welcome'] === '1';
@@ -122,6 +123,32 @@ $show_welcome = isset($_GET['welcome']) && $_GET['welcome'] === '1';
                     </button>
                 </div>
             </form>
+            
+            <!-- Selector de Ordenamiento -->
+            <div class="archive-sorting-controls">
+                <form method="get" action="<?php echo esc_url(home_url('/')); ?>" class="sorting-form">
+                    <input type="hidden" name="post_type" value="trabajo">
+                    <?php if (!empty($ubicacion_filter)): ?>
+                        <input type="hidden" name="ubicacion" value="<?php echo esc_attr($ubicacion_filter); ?>">
+                    <?php endif; ?>
+                    <?php if (!empty($_GET['s'])): ?>
+                        <input type="hidden" name="s" value="<?php echo esc_attr($_GET['s']); ?>">
+                    <?php endif; ?>
+                    <div class="sorting-select-wrapper">
+                        <svg class="sort-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 6h18M7 12h10M11 18h2"/>
+                        </svg>
+                        <select name="orderby" class="sorting-select" onchange="this.form.submit()" title="Ordenar trabajos">
+                            <option value="smart" <?php selected($orderby_filter, 'smart'); ?>>⭐ Recomendado</option>
+                            <option value="date" <?php selected($orderby_filter, 'date'); ?>>🕐 Más recientes</option>
+                            <option value="relevance" <?php selected($orderby_filter, 'relevance'); ?>>🔥 Más relevantes</option>
+                        </select>
+                        <svg class="dropdown-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"/>
+                        </svg>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 
@@ -787,6 +814,85 @@ $show_welcome = isset($_GET['welcome']) && $_GET['welcome'] === '1';
 
 .search-submit-btn svg {
     flex-shrink: 0;
+}
+
+/* Selector de Ordenamiento */
+.archive-sorting-controls {
+    margin-top: 24px;
+    display: flex;
+    justify-content: center;
+}
+
+.sorting-form {
+    margin: 0;
+}
+
+.sorting-select-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #fff;
+    border: 2px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 0;
+    transition: all 0.3s;
+}
+
+.sorting-select-wrapper:hover {
+    border-color: #4CAF50;
+}
+
+.sorting-select-wrapper:focus-within {
+    border-color: #4CAF50;
+    box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+}
+
+.sort-icon {
+    margin-left: 12px;
+    color: #666;
+    flex-shrink: 0;
+}
+
+.sorting-select {
+    appearance: none;
+    border: none;
+    background: transparent;
+    padding: 12px 40px 12px 8px;
+    font-size: 15px;
+    font-weight: 500;
+    color: #333;
+    cursor: pointer;
+    outline: none;
+    min-width: 180px;
+}
+
+.sorting-select-wrapper .dropdown-icon {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #999;
+    pointer-events: none;
+    z-index: 1;
+}
+
+@media (max-width: 768px) {
+    .archive-sorting-controls {
+        margin-top: 20px;
+    }
+    
+    .sorting-select {
+        min-width: 160px;
+        font-size: 14px;
+        padding: 10px 36px 10px 8px;
+    }
+    
+    .sort-icon {
+        margin-left: 10px;
+        width: 16px;
+        height: 16px;
+    }
 }
 
 .trabajos-archive-content {
