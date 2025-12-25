@@ -727,46 +727,6 @@ if (!$has_filters && is_post_type_archive('trabajo') && !is_tax()) {
                             Selecciona una ubicación, busca por empresa o puesto, o explora nuestras ofertas disponibles.
                         </p>
                     </div>
-                    <!-- Filtros Rápidos -->
-                    <div class="quick-filters-section">
-                        <h3 class="suggestions-title">
-                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
-                            </svg>
-                            Filtros rápidos
-                        </h3>
-                        <div class="quick-filters-grid">
-                            <a href="<?php echo esc_url(add_query_arg(array('benefits' => '1'), get_post_type_archive_link('trabajo'))); ?>" class="quick-filter-chip benefits-filter">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                                    <polyline points="22 4 12 14.01 9 11.01"/>
-                                </svg>
-                                <span>Con beneficios</span>
-                            </a>
-                            <a href="<?php echo esc_url(add_query_arg(array('salary' => '2000'), get_post_type_archive_link('trabajo'))); ?>" class="quick-filter-chip salary-filter">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <line x1="12" y1="1" x2="12" y2="23"/>
-                                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-                                </svg>
-                                <span>Buen salario</span>
-                            </a>
-                            <a href="<?php echo esc_url(add_query_arg(array('urgent' => '1'), get_post_type_archive_link('trabajo'))); ?>" class="quick-filter-chip urgent-filter">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <circle cx="12" cy="12" r="10"/>
-                                    <polyline points="12 6 12 12 16 14"/>
-                                </svg>
-                                <span>Urgente</span>
-                            </a>
-                            <a href="<?php echo esc_url(add_query_arg(array('new' => '1'), get_post_type_archive_link('trabajo'))); ?>" class="quick-filter-chip new-filter">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <circle cx="12" cy="12" r="10"/>
-                                    <line x1="12" y1="8" x2="12" y2="12"/>
-                                    <line x1="12" y1="16" x2="12.01" y2="16"/>
-                                </svg>
-                                <span>Nuevos</span>
-                            </a>
-                        </div>
-                    </div>
                     
                     <div class="no-filters-suggestions">
                         <h3 class="suggestions-title">
@@ -803,39 +763,6 @@ if (!$has_filters && is_post_type_archive('trabajo') && !is_tax()) {
                             ?>
                         </div>
                     </div>
-                    
-                    <!-- Cultivos Populares -->
-                    <?php
-                    $popular_cultivos = get_terms(array(
-                        'taxonomy' => 'cultivo',
-                        'hide_empty' => true,
-                        'number' => 6,
-                        'orderby' => 'count',
-                        'order' => 'DESC',
-                    ));
-                    
-                    if (!empty($popular_cultivos) && !is_wp_error($popular_cultivos)):
-                    ?>
-                    <div class="no-filters-suggestions" style="margin-top: 50px;">
-                        <h3 class="suggestions-title">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-                            </svg>
-                            Cultivos populares
-                        </h3>
-                        <div class="popular-locations">
-                            <?php foreach ($popular_cultivos as $cultivo): ?>
-                                <a href="<?php echo esc_url(get_term_link($cultivo)); ?>" class="location-chip cultivo-chip">
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-                                    </svg>
-                                    <span class="location-name"><?php echo esc_html($cultivo->name); ?></span>
-                                    <span class="location-count"><?php echo esc_html($cultivo->count); ?></span>
-                                </a>
-                            <?php endforeach; ?>
-                        </div>
-                    </div>
-                    <?php endif; ?>
                 </div>
             </div>
         <?php elseif (!$has_filters): ?>
@@ -1465,12 +1392,12 @@ if (!$has_filters && is_post_type_archive('trabajo') && !is_tax()) {
 /* Logo Navideño Animado */
 .christmas-logo-container {
     position: relative;
-    margin-bottom: 40px;
-    padding: 40px 0;
+    margin-bottom: 20px;
+    padding: 20px 0;
     display: flex;
     justify-content: center;
     align-items: center;
-    min-height: 200px;
+    min-height: 100px;
 }
 
 .snowflakes {
@@ -1487,24 +1414,24 @@ if (!$has_filters && is_post_type_archive('trabajo') && !is_tax()) {
 .snowflake {
     position: absolute;
     top: -20px;
-    font-size: 20px;
+    font-size: 14px;
     color: #E3F2FD;
-    opacity: 0.8;
+    opacity: 0.7;
     animation: snowfall linear infinite;
-    text-shadow: 0 0 5px rgba(255, 255, 255, 0.8);
+    text-shadow: 0 0 3px rgba(255, 255, 255, 0.6);
 }
 
 @keyframes snowfall {
     0% {
         transform: translateY(0) translateX(0) rotate(0deg);
-        opacity: 0.8;
+        opacity: 0.7;
     }
     50% {
-        transform: translateX(50px) rotate(180deg);
-        opacity: 0.6;
+        transform: translateX(30px) rotate(180deg);
+        opacity: 0.5;
     }
     100% {
-        transform: translateY(calc(100vh + 100px)) translateX(100px) rotate(360deg);
+        transform: translateY(calc(100vh + 100px)) translateX(60px) rotate(360deg);
         opacity: 0;
     }
 }
@@ -1514,7 +1441,7 @@ if (!$has_filters && is_post_type_archive('trabajo') && !is_tax()) {
     z-index: 2;
     display: inline-block;
     animation: logoFloat 3s ease-in-out infinite;
-    filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.1));
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.08));
 }
 
 @keyframes logoFloat {
@@ -1522,12 +1449,12 @@ if (!$has_filters && is_post_type_archive('trabajo') && !is_tax()) {
         transform: translateY(0) scale(1);
     }
     50% {
-        transform: translateY(-10px) scale(1.02);
+        transform: translateY(-5px) scale(1.01);
     }
 }
 
 .christmas-logo {
-    max-width: 300px;
+    max-width: 150px;
     height: auto;
     display: block;
     animation: logoShine 4s ease-in-out infinite;
@@ -1536,10 +1463,10 @@ if (!$has_filters && is_post_type_archive('trabajo') && !is_tax()) {
 
 @keyframes logoShine {
     0%, 100% {
-        filter: brightness(1) drop-shadow(0 0 10px rgba(76, 175, 80, 0.3));
+        filter: brightness(1) drop-shadow(0 0 5px rgba(76, 175, 80, 0.2));
     }
     50% {
-        filter: brightness(1.1) drop-shadow(0 0 20px rgba(76, 175, 80, 0.6));
+        filter: brightness(1.05) drop-shadow(0 0 10px rgba(76, 175, 80, 0.4));
     }
 }
 
@@ -1555,7 +1482,7 @@ if (!$has_filters && is_post_type_archive('trabajo') && !is_tax()) {
 
 .sparkle {
     position: absolute;
-    font-size: 24px;
+    font-size: 14px;
     animation: sparkleAnimation 2s ease-in-out infinite;
     opacity: 0;
 }
@@ -1576,7 +1503,7 @@ if (!$has_filters && is_post_type_archive('trabajo') && !is_tax()) {
     }
     50% {
         opacity: 1;
-        transform: scale(1.2) rotate(180deg);
+        transform: scale(1.1) rotate(180deg);
     }
 }
 
@@ -2761,20 +2688,21 @@ if (!$has_filters && is_post_type_archive('trabajo') && !is_tax()) {
 
 @media (max-width: 768px) {
     .christmas-logo-container {
-        padding: 30px 0;
-        min-height: 150px;
+        padding: 15px 0;
+        min-height: 80px;
+        margin-bottom: 15px;
     }
     
     .christmas-logo {
-        max-width: 200px;
+        max-width: 120px;
     }
     
     .snowflake {
-        font-size: 16px;
+        font-size: 12px;
     }
     
     .sparkle {
-        font-size: 18px;
+        font-size: 12px;
     }
     
     .archive-title {
