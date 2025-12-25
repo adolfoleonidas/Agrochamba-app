@@ -13,7 +13,7 @@ get_header();
 // Obtener término de búsqueda
 $search_query = get_search_query();
 $ubicacion_filter = isset($_GET['ubicacion']) ? sanitize_text_field($_GET['ubicacion']) : '';
-$orderby_filter = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']) : 'smart'; // Por defecto: ordenamiento inteligente
+$orderby_filter = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']) : 'date'; // Por defecto: más recientes
 
 ?>
 <div class="trabajos-archive-wrapper">

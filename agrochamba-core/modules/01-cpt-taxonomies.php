@@ -370,7 +370,7 @@ if (!function_exists('agrochamba_modify_trabajo_archive_query')) {
                 }
                 
                 // Ordenar según parámetro (smart, relevance, date)
-                $order_by = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']) : 'smart';
+                $order_by = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']) : 'date';
                 if ($order_by === 'relevance') {
                     // Ordenar por score de relevancia
                     $query->set('orderby', 'relevance');
@@ -404,7 +404,7 @@ if (!function_exists('agrochamba_modify_trabajo_archive_query')) {
                 }
                 
                 // Ordenar según parámetro (smart, relevance, date)
-                $order_by = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']) : 'smart';
+                $order_by = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']) : 'date';
                 if ($order_by === 'relevance') {
                     // Ordenar por score de relevancia
                     $query->set('orderby', 'relevance');

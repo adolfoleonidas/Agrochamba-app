@@ -18,7 +18,7 @@ $posts_per_page = get_option('posts_per_page', 12);
 $ubicacion_filter = isset($_GET['ubicacion']) ? sanitize_text_field($_GET['ubicacion']) : '';
 $cultivo_filter = isset($_GET['cultivo']) ? sanitize_text_field($_GET['cultivo']) : '';
 $empresa_filter = isset($_GET['empresa']) ? sanitize_text_field($_GET['empresa']) : '';
-$orderby_filter = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']) : 'smart'; // Por defecto: ordenamiento inteligente
+$orderby_filter = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']) : 'date'; // Por defecto: más recientes
 
 // Verificar si es un nuevo usuario
 $show_welcome = isset($_GET['welcome']) && $_GET['welcome'] === '1';
