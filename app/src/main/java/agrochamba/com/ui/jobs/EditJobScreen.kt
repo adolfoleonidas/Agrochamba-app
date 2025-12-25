@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Business
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
@@ -73,6 +74,8 @@ fun EditJobScreen(
     val initialEmpresaTerm = terms.find { it.taxonomy == "empresa" }
     val initialCultivoTerm = terms.find { it.taxonomy == "cultivo" }
     val initialTipoPuestoTerm = terms.find { it.taxonomy == "tipo_puesto" }
+    // Buscar categorías de WordPress (para blogs)
+    val initialCategoriaTerms = terms.filter { it.taxonomy == "category" }
 
     var title by remember { mutableStateOf(job.title?.rendered?.htmlToString() ?: "") }
     var description by remember { mutableStateOf(job.content?.rendered?.htmlToMarkdown() ?: "") }
@@ -84,6 +87,18 @@ fun EditJobScreen(
     var selectedEmpresa by remember { mutableStateOf<Category?>(null) }
     var selectedCultivo by remember { mutableStateOf<Category?>(null) }
     var selectedTipoPuesto by remember { mutableStateOf<Category?>(null) }
+    var selectedCategoria by remember { mutableStateOf<Category?>(null) }
+    
+    // Selector de tipo de publicación (solo para admins)
+    val isAdmin = AuthManager.isUserAdmin()
+    // Determinar tipo inicial: si tiene ubicación es trabajo, si no tiene ubicación pero tiene categorías es blog
+    var tipoPublicacion by remember { 
+        mutableStateOf(
+            if (initialUbicacionTerm != null) "trabajo" 
+            else if (initialCategoriaTerms.isNotEmpty()) "post" 
+            else "trabajo" // Por defecto trabajo
+        ) 
+    }
     
     LaunchedEffect(uiState.ubicaciones, initialUbicacionTerm) {
         if (uiState.ubicaciones.isNotEmpty() && initialUbicacionTerm != null && selectedUbicacion == null) {
@@ -116,6 +131,15 @@ fun EditJobScreen(
         }
     }
     
+    // Cargar categoría inicial si existe
+    LaunchedEffect(uiState.categorias, initialCategoriaTerms) {
+        if (uiState.categorias.isNotEmpty() && initialCategoriaTerms.isNotEmpty() && selectedCategoria == null) {
+            // Usar la primera categoría encontrada
+            val firstCategoriaTerm = initialCategoriaTerms.first()
+            selectedCategoria = uiState.categorias.find { it.id == firstCategoriaTerm.id }
+        }
+    }
+    
     var alojamiento by remember { mutableStateOf(job.meta?.alojamiento ?: false) }
     var transporte by remember { mutableStateOf(job.meta?.transporte ?: false) }
     var alimentacion by remember { mutableStateOf(job.meta?.alimentacion ?: false) }
@@ -145,7 +169,12 @@ fun EditJobScreen(
 
     LaunchedEffect(uiState.updateSuccess) {
         if (uiState.updateSuccess) {
-            Toast.makeText(context, "¡Trabajo actualizado con éxito!", Toast.LENGTH_LONG).show()
+            val mensaje = if (tipoPublicacion == "trabajo") {
+                "¡Trabajo actualizado con éxito!"
+            } else {
+                "¡Artículo de blog actualizado con éxito!"
+            }
+            Toast.makeText(context, mensaje, Toast.LENGTH_LONG).show()
             navController.popBackStack()
         }
     }
@@ -160,7 +189,7 @@ fun EditJobScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Editar Anuncio") },
+                title = { Text(if (tipoPublicacion == "trabajo") "Editar Trabajo" else "Editar Blog") },
                 navigationIcon = { 
                     IconButton(onClick = { navController.popBackStack() }) { 
                         Icon(Icons.Default.ArrowBack, null) 
@@ -173,6 +202,9 @@ fun EditJobScreen(
                 isLoading = uiState.isLoading,
                 loadingMessage = uiState.loadingMessage,
                 onSave = {
+                    // Debug: verificar el tipo de publicación
+                    android.util.Log.d("EditJobScreen", "Tipo de publicación seleccionado: $tipoPublicacion")
+                    
                     if (title.isBlank()) {
                         Toast.makeText(context, "El título es obligatorio", Toast.LENGTH_SHORT).show()
                         return@EditBottomActionBar
@@ -181,48 +213,62 @@ fun EditJobScreen(
                         Toast.makeText(context, "La descripción es obligatoria", Toast.LENGTH_SHORT).show()
                         return@EditBottomActionBar
                     }
-                    if (selectedUbicacion == null) {
-                        Toast.makeText(context, "La ubicación es obligatoria", Toast.LENGTH_SHORT).show()
-                        return@EditBottomActionBar
-                    }
                     
-                    // Validar empresa (requerida)
-                    val isAdmin = AuthManager.isUserAdmin()
-                    val empresaIdToUse = if (isAdmin) {
-                        if (selectedEmpresa == null) {
-                            Toast.makeText(context, "La empresa es obligatoria", Toast.LENGTH_SHORT).show()
+                    // Validaciones específicas según el tipo de publicación
+                    if (tipoPublicacion == "trabajo") {
+                        android.util.Log.d("EditJobScreen", "Validando campos de TRABAJO")
+                        // Validaciones para trabajos
+                        if (selectedUbicacion == null) {
+                            Toast.makeText(context, "La ubicación es obligatoria", Toast.LENGTH_SHORT).show()
                             return@EditBottomActionBar
                         }
-                        selectedEmpresa!!.id
+                        
+                        // Empresa es OPCIONAL - usar la seleccionada o la del usuario automáticamente
+                        val empresaId = if (isAdmin) {
+                            // Admin: puede seleccionar empresa o dejarla vacía
+                            selectedEmpresa?.id
+                        } else {
+                            // Empresa normal: usar su empresa automáticamente si existe
+                            uiState.userCompanyId
+                        }
+                        
+                        val ubicacionIdValue = selectedUbicacion!!.id
+                        
+                        val jobData = mutableMapOf<String, Any?>(
+                            "post_type" to "trabajo",
+                            "title" to title.trim(),
+                            "content" to description.textToHtml(),
+                            "salario_min" to (salarioMin.toIntOrNull() ?: 0),
+                            "salario_max" to (salarioMax.toIntOrNull() ?: 0),
+                            "vacantes" to (vacantes.toIntOrNull() ?: 1),
+                            "ubicacion_id" to ubicacionIdValue,
+                            "cultivo_id" to selectedCultivo?.id,
+                            "tipo_puesto_id" to selectedTipoPuesto?.id,
+                            "alojamiento" to alojamiento,
+                            "transporte" to transporte,
+                            "alimentacion" to alimentacion,
+                            "comentarios_habilitados" to comentariosHabilitados,
+                            "publish_to_facebook" to publishToFacebook
+                        )
+                        
+                        // Agregar empresa_id solo si está presente (opcional)
+                        empresaId?.let { jobData["empresa_id"] = it }
+                        
+                        viewModel.updateJob(jobData, context)
                     } else {
-                        // Empresa normal: siempre usar su empresa automáticamente
-                        uiState.userCompanyId ?: run {
-                            Toast.makeText(context, "No se pudo identificar tu empresa", Toast.LENGTH_SHORT).show()
-                            return@EditBottomActionBar
-                        }
+                        // Para blogs (post) - NO requiere ubicación ni empresa
+                        android.util.Log.d("EditJobScreen", "Actualizando BLOG - sin validar ubicación ni empresa")
+                        val blogData = mutableMapOf<String, Any?>(
+                            "post_type" to "post",
+                            "title" to title.trim(),
+                            "content" to description.textToHtml(),
+                            "comentarios_habilitados" to comentariosHabilitados,
+                            "publish_to_facebook" to publishToFacebook
+                        )
+                        // Agregar categoría si está seleccionada
+                        selectedCategoria?.id?.let { blogData["categories"] = listOf(it) }
+                        viewModel.updateJob(blogData, context)
                     }
-                    
-                    // Guardar en variable local para evitar problemas de smart cast
-                    val ubicacionId = selectedUbicacion!!.id
-                    
-                    val jobData = mutableMapOf<String, Any>(
-                        "title" to title.trim(),
-                        "content" to description.textToHtml(),
-                        "salario_min" to (salarioMin.toIntOrNull() ?: 0),
-                        "salario_max" to (salarioMax.toIntOrNull() ?: 0),
-                        "vacantes" to (vacantes.toIntOrNull() ?: 1),
-                        "ubicacion_id" to ubicacionId, // Obligatorio
-                        "empresa_id" to empresaIdToUse, // Obligatorio
-                        "alojamiento" to alojamiento,
-                        "transporte" to transporte,
-                        "alimentacion" to alimentacion,
-                        "comentarios_habilitados" to comentariosHabilitados, // Nuevo campo
-                        "publish_to_facebook" to publishToFacebook
-                    )
-                    // Agregar IDs solo si no son null (opcionales)
-                    selectedCultivo?.id?.let { jobData["cultivo_id"] = it }
-                    selectedTipoPuesto?.id?.let { jobData["tipo_puesto_id"] = it }
-                    viewModel.updateJob(jobData, context)
                 },
                 onDelete = {
                     viewModel.deleteJob(context)
@@ -355,7 +401,7 @@ fun EditJobScreen(
                 // Descripción
                 Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                     Text(
-                        "Descripción del Trabajo",
+                        if (tipoPublicacion == "trabajo") "Descripción del Trabajo" else "Descripción del Blog",
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.onSurface,
@@ -364,7 +410,11 @@ fun EditJobScreen(
                     RichTextEditor(
                         value = description,
                         onValueChange = { description = it },
-                        placeholder = "Una descripción detallada permite obtener más visitas. Incluye información sobre el trabajo, requisitos y beneficios.\n\nUsa los botones de formato para resaltar texto importante.",
+                        placeholder = if (tipoPublicacion == "trabajo") {
+                            "Una descripción detallada permite obtener más visitas. Incluye información sobre el trabajo, requisitos y beneficios.\n\nUsa los botones de formato para resaltar texto importante."
+                        } else {
+                            "Escribe el contenido de tu artículo de blog aquí.\n\nUsa los botones de formato para resaltar texto importante."
+                        },
                         maxLines = 15,
                         enabled = !uiState.isLoading
                     )
@@ -372,68 +422,114 @@ fun EditJobScreen(
                 
                 Spacer(Modifier.height(24.dp))
                 
-                // Ubicación y Empresa - al mismo nivel (campos básicos más importantes)
-                // Ubicación y Empresa - uno debajo del otro (igual que CreateJobScreen)
-                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                    // Selector de Ubicación (arriba)
-                    CategoryDropdown(
-                        label = "Ubicación *",
-                        items = uiState.ubicaciones,
-                        selectedItem = selectedUbicacion,
-                        modifier = Modifier.fillMaxWidth(),
-                        leadingIcon = Icons.Default.LocationOn
-                    ) { cat -> selectedUbicacion = cat }
-                    
-                    Spacer(Modifier.height(12.dp))
-                    
-                    // Selector de Empresa (abajo) - SIEMPRE VISIBLE
-                    val isAdmin = AuthManager.isUserAdmin()
-                    if (isAdmin) {
-                        // Admin: puede seleccionar cualquier empresa
-                        CategoryDropdown(
-                            label = "Empresa",
-                            items = uiState.empresas,
-                            selectedItem = selectedEmpresa,
+                // Selector de tipo de publicación (solo para admins)
+                if (isAdmin) {
+                    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        Text(
+                            "Tipo de Publicación",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        Row(
                             modifier = Modifier.fillMaxWidth(),
-                            leadingIcon = Icons.Default.Business
-                        ) { cat -> selectedEmpresa = cat }
-                    } else {
-                        // Empresa normal: mostrar su empresa (solo lectura)
-                        OutlinedTextField(
-                            value = selectedEmpresa?.name ?: (uiState.empresas.find { it.id == uiState.userCompanyId }?.name ?: "Tu empresa"),
-                            onValueChange = {},
-                            readOnly = true,
-                            enabled = false,
-                            label = { Text("Empresa") },
-                            modifier = Modifier.fillMaxWidth(),
-                            leadingIcon = { Icon(Icons.Default.Business, contentDescription = null) },
-                            colors = TextFieldDefaults.colors(
-                                disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // Botón Trabajo
+                            FilterChip(
+                                selected = tipoPublicacion == "trabajo",
+                                onClick = { tipoPublicacion = "trabajo" },
+                                label = { Text("📋 Trabajo") },
+                                modifier = Modifier.weight(1f)
                             )
+                            // Botón Blog
+                            FilterChip(
+                                selected = tipoPublicacion == "post",
+                                onClick = { tipoPublicacion = "post" },
+                                label = { Text("📝 Blog") },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(16.dp))
+                }
+                
+                // Selector de Categoría (solo para blogs)
+                if (tipoPublicacion == "post") {
+                    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        CategoryDropdown(
+                            label = "Categoría",
+                            items = uiState.categorias,
+                            selectedItem = selectedCategoria,
+                            modifier = Modifier.fillMaxWidth(),
+                            leadingIcon = Icons.Default.Folder
+                        ) { cat -> selectedCategoria = cat }
+                    }
+                    Spacer(Modifier.height(16.dp))
+                }
+                
+                // Ubicación y Empresa - uno debajo del otro (solo para trabajos)
+                if (tipoPublicacion == "trabajo") {
+                    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        // Selector de Ubicación (arriba)
+                        CategoryDropdown(
+                            label = "Ubicación *",
+                            items = uiState.ubicaciones,
+                            selectedItem = selectedUbicacion,
+                            modifier = Modifier.fillMaxWidth(),
+                            leadingIcon = Icons.Default.LocationOn
+                        ) { cat -> selectedUbicacion = cat }
+                        
+                        Spacer(Modifier.height(12.dp))
+                        
+                        // Selector de Empresa (abajo) - SIEMPRE VISIBLE
+                        if (isAdmin) {
+                            // Admin: puede seleccionar cualquier empresa
+                            CategoryDropdown(
+                                label = "Empresa",
+                                items = uiState.empresas,
+                                selectedItem = selectedEmpresa,
+                                modifier = Modifier.fillMaxWidth(),
+                                leadingIcon = Icons.Default.Business
+                            ) { cat -> selectedEmpresa = cat }
+                        } else {
+                            // Empresa normal: mostrar su empresa (solo lectura)
+                            OutlinedTextField(
+                                value = selectedEmpresa?.name ?: (uiState.empresas.find { it.id == uiState.userCompanyId }?.name ?: "Tu empresa"),
+                                onValueChange = {},
+                                readOnly = true,
+                                enabled = false,
+                                label = { Text("Empresa") },
+                                modifier = Modifier.fillMaxWidth(),
+                                leadingIcon = { Icon(Icons.Default.Business, contentDescription = null) },
+                                colors = TextFieldDefaults.colors(
+                                    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                )
+                            )
+                        }
+                    }
+                    
+                    Spacer(Modifier.height(16.dp))
+                    
+                    // Botón para mostrar más detalles (solo para trabajos)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        ActionButton(
+                            text = if (showMoreOptions) "Ocultar Detalles" else "Más Detalles",
+                            icon = null,
+                            onClick = { showMoreOptions = !showMoreOptions }
                         )
                     }
-                }
-                
-                Spacer(Modifier.height(16.dp))
-                
-                // Botón para mostrar más detalles
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    ActionButton(
-                        text = if (showMoreOptions) "Ocultar Detalles" else "Más Detalles",
-                        icon = null,
-                        onClick = { showMoreOptions = !showMoreOptions }
-                    )
-                }
-                
-                Spacer(Modifier.height(16.dp))
-                
-                // Opciones avanzadas expandibles
-                if (showMoreOptions) {
+                    
+                    Spacer(Modifier.height(16.dp))
+                    
+                    // Opciones avanzadas expandibles (solo para trabajos)
+                    if (showMoreOptions) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -969,6 +1065,7 @@ private fun CategoryDropdown(
     items: List<Category>, 
     selectedItem: Category?,
     modifier: Modifier = Modifier,
+    leadingIcon: androidx.compose.ui.graphics.vector.ImageVector? = null,
     onItemSelected: (Category) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -979,6 +1076,7 @@ private fun CategoryDropdown(
             onValueChange = {},
             readOnly = true,
             label = { Text(label) },
+            leadingIcon = leadingIcon?.let { { Icon(it, contentDescription = null) } },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = modifier.fillMaxWidth().menuAnchor()
         )

@@ -33,6 +33,7 @@ data class EditJobScreenState(
     val empresas: List<Category> = emptyList(),
     val cultivos: List<Category> = emptyList(),
     val tiposPuesto: List<Category> = emptyList(),
+    val categorias: List<Category> = emptyList(),
     val selectedImages: List<Uri> = emptyList(),
     val existingImageUrls: List<String> = emptyList(), // URLs de imágenes existentes
     val existingImageIds: List<Int> = emptyList(), // IDs de imágenes existentes (para mapear con URLs)
@@ -90,12 +91,14 @@ class EditJobViewModel(private val job: JobPost) : ViewModel() {
                 val empresasDeferred = async { WordPressApi.retrofitService.getEmpresas() }
                 val cultivosDeferred = async { WordPressApi.retrofitService.getCultivos() }
                 val tiposPuestoDeferred = async { WordPressApi.retrofitService.getTiposPuesto() }
+                val categoriasDeferred = async { WordPressApi.retrofitService.getCategories() }
 
                 uiState = uiState.copy(
                     ubicaciones = ubicacionesDeferred.await(),
                     empresas = empresasDeferred.await(),
                     cultivos = cultivosDeferred.await(),
                     tiposPuesto = tiposPuestoDeferred.await(),
+                    categorias = categoriasDeferred.await(),
                     userCompanyId = AuthManager.userCompanyId,
                     isLoading = false,
                     // PRESERVAR imágenes existentes
