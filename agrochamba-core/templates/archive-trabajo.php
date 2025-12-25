@@ -370,12 +370,12 @@ $show_welcome = isset($_GET['welcome']) && $_GET['welcome'] === '1';
                                             data-job-title="<?php echo esc_attr(get_the_title($trabajo_id)); ?>"
                                             data-job-url="<?php echo esc_url(get_permalink($trabajo_id)); ?>"
                                             onclick="event.preventDefault(); shareJob(<?php echo esc_js($trabajo_id); ?>, this);">
-                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <circle cx="18" cy="5" r="3"/>
-                                            <circle cx="6" cy="12" r="3"/>
-                                            <circle cx="18" cy="19" r="3"/>
-                                            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
-                                            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M18 8h1a4 4 0 0 1 0 8h-1"/>
+                                            <polyline points="15 12 9 12 9 8 5 12 9 16 9 12"/>
+                                            <circle cx="2" cy="12" r="1.5" fill="currentColor"/>
+                                            <circle cx="4" cy="12" r="1.5" fill="currentColor"/>
+                                            <circle cx="6" cy="12" r="1.5" fill="currentColor"/>
                                         </svg>
                                         <span class="btn-text">Compartir</span>
                                     </button>
@@ -426,12 +426,12 @@ $show_welcome = isset($_GET['welcome']) && $_GET['welcome'] === '1';
                                             data-job-title="<?php echo esc_attr(get_the_title($trabajo_id)); ?>"
                                             data-job-url="<?php echo esc_url(get_permalink($trabajo_id)); ?>"
                                             onclick="event.preventDefault(); shareJob(<?php echo esc_js($trabajo_id); ?>, this);">
-                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <circle cx="18" cy="5" r="3"/>
-                                            <circle cx="6" cy="12" r="3"/>
-                                            <circle cx="18" cy="19" r="3"/>
-                                            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
-                                            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M18 8h1a4 4 0 0 1 0 8h-1"/>
+                                            <polyline points="15 12 9 12 9 8 5 12 9 16 9 12"/>
+                                            <circle cx="2" cy="12" r="1.5" fill="currentColor"/>
+                                            <circle cx="4" cy="12" r="1.5" fill="currentColor"/>
+                                            <circle cx="6" cy="12" r="1.5" fill="currentColor"/>
                                         </svg>
                                         <span class="btn-text">Compartir</span>
                                     </button>
