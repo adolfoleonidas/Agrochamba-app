@@ -549,6 +549,61 @@ if (!$has_filters && is_post_type_archive('trabajo') && !is_tax()) {
                     </div>
                 <?php endif; ?>
             </div>
+            
+            <!-- Luego mostrar la pantalla de "Comienza tu búsqueda" -->
+            <div class="no-filters-state">
+                <div class="no-filters-content">
+                    <div class="search-hero-section">
+                        <div class="search-hero-icon-wrapper">
+                            <svg width="140" height="140" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="no-filters-icon">
+                                <circle cx="11" cy="11" r="8"/>
+                                <path d="m21 21-4.35-4.35"/>
+                                <line x1="11" y1="8" x2="11" y2="14"/>
+                                <line x1="8" y1="11" x2="14" y2="11"/>
+                            </svg>
+                        </div>
+                        <h2 class="no-filters-title">Comienza tu búsqueda</h2>
+                        <p class="no-filters-description">
+                            Selecciona una ubicación, busca por empresa o puesto, o explora nuestras ofertas disponibles.
+                        </p>
+                    </div>
+                    <div class="no-filters-suggestions">
+                        <h3 class="suggestions-title">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                                <circle cx="12" cy="10" r="3"/>
+                            </svg>
+                            Ubicaciones populares
+                        </h3>
+                        <div class="popular-locations">
+                            <?php
+                            $popular_ubicaciones = get_terms(array(
+                                'taxonomy' => 'ubicacion',
+                                'hide_empty' => true,
+                                'number' => 6,
+                                'orderby' => 'count',
+                                'order' => 'DESC',
+                            ));
+                            
+                            if (!empty($popular_ubicaciones) && !is_wp_error($popular_ubicaciones)):
+                                foreach ($popular_ubicaciones as $ubicacion):
+                            ?>
+                                <a href="<?php echo esc_url(get_term_link($ubicacion)); ?>" class="location-chip">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                                        <circle cx="12" cy="10" r="3"/>
+                                    </svg>
+                                    <span class="location-name"><?php echo esc_html($ubicacion->name); ?></span>
+                                    <span class="location-count"><?php echo esc_html($ubicacion->count); ?></span>
+                                </a>
+                            <?php 
+                                endforeach;
+                            endif;
+                            ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
         <?php elseif (!$has_filters): ?>
             <!-- Estado inicial: Sin filtros aplicados (no debería aparecer ahora) -->
             <div class="no-filters-state">
