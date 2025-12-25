@@ -41,6 +41,11 @@ if (is_tax('ubicacion')) {
 
 // Verificar si es un nuevo usuario
 $show_welcome = isset($_GET['welcome']) && $_GET['welcome'] === '1';
+
+// Verificar si hay filtros aplicados
+$has_filters = !empty($ubicacion_filter) || !empty($cultivo_filter) || !empty($empresa_filter) || 
+               (isset($_GET['s']) && !empty($_GET['s'])) || is_tax('ubicacion') || 
+               is_tax('cultivo') || is_tax('empresa');
 ?>
 <div class="trabajos-archive-wrapper">
     <?php if ($show_welcome && is_user_logged_in()): ?>
@@ -173,8 +178,55 @@ $show_welcome = isset($_GET['welcome']) && $_GET['welcome'] === '1';
 
     <!-- Grid de Trabajos -->
     <div class="trabajos-archive-content">
-        <div class="trabajos-grid">
-            <?php if (have_posts()): ?>
+        <?php if (!$has_filters): ?>
+            <!-- Estado inicial: Sin filtros aplicados -->
+            <div class="no-filters-state">
+                <div class="no-filters-content">
+                    <svg width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="no-filters-icon">
+                        <circle cx="11" cy="11" r="8"/>
+                        <path d="m21 21-4.35-4.35"/>
+                        <line x1="11" y1="8" x2="11" y2="14"/>
+                        <line x1="8" y1="11" x2="14" y2="11"/>
+                    </svg>
+                    <h2 class="no-filters-title">Comienza tu búsqueda</h2>
+                    <p class="no-filters-description">
+                        Selecciona una ubicación, busca por empresa o puesto, o explora nuestras ofertas disponibles.
+                    </p>
+                    <div class="no-filters-suggestions">
+                        <h3>Ubicaciones populares:</h3>
+                        <div class="popular-locations">
+                            <?php
+                            $popular_ubicaciones = get_terms(array(
+                                'taxonomy' => 'ubicacion',
+                                'hide_empty' => true,
+                                'number' => 6,
+                                'orderby' => 'count',
+                                'order' => 'DESC',
+                            ));
+                            
+                            if (!empty($popular_ubicaciones) && !is_wp_error($popular_ubicaciones)):
+                                foreach ($popular_ubicaciones as $ubicacion):
+                            ?>
+                                <a href="<?php echo esc_url(get_term_link($ubicacion)); ?>" class="location-chip">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                                        <circle cx="12" cy="10" r="3"/>
+                                    </svg>
+                                    <?php echo esc_html($ubicacion->name); ?>
+                                    <span class="location-count"><?php echo esc_html($ubicacion->count); ?></span>
+                                </a>
+                            <?php 
+                                endforeach;
+                            endif;
+                            ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        <?php else: ?>
+            <!-- Estado con filtros: Mostrar resultados -->
+            <div class="trabajos-grid">
+                <?php if (have_posts()): ?>
                 <?php while (have_posts()): the_post(); 
                     $trabajo_id = get_the_ID();
                     
@@ -463,13 +515,13 @@ $show_welcome = isset($_GET['welcome']) && $_GET['welcome'] === '1';
                                         </button>
                                         <div class="more-options-menu" style="display: none;">
                                             <button class="more-options-item save-btn-menu <?php echo $is_saved ? 'active' : ''; ?>" 
-                                                    data-job-id="<?php echo esc_attr($trabajo_id); ?>"
-                                                    onclick="event.preventDefault(); toggleSave(<?php echo esc_js($trabajo_id); ?>, this);">
+                                            data-job-id="<?php echo esc_attr($trabajo_id); ?>"
+                                            onclick="event.preventDefault(); toggleSave(<?php echo esc_js($trabajo_id); ?>, this);">
                                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="<?php echo $is_saved ? 'currentColor' : 'none'; ?>" stroke="currentColor" stroke-width="2">
-                                                    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
-                                                </svg>
+                                            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+                                        </svg>
                                                 <span><?php echo $is_saved ? 'Guardado' : 'Guardar'; ?></span>
-                                            </button>
+                                    </button>
                                         </div>
                                     </div>
                                 <?php else: ?>
@@ -509,25 +561,29 @@ $show_welcome = isset($_GET['welcome']) && $_GET['welcome'] === '1';
                         </div>
                     </article>
                 <?php endwhile; ?>
-            <?php else: ?>
-                <div class="trabajos-empty">
-                    <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
-                        <circle cx="12" cy="10" r="3"/>
-                    </svg>
-                    <h2>No se encontraron trabajos</h2>
-                    <p>Intenta ajustar los filtros o vuelve más tarde</p>
-                </div>
-            <?php endif; ?>
-        </div>
+                <?php else: ?>
+                    <div class="trabajos-empty">
+                        <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                            <circle cx="12" cy="10" r="3"/>
+                        </svg>
+                        <h2>No se encontraron trabajos</h2>
+                        <p>Intenta ajustar los filtros o vuelve más tarde</p>
+                        <a href="<?php echo esc_url(get_post_type_archive_link('trabajo')); ?>" class="clear-filters-btn">
+                            Ver todos los trabajos
+                        </a>
+                    </div>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
         
         <!-- Paginación -->
-        <?php 
+                <?php
         // Preservar parámetros GET en la paginación
         $pagination_args = array(
-            'prev_text' => '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg> Anterior',
-            'next_text' => 'Siguiente <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>',
-            'type' => 'list',
+                    'prev_text' => '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg> Anterior',
+                    'next_text' => 'Siguiente <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>',
+                    'type' => 'list',
         );
         
         // Detectar si estamos en una página de taxonomía (ubicación, cultivo, empresa)
@@ -609,32 +665,35 @@ $show_welcome = isset($_GET['welcome']) && $_GET['welcome'] === '1';
         $max_pages = $wp_query->max_num_pages;
         $current_page = max(1, get_query_var('paged'));
         
-        if (paginate_links($pagination_args)): ?>
-            <div class="trabajos-pagination">
-                <?php echo paginate_links($pagination_args); ?>
-            </div>
-        <?php endif; ?>
-        
-        <!-- Botón Cargar Más -->
-        <?php if ($current_page < $max_pages): ?>
-            <div class="load-more-wrapper" style="text-align: center; margin-top: 30px;">
-                <button id="load-more-btn" class="load-more-btn" 
-                        data-current-page="<?php echo esc_attr($current_page); ?>"
-                        data-max-pages="<?php echo esc_attr($max_pages); ?>"
-                        data-ubicacion="<?php echo esc_attr($ubicacion_filter); ?>"
-                        data-cultivo="<?php echo esc_attr($cultivo_filter); ?>"
-                        data-empresa="<?php echo esc_attr($empresa_filter); ?>"
-                        data-search="<?php echo esc_attr(isset($_GET['s']) ? sanitize_text_field($_GET['s']) : ''); ?>"
-                        data-orderby="<?php echo esc_attr($orderby_filter); ?>">
-                    <span class="load-more-text">Cargar más trabajos</span>
-                    <span class="load-more-spinner" style="display: none;">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
-                        </svg>
-                    </span>
-                </button>
-            </div>
-        <?php endif; ?>
+        // La paginación y el botón "Cargar más" se muestran después del grid, solo si hay filtros
+        if ($has_filters):
+            if ($current_page < $max_pages): ?>
+                <div class="load-more-wrapper" style="text-align: center; margin-top: 30px;">
+                    <button id="load-more-btn" class="load-more-btn" 
+                            data-current-page="<?php echo esc_attr($current_page); ?>"
+                            data-max-pages="<?php echo esc_attr($max_pages); ?>"
+                            data-ubicacion="<?php echo esc_attr($ubicacion_filter); ?>"
+                            data-cultivo="<?php echo esc_attr($cultivo_filter); ?>"
+                            data-empresa="<?php echo esc_attr($empresa_filter); ?>"
+                            data-search="<?php echo esc_attr(isset($_GET['s']) ? sanitize_text_field($_GET['s']) : ''); ?>"
+                            data-orderby="<?php echo esc_attr($orderby_filter); ?>">
+                        <span class="load-more-text">Cargar más trabajos</span>
+                        <span class="load-more-spinner" style="display: none;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                            </svg>
+                        </span>
+                    </button>
+                </div>
+            <?php endif; ?>
+            
+            <!-- Paginación (solo si hay filtros) -->
+            <?php if (paginate_links($pagination_args)): ?>
+                <div class="trabajos-pagination">
+                    <?php echo paginate_links($pagination_args); ?>
+                </div>
+            <?php endif;
+        endif; ?>
     </div>
 </div>
 
@@ -1180,6 +1239,145 @@ $show_welcome = isset($_GET['welcome']) && $_GET['welcome'] === '1';
 .trabajos-empty p {
     font-size: 16px;
     margin: 0;
+}
+
+.clear-filters-btn {
+    display: inline-block;
+    margin-top: 20px;
+    padding: 12px 24px;
+    background: #4CAF50;
+    color: #fff;
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: all 0.3s;
+}
+
+.clear-filters-btn:hover {
+    background: #45a049;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+}
+
+/* Estado inicial: Sin filtros */
+.no-filters-state {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 60px 20px;
+    text-align: center;
+}
+
+.no-filters-content {
+    background: #fff;
+    border-radius: 16px;
+    padding: 60px 40px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.no-filters-icon {
+    color: #4CAF50;
+    margin: 0 auto 24px;
+    opacity: 0.8;
+}
+
+.no-filters-title {
+    font-size: 32px;
+    font-weight: 700;
+    color: #1a237e;
+    margin: 0 0 16px 0;
+}
+
+.no-filters-description {
+    font-size: 18px;
+    color: #666;
+    line-height: 1.6;
+    margin: 0 0 40px 0;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.no-filters-suggestions {
+    margin-top: 40px;
+    text-align: left;
+}
+
+.no-filters-suggestions h3 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #333;
+    margin: 0 0 20px 0;
+    text-align: center;
+}
+
+.popular-locations {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: center;
+}
+
+.location-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px;
+    background: #f5f5f5;
+    border: 2px solid #e0e0e0;
+    border-radius: 24px;
+    text-decoration: none;
+    color: #333;
+    font-weight: 500;
+    font-size: 15px;
+    transition: all 0.3s;
+}
+
+.location-chip:hover {
+    background: #4CAF50;
+    border-color: #4CAF50;
+    color: #fff;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+}
+
+.location-chip svg {
+    flex-shrink: 0;
+}
+
+.location-count {
+    background: rgba(0, 0, 0, 0.1);
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.location-chip:hover .location-count {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+@media (max-width: 768px) {
+    .no-filters-content {
+        padding: 40px 24px;
+    }
+    
+    .no-filters-title {
+        font-size: 24px;
+    }
+    
+    .no-filters-description {
+        font-size: 16px;
+    }
+    
+    .no-filters-icon {
+        width: 80px;
+        height: 80px;
+    }
+    
+    .location-chip {
+        font-size: 14px;
+        padding: 10px 16px;
+    }
 }
 
 .trabajos-pagination {
@@ -1819,14 +2017,14 @@ function toggleSave(jobId, button) {
             
             // Actualizar contador si existe
             if (btnCount) {
-                const currentCount = parseInt(btnCount.getAttribute('data-count') || 0);
-                const newCount = data.is_saved ? currentCount + 1 : Math.max(0, currentCount - 1);
-                btnCount.setAttribute('data-count', newCount);
-                
-                if (newCount > 0) {
-                    btnCount.textContent = newCount;
-                } else {
-                    btnCount.textContent = '';
+            const currentCount = parseInt(btnCount.getAttribute('data-count') || 0);
+            const newCount = data.is_saved ? currentCount + 1 : Math.max(0, currentCount - 1);
+            btnCount.setAttribute('data-count', newCount);
+            
+            if (newCount > 0) {
+                btnCount.textContent = newCount;
+            } else {
+                btnCount.textContent = '';
                 }
             }
             
