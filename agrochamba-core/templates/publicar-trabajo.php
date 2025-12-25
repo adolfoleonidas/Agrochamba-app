@@ -2617,6 +2617,7 @@ $rest_url = rest_url('agrochamba/v1/');
     // Editar trabajo
     window.editJob = async function(jobId) {
         try {
+            // Usar el endpoint personalizado para obtener el trabajo
             const response = await fetch(restUrl + 'jobs/' + jobId, {
                 headers: {
                     'X-WP-Nonce': restNonce

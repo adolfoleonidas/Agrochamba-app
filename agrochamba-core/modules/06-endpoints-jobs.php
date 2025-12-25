@@ -751,6 +751,108 @@ if (!function_exists('agrochamba_get_current_user_jobs')) {
 }
 
 // ==========================================
+// 3.5. OBTENER UN TRABAJO INDIVIDUAL
+// ==========================================
+if (!function_exists('agrochamba_get_single_job')) {
+    function agrochamba_get_single_job($request) {
+        if (!is_user_logged_in()) {
+            return new WP_Error('rest_not_logged_in', 'No has iniciado sesión.', array('status' => 401));
+        }
+
+        $current_user = wp_get_current_user();
+        if (0 === $current_user->ID) {
+            return new WP_Error('rest_not_logged_in', 'No has iniciado sesión.', array('status' => 401));
+        }
+
+        $post_id = intval($request->get_param('id'));
+        $post = get_post($post_id);
+
+        if (!$post || $post->post_type !== 'trabajo') {
+            return new WP_Error('rest_not_found', 'Trabajo no encontrado.', array('status' => 404));
+        }
+
+        // Verificar que el usuario es el autor o es administrador
+        if ($post->post_author != $current_user->ID && !in_array('administrator', $current_user->roles)) {
+            return new WP_Error('rest_forbidden', 'No tienes permiso para ver este trabajo.', array('status' => 403));
+        }
+
+        // Obtener taxonomías
+        $ubicaciones = wp_get_post_terms($post_id, 'ubicacion', array('fields' => 'all'));
+        $cultivos = wp_get_post_terms($post_id, 'cultivo', array('fields' => 'all'));
+        $tipos_puesto = wp_get_post_terms($post_id, 'tipo_puesto', array('fields' => 'all'));
+        $empresas = wp_get_post_terms($post_id, 'empresa', array('fields' => 'all'));
+        
+        // Obtener meta fields
+        $salario_min = get_post_meta($post_id, 'salario_min', true);
+        $salario_max = get_post_meta($post_id, 'salario_max', true);
+        $vacantes = get_post_meta($post_id, 'vacantes', true);
+        $alojamiento = get_post_meta($post_id, 'alojamiento', true);
+        $transporte = get_post_meta($post_id, 'transporte', true);
+        $alimentacion = get_post_meta($post_id, 'alimentacion', true);
+        $gallery_ids = get_post_meta($post_id, 'gallery_ids', true);
+        $comentarios_habilitados = get_post_meta($post_id, 'comentarios_habilitados', true);
+        
+        // Formatear taxonomías
+        $ubicacion_data = !empty($ubicaciones) && !is_wp_error($ubicaciones) ? array(
+            'id' => $ubicaciones[0]->term_id,
+            'name' => $ubicaciones[0]->name,
+            'slug' => $ubicaciones[0]->slug
+        ) : null;
+        
+        $cultivo_data = !empty($cultivos) && !is_wp_error($cultivos) ? array(
+            'id' => $cultivos[0]->term_id,
+            'name' => $cultivos[0]->name,
+            'slug' => $cultivos[0]->slug
+        ) : null;
+        
+        $tipo_puesto_data = !empty($tipos_puesto) && !is_wp_error($tipos_puesto) ? array(
+            'id' => $tipos_puesto[0]->term_id,
+            'name' => $tipos_puesto[0]->name,
+            'slug' => $tipos_puesto[0]->slug
+        ) : null;
+        
+        $empresa_data = !empty($empresas) && !is_wp_error($empresas) ? array(
+            'id' => $empresas[0]->term_id,
+            'name' => $empresas[0]->name,
+            'slug' => $empresas[0]->slug
+        ) : null;
+        
+        // Obtener imagen destacada
+        $featured_media_id = get_post_thumbnail_id($post_id);
+        $featured_media_url = $featured_media_id ? wp_get_attachment_image_url($featured_media_id, 'full') : null;
+        
+        // Construir respuesta
+        $post_data = array(
+            'id' => $post_id,
+            'title' => array('rendered' => $post->post_title),
+            'content' => array('rendered' => $post->post_content),
+            'excerpt' => array('rendered' => $post->post_excerpt),
+            'date' => $post->post_date,
+            'modified' => $post->post_modified,
+            'status' => $post->post_status,
+            'post_status' => $post->post_status,
+            'link' => get_permalink($post_id),
+            'featured_media' => $featured_media_id,
+            'featured_media_url' => $featured_media_url,
+            'gallery_ids' => is_array($gallery_ids) ? $gallery_ids : array(),
+            'ubicacion' => $ubicacion_data,
+            'cultivo' => $cultivo_data,
+            'tipo_puesto' => $tipo_puesto_data,
+            'empresa' => $empresa_data,
+            'salario_min' => $salario_min ? intval($salario_min) : 0,
+            'salario_max' => $salario_max ? intval($salario_max) : 0,
+            'vacantes' => $vacantes ? intval($vacantes) : 1,
+            'alojamiento' => ($alojamiento === '1' || $alojamiento === 1 || $alojamiento === true),
+            'transporte' => ($transporte === '1' || $transporte === 1 || $transporte === true),
+            'alimentacion' => ($alimentacion === '1' || $alimentacion === 1 || $alimentacion === true),
+            'comentarios_habilitados' => ($comentarios_habilitados !== '0' && $comentarios_habilitados !== 0 && $comentarios_habilitados !== false),
+        );
+        
+        return new WP_REST_Response($post_data, 200);
+    }
+}
+
+// ==========================================
 // 4. OBTENER TRABAJOS DE UNA EMPRESA
 // ==========================================
 if (!function_exists('agrochamba_get_company_jobs')) {
@@ -1190,20 +1292,37 @@ add_action('rest_api_init', function () {
         ));
     }
 
-    // Actualizar trabajo
+    // Obtener un trabajo individual
     if (!isset($routes['/agrochamba/v1/jobs/(?P<id>\d+)'])) {
         register_rest_route('agrochamba/v1', '/jobs/(?P<id>\d+)', array(
-            'methods' => 'PUT',
-            'callback' => 'agrochamba_update_job',
-            'permission_callback' => function () {
-                return is_user_logged_in();
-            },
-            'args' => array(
-                'id' => array(
-                    'required' => true,
-                    'validate_callback' => function($param) {
-                        return is_numeric($param);
-                    }
+            array(
+                'methods' => 'GET',
+                'callback' => 'agrochamba_get_single_job',
+                'permission_callback' => function () {
+                    return is_user_logged_in();
+                },
+                'args' => array(
+                    'id' => array(
+                        'required' => true,
+                        'validate_callback' => function($param) {
+                            return is_numeric($param);
+                        }
+                    ),
+                ),
+            ),
+            array(
+                'methods' => 'PUT',
+                'callback' => 'agrochamba_update_job',
+                'permission_callback' => function () {
+                    return is_user_logged_in();
+                },
+                'args' => array(
+                    'id' => array(
+                        'required' => true,
+                        'validate_callback' => function($param) {
+                            return is_numeric($param);
+                        }
+                    ),
                 ),
             ),
         ));
