@@ -186,8 +186,60 @@ if (!$has_filters && is_post_type_archive('trabajo') && !is_tax()) {
     <!-- Grid de Trabajos -->
     <div class="trabajos-archive-content">
         <?php if ($show_recent_posts): ?>
-            <!-- Mostrar últimos 3 trabajos cuando no hay filtros -->
-        <div class="trabajos-grid">
+            <!-- Landing page: Pantalla de búsqueda + últimos 3 trabajos -->
+            <!-- Primero mostrar la pantalla de "Comienza tu búsqueda" -->
+            <div class="no-filters-state">
+                <div class="no-filters-content">
+                    <svg width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="no-filters-icon">
+                        <circle cx="11" cy="11" r="8"/>
+                        <path d="m21 21-4.35-4.35"/>
+                        <line x1="11" y1="8" x2="11" y2="14"/>
+                        <line x1="8" y1="11" x2="14" y2="11"/>
+                    </svg>
+                    <h2 class="no-filters-title">Comienza tu búsqueda</h2>
+                    <p class="no-filters-description">
+                        Selecciona una ubicación, busca por empresa o puesto, o explora nuestras ofertas disponibles.
+                    </p>
+                    <div class="no-filters-suggestions">
+                        <h3>Ubicaciones populares:</h3>
+                        <div class="popular-locations">
+                            <?php
+                            $popular_ubicaciones = get_terms(array(
+                                'taxonomy' => 'ubicacion',
+                                'hide_empty' => true,
+                                'number' => 6,
+                                'orderby' => 'count',
+                                'order' => 'DESC',
+                            ));
+                            
+                            if (!empty($popular_ubicaciones) && !is_wp_error($popular_ubicaciones)):
+                                foreach ($popular_ubicaciones as $ubicacion):
+                            ?>
+                                <a href="<?php echo esc_url(get_term_link($ubicacion)); ?>" class="location-chip">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                                        <circle cx="12" cy="10" r="3"/>
+                                    </svg>
+                                    <?php echo esc_html($ubicacion->name); ?>
+                                    <span class="location-count"><?php echo esc_html($ubicacion->count); ?></span>
+                                </a>
+                            <?php 
+                                endforeach;
+                            endif;
+                            ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Luego mostrar los últimos 3 trabajos -->
+            <?php if (have_posts()): ?>
+                <div style="margin-top: 60px;">
+                    <h2 style="text-align: center; font-size: 32px; font-weight: 700; margin-bottom: 40px; color: #1a237e;">
+                        Trabajos recientes
+                    </h2>
+                </div>
+                <div class="trabajos-grid">
             <?php if (have_posts()): ?>
                 <?php while (have_posts()): the_post(); 
                     $trabajo_id = get_the_ID();
