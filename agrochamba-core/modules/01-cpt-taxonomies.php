@@ -369,9 +369,17 @@ if (!function_exists('agrochamba_modify_trabajo_archive_query')) {
                     $query->set('tax_query', $tax_query);
                 }
                 
-                // Ordenar por fecha (más recientes primero)
-                $query->set('orderby', 'date');
-                $query->set('order', 'DESC');
+                // Ordenar por fecha o relevancia según parámetro
+                $order_by = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']) : 'date';
+                if ($order_by === 'relevance') {
+                    // Ordenar por score de relevancia
+                    $query->set('orderby', 'relevance');
+                    $query->set('order', 'DESC');
+                } else {
+                    // Ordenar por fecha (más recientes primero)
+                    $query->set('orderby', 'date');
+                    $query->set('order', 'DESC');
+                }
             }
             
             // Para búsquedas de trabajos
