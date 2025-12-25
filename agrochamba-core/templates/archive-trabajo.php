@@ -15,10 +15,29 @@ $paged = get_query_var('paged') ? get_query_var('paged') : 1;
 $posts_per_page = get_option('posts_per_page', 12);
 
 // Obtener filtros de URL
+// Si estamos en una página de taxonomía, obtener el término desde la taxonomía
 $ubicacion_filter = isset($_GET['ubicacion']) ? sanitize_text_field($_GET['ubicacion']) : '';
 $cultivo_filter = isset($_GET['cultivo']) ? sanitize_text_field($_GET['cultivo']) : '';
 $empresa_filter = isset($_GET['empresa']) ? sanitize_text_field($_GET['empresa']) : '';
 $orderby_filter = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']) : 'date'; // Por defecto: más recientes
+
+// Si estamos en una página de taxonomía, obtener el slug del término
+if (is_tax('ubicacion')) {
+    $term = get_queried_object();
+    if ($term && isset($term->slug)) {
+        $ubicacion_filter = $term->slug;
+    }
+} elseif (is_tax('cultivo')) {
+    $term = get_queried_object();
+    if ($term && isset($term->slug)) {
+        $cultivo_filter = $term->slug;
+    }
+} elseif (is_tax('empresa')) {
+    $term = get_queried_object();
+    if ($term && isset($term->slug)) {
+        $empresa_filter = $term->slug;
+    }
+}
 
 // Verificar si es un nuevo usuario
 $show_welcome = isset($_GET['welcome']) && $_GET['welcome'] === '1';
@@ -522,42 +541,79 @@ $show_welcome = isset($_GET['welcome']) && $_GET['welcome'] === '1';
             'type' => 'list',
         );
         
+        // Detectar si estamos en una página de taxonomía (ubicación, cultivo, empresa)
+        $is_taxonomy_page = is_tax('ubicacion') || is_tax('cultivo') || is_tax('empresa');
+        
         // Agregar parámetros GET actuales a la paginación
         // Esto asegura que los filtros se preserven al navegar entre páginas
         $current_url_params = array();
         
-        // Siempre incluir post_type para mantener la consistencia
-        $current_url_params['post_type'] = 'trabajo';
+        // Solo incluir post_type si NO estamos en una página de taxonomía
+        // Las páginas de taxonomía ya tienen la estructura correcta de URL
+        if (!$is_taxonomy_page) {
+            $current_url_params['post_type'] = 'trabajo';
+        }
         
-        // Incluir parámetros solo si tienen valor (no vacíos)
-        if (isset($_GET['ubicacion']) && $_GET['ubicacion'] !== '') {
+        // Incluir parámetros solo si tienen valor (no vacíos) y NO son parte de la estructura de URL de taxonomía
+        if (isset($_GET['ubicacion']) && $_GET['ubicacion'] !== '' && !is_tax('ubicacion')) {
             $current_url_params['ubicacion'] = sanitize_text_field($_GET['ubicacion']);
         }
-        if (isset($_GET['cultivo']) && $_GET['cultivo'] !== '') {
+        if (isset($_GET['cultivo']) && $_GET['cultivo'] !== '' && !is_tax('cultivo')) {
             $current_url_params['cultivo'] = sanitize_text_field($_GET['cultivo']);
         }
-        if (isset($_GET['empresa']) && $_GET['empresa'] !== '') {
+        if (isset($_GET['empresa']) && $_GET['empresa'] !== '' && !is_tax('empresa')) {
             $current_url_params['empresa'] = sanitize_text_field($_GET['empresa']);
         }
         if (isset($_GET['s']) && $_GET['s'] !== '') {
             $current_url_params['s'] = sanitize_text_field($_GET['s']);
         }
+        if (isset($_GET['orderby']) && $_GET['orderby'] !== '') {
+            $current_url_params['orderby'] = sanitize_text_field($_GET['orderby']);
+        }
         
         // Usar base URL correcta para la paginación
-        // Si estamos en el archivo de trabajos, usar su URL base
         if (is_post_type_archive('trabajo')) {
+            // Archivo principal de trabajos
             $pagination_base = get_post_type_archive_link('trabajo');
             // Remover parámetros de página si existen en la URL base
             $pagination_base = remove_query_arg('paged', $pagination_base);
             $pagination_args['base'] = $pagination_base . '%_%';
+        } elseif ($is_taxonomy_page) {
+            // Página de taxonomía: usar la URL de la taxonomía directamente
+            $term = get_queried_object();
+            if ($term && isset($term->taxonomy)) {
+                $taxonomy_link = get_term_link($term);
+                if (!is_wp_error($taxonomy_link)) {
+                    // Remover parámetros de página si existen
+                    $taxonomy_link = remove_query_arg('paged', $taxonomy_link);
+                    // Usar la estructura de paginación de WordPress para taxonomías
+                    $pagination_args['base'] = $taxonomy_link . '%_%';
+                    // NO agregar post_type como parámetro GET en taxonomías
+                    $pagination_args['add_args'] = array();
+                } else {
+                    // Fallback: usar URL actual
+                    $current_url = remove_query_arg('paged');
+                    $pagination_args['base'] = $current_url . '%_%';
+                    $pagination_args['add_args'] = array();
+                }
+            } else {
+                // Fallback: usar URL actual
+                $current_url = remove_query_arg('paged');
+                $pagination_args['base'] = $current_url . '%_%';
+                $pagination_args['add_args'] = array();
+            }
         } else {
-            // Para búsquedas o taxonomías, usar la URL actual sin paged
+            // Para búsquedas, usar la URL actual sin paged
             $current_url = remove_query_arg('paged');
             $pagination_args['base'] = $current_url . '%_%';
+            // Agregar parámetros a la paginación
+            $pagination_args['add_args'] = $current_url_params;
         }
         
-        // Agregar parámetros a la paginación
-        $pagination_args['add_args'] = $current_url_params;
+        // Solo agregar parámetros si no es una página de taxonomía
+        if (!$is_taxonomy_page && !isset($pagination_args['add_args'])) {
+            $pagination_args['add_args'] = $current_url_params;
+        }
         
         // Obtener información de paginación para el botón "Cargar más"
         global $wp_query;
