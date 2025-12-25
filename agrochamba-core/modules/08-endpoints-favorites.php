@@ -1030,6 +1030,7 @@ if (!function_exists('agrochamba_load_more_jobs')) {
                 $card_html .= '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M15 14l4 -4l-4 -4" /><path d="M19 10h-11a4 4 0 1 0 0 8h1" /></svg>';
                 $card_html .= '<span class="btn-text">Compartir</span></button>';
                 
+                // Menú de tres puntos (solo para usuarios logueados)
                 $save_class = $is_saved ? 'active' : '';
                 $save_fill = $is_saved ? 'currentColor' : 'none';
                 $card_html .= '<div class="more-options-wrapper">';
@@ -1060,11 +1061,7 @@ if (!function_exists('agrochamba_load_more_jobs')) {
                 $card_html .= '<button class="interaction-btn share-btn" data-job-id="' . esc_attr($trabajo_id) . '" data-job-title="' . esc_attr($job_title) . '" data-job-url="' . esc_url($job_permalink) . '" onclick="event.preventDefault(); shareJob(' . esc_js($trabajo_id) . ', this);">';
                 $card_html .= '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M15 14l4 -4l-4 -4" /><path d="M19 10h-11a4 4 0 1 0 0 8h1" /></svg>';
                 $card_html .= '<span class="btn-text">Compartir</span></button>';
-                
-                $card_html .= '<div class="more-options-wrapper">';
-                $card_html .= '<a href="' . esc_url(wp_login_url($job_permalink)) . '" class="interaction-btn more-options-btn">';
-                $card_html .= '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>';
-                $card_html .= '</a></div>';
+                // NO incluir menú de tres puntos para usuarios no logueados
             }
             $card_html .= '</div></div></article>';
             

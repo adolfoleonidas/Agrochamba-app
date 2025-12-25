@@ -432,7 +432,7 @@ $orderby_filter = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']
                                         <span class="btn-text">Compartir</span>
                                     </button>
                                     
-                                    <!-- Menú de tres puntos -->
+                                    <!-- Menú de tres puntos (solo para usuarios logueados) -->
                                     <div class="more-options-wrapper">
                                         <button class="interaction-btn more-options-btn" 
                                                 onclick="event.preventDefault(); toggleMoreOptions(this);">
@@ -485,17 +485,6 @@ $orderby_filter = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']
                                         </svg>
                                         <span class="btn-text">Compartir</span>
                                     </button>
-                                    
-                                    <!-- Menú de tres puntos -->
-                                    <div class="more-options-wrapper">
-                                        <a href="<?php echo esc_url(wp_login_url(get_permalink($trabajo_id))); ?>" class="interaction-btn more-options-btn">
-                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                                <circle cx="12" cy="5" r="2"/>
-                                                <circle cx="12" cy="12" r="2"/>
-                                                <circle cx="12" cy="19" r="2"/>
-                                            </svg>
-                                        </a>
-                                    </div>
                                 <?php endif; ?>
                             </div>
                         </div>
@@ -2066,7 +2055,8 @@ document.addEventListener('DOMContentLoaded', function() {
         btn.style.opacity = '1';
     });
     
-    // Forzar visibilidad de menú de tres puntos
+    // Forzar visibilidad de menú de tres puntos (solo para usuarios logueados)
+    <?php if (is_user_logged_in()): ?>
     const moreOptionsWrappers = document.querySelectorAll('.more-options-wrapper');
     moreOptionsWrappers.forEach(function(wrapper) {
         wrapper.style.display = 'flex';
@@ -2080,6 +2070,7 @@ document.addEventListener('DOMContentLoaded', function() {
         btn.style.visibility = 'visible';
         btn.style.opacity = '1';
     });
+    <?php endif; ?>
 });
 
 // Sistema de actualización en tiempo real de todos los contadores (SOLO lectura, NO cuenta vistas)
