@@ -186,60 +186,23 @@ if (!$has_filters && is_post_type_archive('trabajo') && !is_tax()) {
     <!-- Grid de Trabajos -->
     <div class="trabajos-archive-content">
         <?php if ($show_recent_posts): ?>
-            <!-- Landing page: Pantalla de búsqueda + últimos 3 trabajos -->
-            <!-- Primero mostrar la pantalla de "Comienza tu búsqueda" -->
-            <div class="no-filters-state">
-                <div class="no-filters-content">
-                    <svg width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="no-filters-icon">
-                        <circle cx="11" cy="11" r="8"/>
-                        <path d="m21 21-4.35-4.35"/>
-                        <line x1="11" y1="8" x2="11" y2="14"/>
-                        <line x1="8" y1="11" x2="14" y2="11"/>
-                    </svg>
-                    <h2 class="no-filters-title">Comienza tu búsqueda</h2>
-                    <p class="no-filters-description">
-                        Selecciona una ubicación, busca por empresa o puesto, o explora nuestras ofertas disponibles.
-                    </p>
-                    <div class="no-filters-suggestions">
-                        <h3>Ubicaciones populares:</h3>
-                        <div class="popular-locations">
-                            <?php
-                            $popular_ubicaciones = get_terms(array(
-                                'taxonomy' => 'ubicacion',
-                                'hide_empty' => true,
-                                'number' => 6,
-                                'orderby' => 'count',
-                                'order' => 'DESC',
-                            ));
-                            
-                            if (!empty($popular_ubicaciones) && !is_wp_error($popular_ubicaciones)):
-                                foreach ($popular_ubicaciones as $ubicacion):
-                            ?>
-                                <a href="<?php echo esc_url(get_term_link($ubicacion)); ?>" class="location-chip">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
-                                        <circle cx="12" cy="10" r="3"/>
-                                    </svg>
-                                    <?php echo esc_html($ubicacion->name); ?>
-                                    <span class="location-count"><?php echo esc_html($ubicacion->count); ?></span>
-                                </a>
-                            <?php 
-                                endforeach;
-                            endif;
-                            ?>
+            <!-- Landing page: Trabajos recientes primero, luego pantalla de búsqueda -->
+            <!-- Primero mostrar los últimos 3 trabajos -->
+            <?php if (have_posts()): ?>
+                <div class="recent-jobs-section">
+                    <div class="recent-jobs-header">
+                        <div class="recent-jobs-header-content">
+                            <h2 class="recent-jobs-title">
+                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <polyline points="12 6 12 12 16 14"/>
+                                </svg>
+                                Trabajos recientes
+                            </h2>
+                            <p class="recent-jobs-subtitle">Las últimas oportunidades laborales publicadas</p>
                         </div>
                     </div>
-                </div>
-            </div>
-            
-            <!-- Luego mostrar los últimos 3 trabajos -->
-            <?php if (have_posts()): ?>
-                <div style="margin-top: 60px;">
-                    <h2 style="text-align: center; font-size: 32px; font-weight: 700; margin-bottom: 40px; color: #1a237e;">
-                        Trabajos recientes
-                    </h2>
-                </div>
-                <div class="trabajos-grid">
+                    <div class="trabajos-grid recent-jobs-grid">
                 <?php while (have_posts()): the_post(); 
                     $trabajo_id = get_the_ID();
                     
@@ -1667,124 +1630,287 @@ if (!$has_filters && is_post_type_archive('trabajo') && !is_tax()) {
     box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
 }
 
-/* Estado inicial: Sin filtros */
-.no-filters-state {
-    max-width: 800px;
-    margin: 0 auto;
-    padding: 60px 20px;
+/* Sección de Trabajos Recientes */
+.recent-jobs-section {
+    margin-bottom: 80px;
+}
+
+.recent-jobs-header {
+    margin-bottom: 40px;
     text-align: center;
 }
 
+.recent-jobs-header-content {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+.recent-jobs-title {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    font-size: 42px;
+    font-weight: 800;
+    color: #1a237e;
+    margin: 0 0 12px 0;
+    line-height: 1.2;
+}
+
+.recent-jobs-title svg {
+    color: #4CAF50;
+    flex-shrink: 0;
+}
+
+.recent-jobs-subtitle {
+    font-size: 18px;
+    color: #666;
+    margin: 0;
+    font-weight: 400;
+}
+
+.recent-jobs-grid {
+    margin-top: 40px;
+}
+
+/* Estado inicial: Sin filtros - Landing Page Mejorada */
+.no-filters-state {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 0 20px 80px;
+}
+
 .no-filters-content {
-    background: #fff;
-    border-radius: 16px;
-    padding: 60px 40px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    border-radius: 24px;
+    padding: 80px 60px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+    border: 1px solid rgba(76, 175, 80, 0.1);
+    position: relative;
+    overflow: hidden;
+}
+
+.no-filters-content::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #4CAF50 0%, #45a049 50%, #4CAF50 100%);
+}
+
+.search-hero-section {
+    text-align: center;
+    margin-bottom: 60px;
+}
+
+.search-hero-icon-wrapper {
+    margin-bottom: 32px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
 .no-filters-icon {
     color: #4CAF50;
-    margin: 0 auto 24px;
-    opacity: 0.8;
+    opacity: 1;
+    filter: drop-shadow(0 4px 12px rgba(76, 175, 80, 0.2));
+    animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.05);
+        opacity: 0.9;
+    }
 }
 
 .no-filters-title {
-    font-size: 32px;
-    font-weight: 700;
+    font-size: 42px;
+    font-weight: 800;
     color: #1a237e;
-    margin: 0 0 16px 0;
+    margin: 0 0 20px 0;
+    line-height: 1.2;
+    background: linear-gradient(135deg, #1a237e 0%, #4CAF50 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
 }
 
 .no-filters-description {
-    font-size: 18px;
-    color: #666;
-    line-height: 1.6;
-    margin: 0 0 40px 0;
-    max-width: 600px;
+    font-size: 20px;
+    color: #555;
+    line-height: 1.7;
+    margin: 0;
+    max-width: 700px;
     margin-left: auto;
     margin-right: auto;
+    font-weight: 400;
 }
 
 .no-filters-suggestions {
-    margin-top: 40px;
-    text-align: left;
+    margin-top: 60px;
+    padding-top: 50px;
+    border-top: 2px solid #e8f5e9;
 }
 
-.no-filters-suggestions h3 {
-    font-size: 18px;
-    font-weight: 600;
-    color: #333;
-    margin: 0 0 20px 0;
+.suggestions-title {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    font-size: 24px;
+    font-weight: 700;
+    color: #1a237e;
+    margin: 0 0 32px 0;
     text-align: center;
+}
+
+.suggestions-title svg {
+    color: #4CAF50;
+    flex-shrink: 0;
 }
 
 .popular-locations {
     display: flex;
     flex-wrap: wrap;
-    gap: 12px;
+    gap: 16px;
     justify-content: center;
+    align-items: center;
 }
 
 .location-chip {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    padding: 12px 20px;
-    background: #f5f5f5;
+    gap: 10px;
+    padding: 16px 24px;
+    background: #fff;
     border: 2px solid #e0e0e0;
-    border-radius: 24px;
+    border-radius: 30px;
     text-decoration: none;
     color: #333;
-    font-weight: 500;
-    font-size: 15px;
-    transition: all 0.3s;
+    font-weight: 600;
+    font-size: 16px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    position: relative;
+    overflow: hidden;
+}
+
+.location-chip::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    transition: left 0.5s;
+}
+
+.location-chip:hover::before {
+    left: 100%;
 }
 
 .location-chip:hover {
-    background: #4CAF50;
+    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
     border-color: #4CAF50;
     color: #fff;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 8px 24px rgba(76, 175, 80, 0.4);
 }
 
 .location-chip svg {
     flex-shrink: 0;
+    transition: transform 0.3s;
 }
 
-.location-count {
-    background: rgba(0, 0, 0, 0.1);
-    padding: 2px 8px;
-    border-radius: 12px;
-    font-size: 12px;
+.location-chip:hover svg {
+    transform: scale(1.1);
+}
+
+.location-name {
     font-weight: 600;
 }
 
+.location-count {
+    background: rgba(0, 0, 0, 0.08);
+    padding: 4px 10px;
+    border-radius: 16px;
+    font-size: 13px;
+    font-weight: 700;
+    min-width: 32px;
+    text-align: center;
+    transition: all 0.3s;
+}
+
 .location-chip:hover .location-count {
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.25);
+    color: #fff;
 }
 
 @media (max-width: 768px) {
-    .no-filters-content {
-        padding: 40px 24px;
+    .recent-jobs-title {
+        font-size: 32px;
+        flex-direction: column;
+        gap: 8px;
     }
     
-    .no-filters-title {
-        font-size: 24px;
+    .recent-jobs-title svg {
+        width: 28px;
+        height: 28px;
     }
     
-    .no-filters-description {
+    .recent-jobs-subtitle {
         font-size: 16px;
     }
     
+    .recent-jobs-section {
+        margin-bottom: 60px;
+    }
+    
+    .no-filters-content {
+        padding: 50px 30px;
+        border-radius: 20px;
+    }
+    
+    .no-filters-title {
+        font-size: 32px;
+    }
+    
+    .no-filters-description {
+        font-size: 17px;
+    }
+    
     .no-filters-icon {
-        width: 80px;
-        height: 80px;
+        width: 100px;
+        height: 100px;
+    }
+    
+    .suggestions-title {
+        font-size: 20px;
+        flex-direction: column;
+        gap: 8px;
     }
     
     .location-chip {
-        font-size: 14px;
-        padding: 10px 16px;
+        font-size: 15px;
+        padding: 14px 20px;
+    }
+    
+    .popular-locations {
+        gap: 12px;
+    }
+    
+    .no-filters-suggestions {
+        margin-top: 50px;
+        padding-top: 40px;
     }
 }
 
