@@ -49,34 +49,23 @@ $ubicacion_filter = isset($_GET['ubicacion']) ? sanitize_text_field($_GET['ubica
                             <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
                             <circle cx="12" cy="10" r="3"/>
                         </svg>
-                        <?php
-                        // Obtener URL base de trabajos
-                        $trabajos_archive_url = get_post_type_archive_link('trabajo');
-                        if (!$trabajos_archive_url) {
-                            $trabajos_archive_url = home_url('/trabajos/');
-                        }
-                        
-                        // Obtener ubicaciones
-                        $ubicaciones = get_terms(array(
-                            'taxonomy' => 'ubicacion',
-                            'hide_empty' => true,
-                            'number' => 50,
-                        ));
-                        ?>
-                        <select id="ubicacion-filter" class="search-input search-select" onchange="handleUbicacionChange(this)">
-                            <option value="<?php echo esc_url($trabajos_archive_url); ?>" <?php echo empty($ubicacion_filter) ? 'selected' : ''; ?>>Todas las ubicaciones</option>
+                        <select name="ubicacion" class="search-input search-select" onchange="this.form.submit()">
+                            <option value="">Seleccionando todas las ubicaciones</option>
                             <?php
+                            $ubicaciones = get_terms(array(
+                                'taxonomy' => 'ubicacion',
+                                'hide_empty' => true,
+                                'number' => 50,
+                            ));
+                            
                             if (!empty($ubicaciones) && !is_wp_error($ubicaciones)):
                                 foreach ($ubicaciones as $ubicacion):
-                                    $term_link = get_term_link($ubicacion);
-                                    if (!is_wp_error($term_link)):
                             ?>
-                                <option value="<?php echo esc_url($term_link); ?>" 
+                                <option value="<?php echo esc_attr($ubicacion->slug); ?>" 
                                         <?php selected($ubicacion_filter, $ubicacion->slug); ?>>
                                     <?php echo esc_html($ubicacion->name); ?>
                                 </option>
                             <?php 
-                                    endif;
                                 endforeach;
                             endif;
                             ?>
@@ -84,20 +73,6 @@ $ubicacion_filter = isset($_GET['ubicacion']) ? sanitize_text_field($_GET['ubica
                         <svg class="dropdown-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <polyline points="6 9 12 15 18 9"/>
                         </svg>
-                        <script>
-                        function handleUbicacionChange(select) {
-                            var url = select.value;
-                            if (url) {
-                                // Si hay un término de búsqueda, agregarlo a la URL
-                                var searchInput = document.querySelector('input[name="s"]');
-                                if (searchInput && searchInput.value.trim() !== '') {
-                                    var separator = url.indexOf('?') !== -1 ? '&' : '?';
-                                    url += separator + 's=' + encodeURIComponent(searchInput.value.trim()) + '&post_type=trabajo';
-                                }
-                                window.location.href = url;
-                            }
-                        }
-                        </script>
                     </div>
                     
                     <button type="submit" class="search-submit-btn">
@@ -390,15 +365,42 @@ $ubicacion_filter = isset($_GET['ubicacion']) ? sanitize_text_field($_GET['ubica
                                         <?php endif; ?>
                                     </a>
                                     
-                                    <button class="interaction-btn save-btn <?php echo $is_saved ? 'active' : ''; ?>" 
+                                    <button class="interaction-btn share-btn" 
                                             data-job-id="<?php echo esc_attr($trabajo_id); ?>"
-                                            onclick="event.preventDefault(); toggleSave(<?php echo esc_js($trabajo_id); ?>, this);">
-                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="<?php echo $is_saved ? 'currentColor' : 'none'; ?>" stroke="currentColor" stroke-width="2">
-                                            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+                                            data-job-title="<?php echo esc_attr(get_the_title($trabajo_id)); ?>"
+                                            data-job-url="<?php echo esc_url(get_permalink($trabajo_id)); ?>"
+                                            onclick="event.preventDefault(); shareJob(<?php echo esc_js($trabajo_id); ?>, this);">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <circle cx="18" cy="5" r="3"/>
+                                            <circle cx="6" cy="12" r="3"/>
+                                            <circle cx="18" cy="19" r="3"/>
+                                            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+                                            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
                                         </svg>
-                                        <span class="btn-text">Guardar</span>
-                                        <span class="btn-count" data-count="<?php echo esc_attr($saved_count); ?>"><?php echo esc_html($saved_count > 0 ? $saved_count : ''); ?></span>
+                                        <span class="btn-text">Compartir</span>
                                     </button>
+                                    
+                                    <!-- Menú de tres puntos -->
+                                    <div class="more-options-wrapper">
+                                        <button class="interaction-btn more-options-btn" 
+                                                onclick="event.preventDefault(); toggleMoreOptions(this);">
+                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                                <circle cx="12" cy="5" r="2"/>
+                                                <circle cx="12" cy="12" r="2"/>
+                                                <circle cx="12" cy="19" r="2"/>
+                                            </svg>
+                                        </button>
+                                        <div class="more-options-menu" style="display: none;">
+                                            <button class="more-options-item save-btn-menu <?php echo $is_saved ? 'active' : ''; ?>" 
+                                                    data-job-id="<?php echo esc_attr($trabajo_id); ?>"
+                                                    onclick="event.preventDefault(); toggleSave(<?php echo esc_js($trabajo_id); ?>, this);">
+                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="<?php echo $is_saved ? 'currentColor' : 'none'; ?>" stroke="currentColor" stroke-width="2">
+                                                    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+                                                </svg>
+                                                <span><?php echo $is_saved ? 'Guardado' : 'Guardar'; ?></span>
+                                            </button>
+                                        </div>
+                                    </div>
                                 <?php else: ?>
                                     <!-- Usuario no logueado: redirigir a login -->
                                     <a href="<?php echo esc_url(wp_login_url(get_permalink($trabajo_id))); ?>" class="interaction-btn like-btn">
@@ -419,13 +421,31 @@ $ubicacion_filter = isset($_GET['ubicacion']) ? sanitize_text_field($_GET['ubica
                                         <?php endif; ?>
                                     </a>
                                     
-                                    <a href="<?php echo esc_url(wp_login_url(get_permalink($trabajo_id))); ?>" class="interaction-btn save-btn">
+                                    <button class="interaction-btn share-btn" 
+                                            data-job-id="<?php echo esc_attr($trabajo_id); ?>"
+                                            data-job-title="<?php echo esc_attr(get_the_title($trabajo_id)); ?>"
+                                            data-job-url="<?php echo esc_url(get_permalink($trabajo_id)); ?>"
+                                            onclick="event.preventDefault(); shareJob(<?php echo esc_js($trabajo_id); ?>, this);">
                                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+                                            <circle cx="18" cy="5" r="3"/>
+                                            <circle cx="6" cy="12" r="3"/>
+                                            <circle cx="18" cy="19" r="3"/>
+                                            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+                                            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
                                         </svg>
-                                        <span class="btn-text">Guardar</span>
-                                        <span class="btn-count" data-count="<?php echo esc_attr($saved_count); ?>"><?php echo esc_html($saved_count > 0 ? $saved_count : ''); ?></span>
-                                    </a>
+                                        <span class="btn-text">Compartir</span>
+                                    </button>
+                                    
+                                    <!-- Menú de tres puntos -->
+                                    <div class="more-options-wrapper">
+                                        <a href="<?php echo esc_url(wp_login_url(get_permalink($trabajo_id))); ?>" class="interaction-btn more-options-btn">
+                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                                <circle cx="12" cy="5" r="2"/>
+                                                <circle cx="12" cy="12" r="2"/>
+                                                <circle cx="12" cy="19" r="2"/>
+                                            </svg>
+                                        </a>
+                                    </div>
                                 <?php endif; ?>
                             </div>
                         </div>
@@ -1070,6 +1090,194 @@ $ubicacion_filter = isset($_GET['ubicacion']) ? sanitize_text_field($_GET['ubica
     color: #1877f2;
 }
 
+/* Menú de tres puntos */
+.more-options-wrapper {
+    position: relative;
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+.more-options-btn {
+    flex: 0 0 auto !important;
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+.more-options-menu {
+    position: absolute;
+    bottom: 100%;
+    right: 0;
+    margin-bottom: 8px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    min-width: 160px;
+    z-index: 1000;
+    overflow: hidden;
+    border: 1px solid #e0e0e0;
+}
+
+.more-options-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 12px 16px;
+    border: none;
+    background: transparent;
+    color: #333;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    text-align: left;
+}
+
+.more-options-item:hover {
+    background: #f0f2f5;
+}
+
+.more-options-item.active {
+    color: #1877f2;
+}
+
+.more-options-item svg {
+    flex-shrink: 0;
+}
+
+.more-options-item span {
+    flex: 1;
+}
+
+/* Botón de compartir */
+.share-btn {
+    color: #65676b;
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+.share-btn:hover {
+    color: #1877f2;
+}
+
+/* Menú de compartir */
+.share-menu {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-bottom: 8px;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    min-width: 280px;
+    z-index: 1001;
+    overflow: hidden;
+    border: 1px solid #e0e0e0;
+    padding: 8px;
+}
+
+.share-menu-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid #e0e0e0;
+    font-weight: 600;
+    font-size: 16px;
+    color: #1a1a1a;
+}
+
+.share-options {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    padding: 8px;
+}
+
+.share-option {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 8px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    text-decoration: none;
+    color: #333;
+}
+
+.share-option:hover {
+    background: #f0f2f5;
+}
+
+.share-option-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+}
+
+.share-option-icon.facebook {
+    background: #1877f2;
+    color: #fff;
+}
+
+.share-option-icon.whatsapp {
+    background: #25d366;
+    color: #fff;
+}
+
+.share-option-icon.twitter {
+    background: #1da1f2;
+    color: #fff;
+}
+
+.share-option-icon.link {
+    background: #f0f2f5;
+    color: #65676b;
+}
+
+.share-option-label {
+    font-size: 12px;
+    font-weight: 500;
+    text-align: center;
+}
+
+.interaction-buttons {
+    display: flex !important;
+    justify-content: space-around;
+    align-items: center;
+    border-top: 1px solid #e0e0e0;
+    padding-top: 4px;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+.interaction-btn {
+    flex: 1;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 4px;
+    border: none;
+    background: transparent;
+    color: #65676b;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.2s;
+    text-decoration: none;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
 @media (max-width: 768px) {
     .interaction-buttons {
         gap: 4px;
@@ -1091,6 +1299,23 @@ $ubicacion_filter = isset($_GET['ubicacion']) ? sanitize_text_field($_GET['ubica
     .counter-group {
         gap: 8px;
         font-size: 12px;
+    }
+    
+    .share-btn,
+    .more-options-btn {
+        display: flex !important;
+        visibility: visible !important;
+    }
+    
+    .share-menu {
+        min-width: 240px;
+        left: auto;
+        right: 0;
+        transform: none;
+    }
+    
+    .share-options {
+        grid-template-columns: repeat(3, 1fr);
     }
 }
 </style>
@@ -1167,7 +1392,8 @@ function toggleSave(jobId, button) {
     <?php endif; ?>
     
     const btn = button;
-    const btnText = btn.querySelector('.btn-text');
+    const isMenuButton = btn.classList.contains('save-btn-menu');
+    const btnText = btn.querySelector('.btn-text') || btn.querySelector('span');
     const btnCount = btn.querySelector('.btn-count');
     const isActive = btn.classList.contains('active');
     
@@ -1187,20 +1413,46 @@ function toggleSave(jobId, button) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
+            // Actualizar estado visual del botón actual
             if (data.is_saved) {
                 btn.classList.add('active');
+                const svg = btn.querySelector('svg');
+                if (svg) {
+                    svg.setAttribute('fill', 'currentColor');
+                }
+                if (btnText && btnText.tagName === 'SPAN') {
+                    btnText.textContent = 'Guardado';
+                }
             } else {
                 btn.classList.remove('active');
+                const svg = btn.querySelector('svg');
+                if (svg) {
+                    svg.setAttribute('fill', 'none');
+                }
+                if (btnText && btnText.tagName === 'SPAN') {
+                    btnText.textContent = 'Guardar';
+                }
             }
             
-            const currentCount = parseInt(btnCount.getAttribute('data-count') || 0);
-            const newCount = data.is_saved ? currentCount + 1 : Math.max(0, currentCount - 1);
-            btnCount.setAttribute('data-count', newCount);
+            // Actualizar contador si existe
+            if (btnCount) {
+                const currentCount = parseInt(btnCount.getAttribute('data-count') || 0);
+                const newCount = data.is_saved ? currentCount + 1 : Math.max(0, currentCount - 1);
+                btnCount.setAttribute('data-count', newCount);
+                
+                if (newCount > 0) {
+                    btnCount.textContent = newCount;
+                } else {
+                    btnCount.textContent = '';
+                }
+            }
             
-            if (newCount > 0) {
-                btnCount.textContent = newCount;
-            } else {
-                btnCount.textContent = '';
+            // Cerrar menú de tres puntos si se usó desde ahí
+            if (isMenuButton) {
+                const menu = btn.closest('.more-options-menu');
+                if (menu) {
+                    menu.style.display = 'none';
+                }
             }
         } else {
             alert(data.message || 'Error al guardar trabajo');
@@ -1214,6 +1466,202 @@ function toggleSave(jobId, button) {
         btn.disabled = false;
     });
 }
+
+// Función para compartir trabajo
+function shareJob(jobId, button) {
+    const jobTitle = button.getAttribute('data-job-title');
+    const jobUrl = button.getAttribute('data-job-url');
+    const jobText = 'Mira esta oportunidad de trabajo: ' + jobTitle;
+    
+    // Intentar usar Web Share API (similar a Facebook)
+    if (navigator.share) {
+        navigator.share({
+            title: jobTitle,
+            text: jobText,
+            url: jobUrl
+        })
+        .then(() => {
+            console.log('Compartido exitosamente');
+        })
+        .catch((error) => {
+            console.log('Error al compartir:', error);
+            // Si falla, mostrar menú de opciones
+            showShareMenu(button, jobTitle, jobUrl, jobText);
+        });
+    } else {
+        // Fallback: mostrar menú de opciones de compartir
+        showShareMenu(button, jobTitle, jobUrl, jobText);
+    }
+}
+
+// Función para mostrar menú de compartir
+function showShareMenu(button, jobTitle, jobUrl, jobText) {
+    // Cerrar otros menús abiertos
+    closeAllMenus();
+    
+    const card = button.closest('.trabajo-card');
+    const shareMenu = document.createElement('div');
+    shareMenu.className = 'share-menu';
+    shareMenu.innerHTML = `
+        <div class="share-menu-header">Compartir en</div>
+        <div class="share-options">
+            <a href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(jobUrl)}" 
+               target="_blank" 
+               rel="noopener noreferrer"
+               class="share-option"
+               onclick="closeAllMenus();">
+                <div class="share-option-icon facebook">f</div>
+                <div class="share-option-label">Facebook</div>
+            </a>
+            <a href="https://wa.me/?text=${encodeURIComponent(jobText + ' ' + jobUrl)}" 
+               target="_blank" 
+               rel="noopener noreferrer"
+               class="share-option"
+               onclick="closeAllMenus();">
+                <div class="share-option-icon whatsapp">W</div>
+                <div class="share-option-label">WhatsApp</div>
+            </a>
+            <a href="https://twitter.com/intent/tweet?text=${encodeURIComponent(jobText)}&url=${encodeURIComponent(jobUrl)}" 
+               target="_blank" 
+               rel="noopener noreferrer"
+               class="share-option"
+               onclick="closeAllMenus();">
+                <div class="share-option-icon twitter">t</div>
+                <div class="share-option-label">Twitter</div>
+            </a>
+            <button class="share-option" 
+                    onclick="copyToClipboard('${jobUrl.replace(/'/g, "\\'")}'); closeAllMenus();">
+                <div class="share-option-icon link">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                    </svg>
+                </div>
+                <div class="share-option-label">Copiar enlace</div>
+            </button>
+        </div>
+    `;
+    
+    const buttonWrapper = button.closest('.interaction-btn');
+    buttonWrapper.style.position = 'relative';
+    buttonWrapper.appendChild(shareMenu);
+    
+    // Cerrar menú al hacer clic fuera
+    setTimeout(() => {
+        document.addEventListener('click', function closeMenuOnClickOutside(e) {
+            if (!shareMenu.contains(e.target) && e.target !== button) {
+                shareMenu.remove();
+                document.removeEventListener('click', closeMenuOnClickOutside);
+            }
+        });
+    }, 100);
+}
+
+// Función para copiar al portapapeles
+function copyToClipboard(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+            // Mostrar notificación temporal
+            const notification = document.createElement('div');
+            notification.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #4CAF50; color: white; padding: 12px 20px; border-radius: 8px; z-index: 10000; box-shadow: 0 4px 12px rgba(0,0,0,0.15);';
+            notification.textContent = 'Enlace copiado al portapapeles';
+            document.body.appendChild(notification);
+            setTimeout(() => {
+                notification.remove();
+            }, 2000);
+        }).catch(err => {
+            console.error('Error al copiar:', err);
+            alert('Error al copiar el enlace');
+        });
+    } else {
+        // Fallback para navegadores antiguos
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.opacity = '0';
+        document.body.appendChild(textArea);
+        textArea.select();
+        try {
+            document.execCommand('copy');
+            alert('Enlace copiado al portapapeles');
+        } catch (err) {
+            alert('Error al copiar el enlace');
+        }
+        document.body.removeChild(textArea);
+    }
+}
+
+// Función para abrir/cerrar menú de tres puntos
+function toggleMoreOptions(button) {
+    const wrapper = button.closest('.more-options-wrapper');
+    const menu = wrapper.querySelector('.more-options-menu');
+    
+    // Cerrar otros menús abiertos
+    closeAllMenus();
+    
+    if (menu.style.display === 'none' || !menu.style.display) {
+        menu.style.display = 'block';
+        
+        // Cerrar menú al hacer clic fuera
+        setTimeout(() => {
+            document.addEventListener('click', function closeMenuOnClickOutside(e) {
+                if (!menu.contains(e.target) && e.target !== button) {
+                    menu.style.display = 'none';
+                    document.removeEventListener('click', closeMenuOnClickOutside);
+                }
+            });
+        }, 100);
+    } else {
+        menu.style.display = 'none';
+    }
+}
+
+// Función para cerrar todos los menús abiertos
+function closeAllMenus() {
+    // Cerrar menús de compartir
+    document.querySelectorAll('.share-menu').forEach(menu => {
+        menu.remove();
+    });
+    
+    // Cerrar menús de tres puntos
+    document.querySelectorAll('.more-options-menu').forEach(menu => {
+        menu.style.display = 'none';
+    });
+}
+
+// Asegurar que los botones de compartir y menú de tres puntos siempre sean visibles
+document.addEventListener('DOMContentLoaded', function() {
+    // Forzar visibilidad de botones de interacción
+    const interactionButtons = document.querySelectorAll('.interaction-buttons');
+    interactionButtons.forEach(function(container) {
+        container.style.display = 'flex';
+        container.style.visibility = 'visible';
+        container.style.opacity = '1';
+    });
+    
+    // Forzar visibilidad de botones de compartir
+    const shareButtons = document.querySelectorAll('.share-btn');
+    shareButtons.forEach(function(btn) {
+        btn.style.display = 'flex';
+        btn.style.visibility = 'visible';
+        btn.style.opacity = '1';
+    });
+    
+    // Forzar visibilidad de menú de tres puntos
+    const moreOptionsWrappers = document.querySelectorAll('.more-options-wrapper');
+    moreOptionsWrappers.forEach(function(wrapper) {
+        wrapper.style.display = 'flex';
+        wrapper.style.visibility = 'visible';
+        wrapper.style.opacity = '1';
+    });
+    
+    const moreOptionsButtons = document.querySelectorAll('.more-options-btn');
+    moreOptionsButtons.forEach(function(btn) {
+        btn.style.display = 'flex';
+        btn.style.visibility = 'visible';
+        btn.style.opacity = '1';
+    });
+});
 
 // Sistema de actualización en tiempo real de todos los contadores (SOLO lectura, NO cuenta vistas)
 // Las vistas solo se cuentan cuando se abre la página individual del trabajo
