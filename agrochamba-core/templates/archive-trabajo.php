@@ -15,18 +15,7 @@ $paged = get_query_var('paged') ? get_query_var('paged') : 1;
 $posts_per_page = get_option('posts_per_page', 12);
 
 // Obtener filtros de URL
-// Si estamos en una página de taxonomía, obtener el slug del término actual
-$ubicacion_filter = '';
-if (is_tax('ubicacion')) {
-    $queried_object = get_queried_object();
-    if ($queried_object && isset($queried_object->slug)) {
-        $ubicacion_filter = $queried_object->slug;
-    }
-} elseif (isset($_GET['ubicacion']) && $_GET['ubicacion'] !== '') {
-    // Solo usar el filtro si no está vacío (vacío significa "todas las ubicaciones")
-    $ubicacion_filter = sanitize_text_field($_GET['ubicacion']);
-}
-
+$ubicacion_filter = isset($_GET['ubicacion']) ? sanitize_text_field($_GET['ubicacion']) : '';
 $cultivo_filter = isset($_GET['cultivo']) ? sanitize_text_field($_GET['cultivo']) : '';
 $empresa_filter = isset($_GET['empresa']) ? sanitize_text_field($_GET['empresa']) : '';
 
@@ -67,15 +56,7 @@ $show_welcome = isset($_GET['welcome']) && $_GET['welcome'] === '1';
             <p class="archive-subtitle">Explora nuestro directorio completo de ofertas en el sector agroindustrial</p>
             
             <!-- Barra de búsqueda -->
-            <?php
-            // Determinar la URL base del formulario
-            // Siempre usar la URL del archivo de trabajos para evitar problemas de permisos
-            $form_action = get_post_type_archive_link('trabajo');
-            if (!$form_action) {
-                $form_action = home_url('/trabajos/');
-            }
-            ?>
-            <form class="archive-search-form" method="get" action="<?php echo esc_url($form_action); ?>">
+            <form class="archive-search-form" method="get" action="<?php echo esc_url(home_url('/')); ?>">
                 <input type="hidden" name="post_type" value="trabajo">
                 <div class="search-input-group">
                     <div class="search-input-wrapper">
@@ -95,34 +76,23 @@ $show_welcome = isset($_GET['welcome']) && $_GET['welcome'] === '1';
                             <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
                             <circle cx="12" cy="10" r="3"/>
                         </svg>
-                        <?php
-                        // Obtener URL base de trabajos
-                        $trabajos_archive_url = get_post_type_archive_link('trabajo');
-                        if (!$trabajos_archive_url) {
-                            $trabajos_archive_url = home_url('/trabajos/');
-                        }
-                        
-                        // Obtener ubicaciones
-                        $ubicaciones = get_terms(array(
-                            'taxonomy' => 'ubicacion',
-                            'hide_empty' => true,
-                            'number' => 50,
-                        ));
-                        ?>
-                        <select id="ubicacion-filter" class="search-input search-select" onchange="handleUbicacionChange(this)">
-                            <option value="<?php echo esc_url($trabajos_archive_url); ?>" <?php echo empty($ubicacion_filter) ? 'selected' : ''; ?>>Todas las ubicaciones</option>
+                        <select name="ubicacion" class="search-input search-select" onchange="this.form.submit()">
+                            <option value="">Todas las ubicaciones</option>
                             <?php
+                            $ubicaciones = get_terms(array(
+                                'taxonomy' => 'ubicacion',
+                                'hide_empty' => true,
+                                'number' => 50,
+                            ));
+                            
                             if (!empty($ubicaciones) && !is_wp_error($ubicaciones)):
                                 foreach ($ubicaciones as $ubicacion):
-                                    $term_link = get_term_link($ubicacion);
-                                    if (!is_wp_error($term_link)):
                             ?>
-                                <option value="<?php echo esc_url($term_link); ?>" 
+                                <option value="<?php echo esc_attr($ubicacion->slug); ?>" 
                                         <?php selected($ubicacion_filter, $ubicacion->slug); ?>>
                                     <?php echo esc_html($ubicacion->name); ?>
                                 </option>
                             <?php 
-                                    endif;
                                 endforeach;
                             endif;
                             ?>
@@ -130,20 +100,6 @@ $show_welcome = isset($_GET['welcome']) && $_GET['welcome'] === '1';
                         <svg class="dropdown-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <polyline points="6 9 12 15 18 9"/>
                         </svg>
-                        <script>
-                        function handleUbicacionChange(select) {
-                            var url = select.value;
-                            if (url) {
-                                // Si hay un término de búsqueda, agregarlo a la URL
-                                var searchInput = document.querySelector('input[name="s"]');
-                                if (searchInput && searchInput.value.trim() !== '') {
-                                    var separator = url.indexOf('?') !== -1 ? '&' : '?';
-                                    url += separator + 's=' + encodeURIComponent(searchInput.value.trim()) + '&post_type=trabajo';
-                                }
-                                window.location.href = url;
-                            }
-                        }
-                        </script>
                     </div>
                     
                     <button type="submit" class="search-submit-btn">
@@ -1153,16 +1109,18 @@ $show_welcome = isset($_GET['welcome']) && $_GET['welcome'] === '1';
 }
 
 .interaction-buttons {
-    display: flex;
+    display: flex !important;
     justify-content: space-around;
     align-items: center;
     border-top: 1px solid #e0e0e0;
     padding-top: 4px;
+    visibility: visible !important;
+    opacity: 1 !important;
 }
 
 .interaction-btn {
     flex: 1;
-    display: flex;
+    display: flex !important;
     align-items: center;
     justify-content: center;
     gap: 6px;
@@ -1176,6 +1134,8 @@ $show_welcome = isset($_GET['welcome']) && $_GET['welcome'] === '1';
     border-radius: 4px;
     transition: all 0.2s;
     text-decoration: none;
+    visibility: visible !important;
+    opacity: 1 !important;
 }
 
 .interaction-btn:hover {
@@ -1238,10 +1198,16 @@ $show_welcome = isset($_GET['welcome']) && $_GET['welcome'] === '1';
 /* Menú de tres puntos */
 .more-options-wrapper {
     position: relative;
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
 }
 
 .more-options-btn {
     flex: 0 0 auto !important;
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
 }
 
 .more-options-menu {
@@ -1293,6 +1259,9 @@ $show_welcome = isset($_GET['welcome']) && $_GET['welcome'] === '1';
 /* Botón de compartir */
 .share-btn {
     color: #65676b;
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
 }
 
 .share-btn:hover {
@@ -1387,11 +1356,15 @@ $show_welcome = isset($_GET['welcome']) && $_GET['welcome'] === '1';
 @media (max-width: 768px) {
     .interaction-buttons {
         gap: 4px;
+        display: flex !important;
+        visibility: visible !important;
     }
     
     .interaction-btn {
         font-size: 12px;
         padding: 6px 2px;
+        display: flex !important;
+        visibility: visible !important;
     }
     
     .interaction-btn .btn-text {
@@ -1405,6 +1378,12 @@ $show_welcome = isset($_GET['welcome']) && $_GET['welcome'] === '1';
     .counter-group {
         gap: 8px;
         font-size: 12px;
+    }
+    
+    .share-btn,
+    .more-options-btn {
+        display: flex !important;
+        visibility: visible !important;
     }
     
     .share-menu {
@@ -1746,29 +1725,6 @@ function toggleSave(jobId, button) {
 
 // La búsqueda ahora se maneja con el formulario HTML estándar
 // No necesitamos funciones JavaScript adicionales para los filtros
-
-// Asegurar que el selector de ubicación muestre el texto correcto
-document.addEventListener('DOMContentLoaded', function() {
-    const ubicacionSelect = document.querySelector('select[name="ubicacion"]');
-    if (ubicacionSelect) {
-        // Si el valor está vacío, asegurar que muestre "Todas las ubicaciones"
-        if (ubicacionSelect.value === '') {
-            const option = ubicacionSelect.querySelector('option[value=""]');
-            if (option) {
-                option.textContent = 'Todas las ubicaciones';
-            }
-        }
-        
-        // Asegurar que los botones de compartir y tres puntos siempre sean visibles
-        const shareButtons = document.querySelectorAll('.share-btn, .more-options-btn');
-        shareButtons.forEach(function(btn) {
-            if (btn) {
-                btn.style.display = '';
-                btn.style.visibility = 'visible';
-            }
-        });
-    }
-});
 
 // Función para compartir trabajo
 function shareJob(jobId, button) {
