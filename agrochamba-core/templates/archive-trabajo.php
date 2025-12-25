@@ -244,20 +244,6 @@ if (!$has_filters && is_post_type_archive('trabajo') && !is_tax()) {
             ));
             $ubicaciones_count = is_wp_error($ubicaciones_terms) ? 0 : intval($ubicaciones_terms);
             
-            // Trabajos con beneficios
-            $benefits_query = new WP_Query(array(
-                'post_type' => 'trabajo',
-                'post_status' => 'publish',
-                'posts_per_page' => -1,
-                'meta_query' => array(
-                    'relation' => 'OR',
-                    array('key' => 'alojamiento', 'value' => '1', 'compare' => '='),
-                    array('key' => 'transporte', 'value' => '1', 'compare' => '='),
-                    array('key' => 'alimentacion', 'value' => '1', 'compare' => '='),
-                ),
-                'fields' => 'ids',
-            ));
-            $benefits_count = $benefits_query->found_posts;
             ?>
             <div class="landing-stats-section">
                 <div class="stats-grid">
@@ -294,18 +280,6 @@ if (!$has_filters && is_post_type_archive('trabajo') && !is_tax()) {
                         <div class="stat-content">
                             <div class="stat-number"><?php echo number_format($ubicaciones_count); ?></div>
                             <div class="stat-label">Ubicaciones</div>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                                <polyline points="22 4 12 14.01 9 11.01"/>
-                            </svg>
-                        </div>
-                        <div class="stat-content">
-                            <div class="stat-number"><?php echo number_format($benefits_count); ?></div>
-                            <div class="stat-label">Con beneficios</div>
                         </div>
                     </div>
                 </div>

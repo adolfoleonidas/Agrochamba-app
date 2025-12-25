@@ -134,12 +134,264 @@ $rest_url = rest_url('agrochamba/v1/');
                 </form>
             </div>
         <?php else: ?>
-            <!-- Formulario de Publicación de Trabajo -->
-            <div class="publicar-trabajo-section">
-                <div class="form-header">
-                    <h1 class="form-title">Publicar Nuevo Trabajo</h1>
-                    <p class="form-subtitle">Completa todos los campos para publicar tu oferta de trabajo</p>
+            <!-- Dashboard de Empresa -->
+            <div class="empresa-dashboard">
+                <!-- Navegación por Tabs -->
+                <div class="dashboard-nav">
+                    <button class="nav-tab active" data-tab="dashboard">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="7" height="7"/>
+                            <rect x="14" y="3" width="7" height="7"/>
+                            <rect x="14" y="14" width="7" height="7"/>
+                            <rect x="3" y="14" width="7" height="7"/>
+                        </svg>
+                        <span>Dashboard</span>
+                    </button>
+                    <button class="nav-tab" data-tab="mis-trabajos">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
+                            <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+                        </svg>
+                        <span>Mis Trabajos</span>
+                    </button>
+                    <button class="nav-tab" data-tab="crear-trabajo">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"/>
+                            <line x1="5" y1="12" x2="19" y2="12"/>
+                        </svg>
+                        <span>Crear Trabajo</span>
+                    </button>
+                    <button class="nav-tab" data-tab="mi-empresa">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                        </svg>
+                        <span>Mi Empresa</span>
+                    </button>
                 </div>
+                
+                <!-- Contenido de Tabs -->
+                <div class="dashboard-content">
+                    <!-- Tab: Dashboard -->
+                    <div class="tab-content active" id="tab-dashboard">
+                        <div class="dashboard-header">
+                            <h1 class="dashboard-title">Panel de Control</h1>
+                            <p class="dashboard-subtitle">Bienvenido, <?php echo esc_html($current_user->display_name); ?></p>
+                        </div>
+                        
+                        <div class="dashboard-stats" id="dashboard-stats">
+                            <div class="stat-card">
+                                <div class="stat-icon">
+                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
+                                        <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+                                    </svg>
+                                </div>
+                                <div class="stat-content">
+                                    <div class="stat-number" id="stat-total-jobs">-</div>
+                                    <div class="stat-label">Total Trabajos</div>
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-icon">
+                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                                        <polyline points="22 4 12 14.01 9 11.01"/>
+                                    </svg>
+                                </div>
+                                <div class="stat-content">
+                                    <div class="stat-number" id="stat-published-jobs">-</div>
+                                    <div class="stat-label">Publicados</div>
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-icon">
+                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"/>
+                                        <polyline points="12 6 12 12 16 14"/>
+                                    </svg>
+                                </div>
+                                <div class="stat-content">
+                                    <div class="stat-number" id="stat-pending-jobs">-</div>
+                                    <div class="stat-label">Pendientes</div>
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-icon">
+                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                                        <circle cx="9" cy="7" r="4"/>
+                                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                                        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                                    </svg>
+                                </div>
+                                <div class="stat-content">
+                                    <div class="stat-number" id="stat-total-views">-</div>
+                                    <div class="stat-label">Total Vistas</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="dashboard-actions">
+                            <a href="#" class="action-card" data-tab="crear-trabajo">
+                                <div class="action-icon">
+                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="12" y1="5" x2="12" y2="19"/>
+                                        <line x1="5" y1="12" x2="19" y2="12"/>
+                                    </svg>
+                                </div>
+                                <div class="action-content">
+                                    <h3>Crear Nuevo Trabajo</h3>
+                                    <p>Publica una nueva oferta de trabajo</p>
+                                </div>
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="9 18 15 12 9 6"/>
+                                </svg>
+                            </a>
+                            <a href="#" class="action-card" data-tab="mis-trabajos">
+                                <div class="action-icon">
+                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
+                                        <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+                                    </svg>
+                                </div>
+                                <div class="action-content">
+                                    <h3>Gestionar Trabajos</h3>
+                                    <p>Ver y editar tus trabajos publicados</p>
+                                </div>
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="9 18 15 12 9 6"/>
+                                </svg>
+                            </a>
+                            <a href="#" class="action-card" data-tab="mi-empresa">
+                                <div class="action-icon">
+                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                                    </svg>
+                                </div>
+                                <div class="action-content">
+                                    <h3>Mi Perfil de Empresa</h3>
+                                    <p>Actualiza la información de tu empresa</p>
+                                </div>
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="9 18 15 12 9 6"/>
+                                </svg>
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <!-- Tab: Mis Trabajos -->
+                    <div class="tab-content" id="tab-mis-trabajos">
+                        <div class="dashboard-header">
+                            <h1 class="dashboard-title">Mis Trabajos Publicados</h1>
+                            <button class="btn-primary" data-tab="crear-trabajo">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="12" y1="5" x2="12" y2="19"/>
+                                    <line x1="5" y1="12" x2="19" y2="12"/>
+                                </svg>
+                                Crear Nuevo Trabajo
+                            </button>
+                        </div>
+                        
+                        <div id="mis-trabajos-list" class="mis-trabajos-list">
+                            <div class="loading-spinner">
+                                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                                </svg>
+                                <p>Cargando trabajos...</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Tab: Mi Empresa -->
+                    <div class="tab-content" id="tab-mi-empresa">
+                        <div class="dashboard-header">
+                            <h1 class="dashboard-title">Información de Mi Empresa</h1>
+                            <p class="dashboard-subtitle">Actualiza los datos de tu empresa</p>
+                        </div>
+                        
+                        <form id="empresa-profile-form" class="empresa-profile-form">
+                            <div class="form-section">
+                                <label for="company-name" class="section-label">Nombre de la Empresa</label>
+                                <input type="text" id="company-name" name="company_name" value="<?php echo esc_attr($current_user->display_name); ?>" readonly>
+                                <p class="field-hint">El nombre de la empresa no se puede cambiar</p>
+                            </div>
+                            
+                            <div class="form-section">
+                                <label for="company-email" class="section-label">Correo Electrónico</label>
+                                <input type="email" id="company-email" name="email" value="<?php echo esc_attr($current_user->user_email); ?>" required>
+                            </div>
+                            
+                            <div class="form-section">
+                                <label for="company-description" class="section-label">Descripción</label>
+                                <textarea id="company-description" name="description" rows="6" placeholder="Describe tu empresa, su historia, valores y lo que la hace especial..."></textarea>
+                            </div>
+                            
+                            <div class="form-section">
+                                <label for="company-phone" class="section-label">Teléfono</label>
+                                <input type="tel" id="company-phone" name="phone" placeholder="Ej: +51 999 999 999">
+                            </div>
+                            
+                            <div class="form-section">
+                                <label for="company-address" class="section-label">Dirección</label>
+                                <input type="text" id="company-address" name="address" placeholder="Dirección completa de la empresa">
+                            </div>
+                            
+                            <div class="form-section">
+                                <label for="company-website" class="section-label">Sitio Web</label>
+                                <input type="url" id="company-website" name="website" placeholder="https://ejemplo.com">
+                            </div>
+                            
+                            <div class="form-section">
+                                <label class="section-label">Redes Sociales</label>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="company-facebook">Facebook</label>
+                                        <input type="url" id="company-facebook" name="facebook" placeholder="https://facebook.com/...">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="company-instagram">Instagram</label>
+                                        <input type="url" id="company-instagram" name="instagram" placeholder="https://instagram.com/...">
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="company-linkedin">LinkedIn</label>
+                                        <input type="url" id="company-linkedin" name="linkedin" placeholder="https://linkedin.com/...">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="company-twitter">Twitter</label>
+                                        <input type="url" id="company-twitter" name="twitter" placeholder="https://twitter.com/...">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="form-actions">
+                                <button type="submit" class="btn-primary" id="save-profile-btn">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                                        <polyline points="17 21 17 13 7 13 7 21"/>
+                                        <polyline points="7 3 7 8 15 8"/>
+                                    </svg>
+                                    <span class="btn-text">Guardar Cambios</span>
+                                    <span class="btn-spinner" style="display: none;">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                                        </svg>
+                                    </span>
+                                </button>
+                            </div>
+                            
+                            <div id="profile-error-message" class="error-message" style="display: none;"></div>
+                            <div id="profile-success-message" class="success-message" style="display: none;"></div>
+                        </form>
+                    </div>
+                    
+                    <!-- Tab: Crear Trabajo -->
+                    <div class="tab-content" id="tab-crear-trabajo">
+                        <div class="form-header">
+                            <h1 class="form-title">Publicar Nuevo Trabajo</h1>
+                            <p class="form-subtitle">Completa todos los campos para publicar tu oferta de trabajo</p>
+                        </div>
                 
                 <form id="publicar-trabajo-form" class="publicar-trabajo-form" enctype="multipart/form-data">
                     <!-- Galería de Imágenes -->
@@ -440,6 +692,48 @@ $rest_url = rest_url('agrochamba/v1/');
                     <div id="publish-error-message" class="error-message" style="display: none;"></div>
                     <div id="publish-success-message" class="success-message" style="display: none;"></div>
                 </form>
+                    </div>
+                    
+                    <!-- Tab: Editar Trabajo (se muestra dinámicamente) -->
+                    <div class="tab-content" id="tab-editar-trabajo">
+                        <div class="form-header">
+                            <h1 class="form-title">Editar Trabajo</h1>
+                            <button class="btn-secondary" onclick="showTab('mis-trabajos')">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="15 18 9 12 15 6"/>
+                                </svg>
+                                Volver a Mis Trabajos
+                            </button>
+                        </div>
+                        
+                        <form id="editar-trabajo-form" class="publicar-trabajo-form" enctype="multipart/form-data">
+                            <input type="hidden" id="edit-job-id" name="job_id">
+                            <!-- El mismo formulario que crear trabajo, se llenará dinámicamente -->
+                            <div id="edit-job-form-content">
+                                <!-- Se llenará con JavaScript -->
+                            </div>
+                            
+                            <div class="form-actions">
+                                <button type="submit" class="btn-primary" id="update-submit-btn">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                                        <polyline points="17 21 17 13 7 13 7 21"/>
+                                        <polyline points="7 3 7 8 15 8"/>
+                                    </svg>
+                                    <span class="btn-text">Actualizar Trabajo</span>
+                                    <span class="btn-spinner" style="display: none;">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                                        </svg>
+                                    </span>
+                                </button>
+                            </div>
+                            
+                            <div id="update-error-message" class="error-message" style="display: none;"></div>
+                            <div id="update-success-message" class="success-message" style="display: none;"></div>
+                        </form>
+                    </div>
+                </div>
             </div>
         <?php endif; ?>
     </div>
@@ -975,6 +1269,348 @@ $rest_url = rest_url('agrochamba/v1/');
     margin-top: 4px;
 }
 
+/* Dashboard de Empresa */
+.empresa-dashboard {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+.dashboard-nav {
+    display: flex;
+    background: #fff;
+    border-bottom: 2px solid #e0e0e0;
+    overflow-x: auto;
+    gap: 0;
+}
+
+.nav-tab {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 16px 24px;
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: 600;
+    color: #666;
+    transition: all 0.3s;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.nav-tab:hover {
+    background: #f5f5f5;
+    color: #4CAF50;
+}
+
+.nav-tab.active {
+    color: #4CAF50;
+    border-bottom-color: #4CAF50;
+    background: #f0f4f0;
+}
+
+.nav-tab svg {
+    flex-shrink: 0;
+}
+
+.dashboard-content {
+    flex: 1;
+    background: #f5f5f5;
+    padding: 40px;
+}
+
+.tab-content {
+    display: none;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+.dashboard-header {
+    margin-bottom: 32px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.dashboard-title {
+    font-size: 32px;
+    font-weight: 800;
+    color: #1a237e;
+    margin: 0;
+}
+
+.dashboard-subtitle {
+    font-size: 16px;
+    color: #666;
+    margin: 8px 0 0 0;
+}
+
+.dashboard-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 24px;
+    margin-bottom: 40px;
+}
+
+.dashboard-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 24px;
+}
+
+.action-card {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 24px;
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.3s;
+    border: 2px solid transparent;
+}
+
+.action-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(76, 175, 80, 0.15);
+    border-color: #4CAF50;
+    color: inherit;
+}
+
+.action-icon {
+    flex-shrink: 0;
+    width: 56px;
+    height: 56px;
+    background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #4CAF50;
+}
+
+.action-content {
+    flex: 1;
+}
+
+.action-content h3 {
+    font-size: 18px;
+    font-weight: 700;
+    color: #333;
+    margin: 0 0 4px 0;
+}
+
+.action-content p {
+    font-size: 14px;
+    color: #666;
+    margin: 0;
+}
+
+.action-card svg:last-child {
+    flex-shrink: 0;
+    color: #999;
+    transition: transform 0.3s;
+}
+
+.action-card:hover svg:last-child {
+    transform: translateX(4px);
+    color: #4CAF50;
+}
+
+/* Lista de Trabajos */
+.mis-trabajos-list {
+    background: #fff;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.loading-spinner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    color: #666;
+}
+
+.loading-spinner svg {
+    animation: spin 1s linear infinite;
+    margin-bottom: 16px;
+}
+
+.job-item {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 20px;
+    border-bottom: 1px solid #e0e0e0;
+    transition: background 0.2s;
+}
+
+.job-item:last-child {
+    border-bottom: none;
+}
+
+.job-item:hover {
+    background: #f8f9fa;
+}
+
+.job-item-image {
+    flex-shrink: 0;
+    width: 100px;
+    height: 100px;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #f0f0f0;
+}
+
+.job-item-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.job-item-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.job-item-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #333;
+    margin: 0 0 8px 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.job-item-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 8px;
+}
+
+.job-item-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.job-item-status.published {
+    background: #E8F5E9;
+    color: #2E7D32;
+}
+
+.job-item-status.pending {
+    background: #FFF3E0;
+    color: #E65100;
+}
+
+.job-item-status.draft {
+    background: #F5F5F5;
+    color: #666;
+}
+
+.job-item-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.btn-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    background: transparent;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: #666;
+}
+
+.btn-icon:hover {
+    border-color: #4CAF50;
+    color: #4CAF50;
+    background: #f0f4f0;
+}
+
+.btn-icon.delete:hover {
+    border-color: #D32F2F;
+    color: #D32F2F;
+    background: #FFEBEE;
+}
+
+.btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 24px;
+    background: #fff;
+    color: #666;
+    border: 2px solid #e0e0e0;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    text-decoration: none;
+}
+
+.btn-secondary:hover {
+    border-color: #4CAF50;
+    color: #4CAF50;
+    background: #f0f4f0;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: #999;
+}
+
+.empty-state svg {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 20px;
+    opacity: 0.5;
+}
+
+.empty-state h3 {
+    font-size: 20px;
+    color: #666;
+    margin: 0 0 8px 0;
+}
+
+.empty-state p {
+    font-size: 14px;
+    margin: 0;
+}
+
 @media (max-width: 768px) {
     .publicar-trabajo-wrapper {
         padding: 20px 10px;
@@ -1001,6 +1637,46 @@ $rest_url = rest_url('agrochamba/v1/');
     
     .post-type-selector {
         flex-direction: column;
+    }
+    
+    .dashboard-content {
+        padding: 20px;
+    }
+    
+    .dashboard-nav {
+        gap: 0;
+    }
+    
+    .nav-tab {
+        padding: 12px 16px;
+        font-size: 14px;
+    }
+    
+    .nav-tab span {
+        display: none;
+    }
+    
+    .dashboard-stats {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+    }
+    
+    .dashboard-actions {
+        grid-template-columns: 1fr;
+    }
+    
+    .job-item {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .job-item-image {
+        width: 100%;
+        height: 200px;
+    }
+    
+    .job-item-actions {
+        justify-content: flex-end;
     }
 }
 </style>
@@ -1584,10 +2260,12 @@ $rest_url = rest_url('agrochamba/v1/');
                         editor.commands.clearContent();
                     }
                     
-                    // Redirigir después de 3 segundos
+                    // Actualizar dashboard y cambiar a Mis Trabajos
                     setTimeout(() => {
-                        window.location.href = '<?php echo esc_url(get_post_type_archive_link('trabajo')); ?>';
-                    }, 3000);
+                        loadDashboardStats();
+                        loadMyJobs();
+                        showTab('mis-trabajos');
+                    }, 1000);
                 } else {
                     const errorText = result.message || 'Error al publicar el trabajo';
                     errorMsg.textContent = errorText;
@@ -1604,6 +2282,378 @@ $rest_url = rest_url('agrochamba/v1/');
             }
         });
     }
+    
+    // Sistema de navegación por tabs
+    function showTab(tabName) {
+        // Ocultar todos los tabs
+        document.querySelectorAll('.tab-content').forEach(tab => {
+            tab.classList.remove('active');
+        });
+        document.querySelectorAll('.nav-tab').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        
+        // Mostrar tab seleccionado
+        const targetTab = document.getElementById('tab-' + tabName);
+        const targetBtn = document.querySelector(`[data-tab="${tabName}"]`);
+        
+        if (targetTab) {
+            targetTab.classList.add('active');
+        }
+        if (targetBtn) {
+            targetBtn.classList.add('active');
+        }
+        
+        // Cargar datos según el tab
+        if (tabName === 'dashboard') {
+            loadDashboardStats();
+        } else if (tabName === 'mis-trabajos') {
+            loadMyJobs();
+        } else if (tabName === 'mi-empresa') {
+            loadCompanyProfile();
+        }
+    }
+    
+    // Event listeners para tabs
+    document.querySelectorAll('.nav-tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tabName = btn.getAttribute('data-tab');
+            showTab(tabName);
+        });
+    });
+    
+    // Event listeners para action cards
+    document.querySelectorAll('.action-card').forEach(card => {
+        card.addEventListener('click', (e) => {
+            e.preventDefault();
+            const tabName = card.getAttribute('data-tab');
+            if (tabName) {
+                showTab(tabName);
+            }
+        });
+    });
+    
+    // Cargar estadísticas del dashboard
+    async function loadDashboardStats() {
+        try {
+            const response = await fetch(restUrl + 'me/jobs?per_page=100', {
+                headers: {
+                    'X-WP-Nonce': restNonce
+                },
+                credentials: 'same-origin'
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                const jobs = data.jobs || data.data || [];
+                
+                const totalJobs = jobs.length;
+                const publishedJobs = jobs.filter(j => j.status === 'publish' || j.post_status === 'publish').length;
+                const pendingJobs = jobs.filter(j => j.status === 'pending' || j.post_status === 'pending').length;
+                
+                // Calcular total de vistas
+                let totalViews = 0;
+                jobs.forEach(job => {
+                    const views = parseInt(job.views || job.views_count || 0);
+                    totalViews += views;
+                });
+                
+                // Actualizar estadísticas
+                document.getElementById('stat-total-jobs').textContent = totalJobs;
+                document.getElementById('stat-published-jobs').textContent = publishedJobs;
+                document.getElementById('stat-pending-jobs').textContent = pendingJobs;
+                document.getElementById('stat-total-views').textContent = totalViews.toLocaleString();
+            }
+        } catch (error) {
+            console.error('Error loading dashboard stats:', error);
+        }
+    }
+    
+    // Cargar trabajos del usuario
+    async function loadMyJobs() {
+        const jobsList = document.getElementById('mis-trabajos-list');
+        if (!jobsList) return;
+        
+        jobsList.innerHTML = `
+            <div class="loading-spinner">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                </svg>
+                <p>Cargando trabajos...</p>
+            </div>
+        `;
+        
+        try {
+            const response = await fetch(restUrl + 'me/jobs?per_page=100', {
+                headers: {
+                    'X-WP-Nonce': restNonce
+                },
+                credentials: 'same-origin'
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                const jobs = data.jobs || data.data || [];
+                
+                if (jobs.length === 0) {
+                    jobsList.innerHTML = `
+                        <div class="empty-state">
+                            <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
+                                <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+                            </svg>
+                            <h3>No tienes trabajos publicados</h3>
+                            <p>Crea tu primera oferta de trabajo</p>
+                            <button class="btn-primary" style="margin-top: 20px; width: auto;" onclick="showTab('crear-trabajo')">
+                                Crear Trabajo
+                            </button>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                let html = '';
+                jobs.forEach(job => {
+                    const status = job.status || job.post_status || 'draft';
+                    const statusText = status === 'publish' ? 'Publicado' : status === 'pending' ? 'Pendiente' : 'Borrador';
+                    const statusClass = status === 'publish' ? 'published' : status === 'pending' ? 'pending' : 'draft';
+                    
+                    const imageUrl = job.featured_image_url || (job.featured_media ? `<?php echo esc_url(home_url()); ?>/?attachment_id=${job.featured_media}` : '');
+                    const ubicacion = job.ubicacion?.name || job.ubicacion || 'Sin ubicación';
+                    const fecha = job.date ? new Date(job.date).toLocaleDateString('es-PE') : '';
+                    const views = job.views || job.views_count || 0;
+                    
+                    html += `
+                        <div class="job-item" data-job-id="${job.id}">
+                            <div class="job-item-image">
+                                ${imageUrl ? `<img src="${imageUrl}" alt="${job.title?.rendered || job.title || ''}">` : '<div style="width:100%;height:100%;background:#f0f0f0;display:flex;align-items:center;justify-content:center;color:#999;">Sin imagen</div>'}
+                            </div>
+                            <div class="job-item-content">
+                                <h3 class="job-item-title">${job.title?.rendered || job.title || 'Sin título'}</h3>
+                                <div class="job-item-meta">
+                                    <span>📍 ${ubicacion}</span>
+                                    <span>📅 ${fecha}</span>
+                                    <span>👁️ ${views} vistas</span>
+                                </div>
+                                <div>
+                                    <span class="job-item-status ${statusClass}">${statusText}</span>
+                                </div>
+                            </div>
+                            <div class="job-item-actions">
+                                <button class="btn-icon" onclick="editJob(${job.id})" title="Editar">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                    </svg>
+                                </button>
+                                <a href="${job.link || job.permalink || '#'}" class="btn-icon" target="_blank" title="Ver">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                        <circle cx="12" cy="12" r="3"/>
+                                    </svg>
+                                </a>
+                                <button class="btn-icon delete" onclick="deleteJob(${job.id})" title="Eliminar">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="3 6 5 6 21 6"/>
+                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                jobsList.innerHTML = html;
+            } else {
+                jobsList.innerHTML = `
+                    <div class="empty-state">
+                        <h3>Error al cargar trabajos</h3>
+                        <p>Por favor, intenta de nuevo</p>
+                    </div>
+                `;
+            }
+        } catch (error) {
+            console.error('Error loading jobs:', error);
+            jobsList.innerHTML = `
+                <div class="empty-state">
+                    <h3>Error de conexión</h3>
+                    <p>No se pudieron cargar los trabajos</p>
+                </div>
+            `;
+        }
+    }
+    
+    // Cargar perfil de empresa
+    async function loadCompanyProfile() {
+        try {
+            const response = await fetch(restUrl + 'me/company-profile', {
+                headers: {
+                    'X-WP-Nonce': restNonce
+                },
+                credentials: 'same-origin'
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                const profile = data.company || data;
+                
+                // Llenar formulario
+                if (document.getElementById('company-description')) {
+                    document.getElementById('company-description').value = profile.description || '';
+                }
+                if (document.getElementById('company-phone')) {
+                    document.getElementById('company-phone').value = profile.phone || '';
+                }
+                if (document.getElementById('company-address')) {
+                    document.getElementById('company-address').value = profile.address || '';
+                }
+                if (document.getElementById('company-website')) {
+                    document.getElementById('company-website').value = profile.website || '';
+                }
+                if (document.getElementById('company-facebook')) {
+                    document.getElementById('company-facebook').value = profile.facebook || '';
+                }
+                if (document.getElementById('company-instagram')) {
+                    document.getElementById('company-instagram').value = profile.instagram || '';
+                }
+                if (document.getElementById('company-linkedin')) {
+                    document.getElementById('company-linkedin').value = profile.linkedin || '';
+                }
+                if (document.getElementById('company-twitter')) {
+                    document.getElementById('company-twitter').value = profile.twitter || '';
+                }
+            }
+        } catch (error) {
+            console.error('Error loading company profile:', error);
+        }
+    }
+    
+    // Guardar perfil de empresa
+    const profileForm = document.getElementById('empresa-profile-form');
+    if (profileForm) {
+        profileForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const submitBtn = document.getElementById('save-profile-btn');
+            const btnText = submitBtn.querySelector('.btn-text');
+            const btnSpinner = submitBtn.querySelector('.btn-spinner');
+            const errorMsg = document.getElementById('profile-error-message');
+            const successMsg = document.getElementById('profile-success-message');
+            
+            errorMsg.style.display = 'none';
+            successMsg.style.display = 'none';
+            
+            submitBtn.disabled = true;
+            btnText.style.display = 'none';
+            btnSpinner.style.display = 'inline-block';
+            
+            try {
+                const formData = new FormData(profileForm);
+                const profileData = {
+                    email: formData.get('email'),
+                    description: formData.get('description'),
+                    phone: formData.get('phone'),
+                    address: formData.get('address'),
+                    website: formData.get('website'),
+                    facebook: formData.get('facebook'),
+                    instagram: formData.get('instagram'),
+                    linkedin: formData.get('linkedin'),
+                    twitter: formData.get('twitter')
+                };
+                
+                const response = await fetch(restUrl + 'me/company-profile', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-WP-Nonce': restNonce
+                    },
+                    credentials: 'same-origin',
+                    body: JSON.stringify(profileData)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success || response.ok) {
+                    successMsg.textContent = 'Perfil actualizado exitosamente';
+                    successMsg.style.display = 'block';
+                } else {
+                    errorMsg.textContent = result.message || 'Error al actualizar el perfil';
+                    errorMsg.style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                errorMsg.textContent = 'Error de conexión. Por favor, intenta nuevamente.';
+                errorMsg.style.display = 'block';
+            } finally {
+                submitBtn.disabled = false;
+                btnText.style.display = 'inline';
+                btnSpinner.style.display = 'none';
+            }
+        });
+    }
+    
+    // Editar trabajo
+    window.editJob = async function(jobId) {
+        try {
+            const response = await fetch(restUrl + 'jobs/' + jobId, {
+                headers: {
+                    'X-WP-Nonce': restNonce
+                },
+                credentials: 'same-origin'
+            });
+            
+            if (response.ok) {
+                const job = await response.json();
+                
+                // Llenar formulario de edición (simplificado - copiar campos del formulario de crear)
+                document.getElementById('edit-job-id').value = jobId;
+                
+                // Por ahora, redirigir a crear trabajo con datos precargados
+                // TODO: Implementar formulario de edición completo
+                showTab('crear-trabajo');
+                alert('Funcionalidad de edición en desarrollo. Por ahora, puedes crear un nuevo trabajo.');
+            }
+        } catch (error) {
+            console.error('Error loading job:', error);
+            alert('Error al cargar el trabajo');
+        }
+    };
+    
+    // Eliminar trabajo
+    window.deleteJob = async function(jobId) {
+        if (!confirm('¿Estás seguro de eliminar este trabajo? Esta acción no se puede deshacer.')) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(restUrl + 'jobs/' + jobId, {
+                method: 'DELETE',
+                headers: {
+                    'X-WP-Nonce': restNonce
+                },
+                credentials: 'same-origin'
+            });
+            
+            if (response.ok) {
+                // Recargar lista de trabajos
+                loadMyJobs();
+                loadDashboardStats();
+            } else {
+                alert('Error al eliminar el trabajo');
+            }
+        } catch (error) {
+            console.error('Error deleting job:', error);
+            alert('Error de conexión');
+        }
+    };
+    
+    // Cargar datos iniciales si estamos en dashboard
+    <?php if ($is_logged_in): ?>
+    if (document.querySelector('.tab-content.active')?.id === 'tab-dashboard') {
+        loadDashboardStats();
+    }
+    <?php endif; ?>
+    
     <?php endif; ?>
 })();
 </script>
