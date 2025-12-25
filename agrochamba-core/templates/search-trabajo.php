@@ -424,12 +424,10 @@ $orderby_filter = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']
                                             data-job-title="<?php echo esc_attr(get_the_title($trabajo_id)); ?>"
                                             data-job-url="<?php echo esc_url(get_permalink($trabajo_id)); ?>"
                                             onclick="event.preventDefault(); shareJob(<?php echo esc_js($trabajo_id); ?>, this);">
-                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <circle cx="18" cy="5" r="3"/>
-                                            <circle cx="6" cy="12" r="3"/>
-                                            <circle cx="18" cy="19" r="3"/>
-                                            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
-                                            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                            <path d="M15 14l4 -4l-4 -4" />
+                                            <path d="M19 10h-11a4 4 0 1 0 0 8h1" />
                                         </svg>
                                         <span class="btn-text">Compartir</span>
                                     </button>
@@ -480,12 +478,10 @@ $orderby_filter = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']
                                             data-job-title="<?php echo esc_attr(get_the_title($trabajo_id)); ?>"
                                             data-job-url="<?php echo esc_url(get_permalink($trabajo_id)); ?>"
                                             onclick="event.preventDefault(); shareJob(<?php echo esc_js($trabajo_id); ?>, this);">
-                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <circle cx="18" cy="5" r="3"/>
-                                            <circle cx="6" cy="12" r="3"/>
-                                            <circle cx="18" cy="19" r="3"/>
-                                            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
-                                            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                            <path d="M15 14l4 -4l-4 -4" />
+                                            <path d="M19 10h-11a4 4 0 1 0 0 8h1" />
                                         </svg>
                                         <span class="btn-text">Compartir</span>
                                     </button>
