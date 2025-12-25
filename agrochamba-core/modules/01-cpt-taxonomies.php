@@ -349,25 +349,17 @@ if (!function_exists('agrochamba_modify_trabajo_archive_query')) {
             $request_uri = isset($_SERVER['REQUEST_URI']) ? esc_url_raw($_SERVER['REQUEST_URI']) : '';
             $parsed_uri = parse_url($request_uri);
             $path = isset($parsed_uri['path']) ? trim($parsed_uri['path'], '/') : '';
-            $is_trabajos_url = ($path === 'trabajos' || strpos($path, 'trabajos/') === 0);
+            $is_trabajos_url = ($path === 'trabajos' || $path === 'trabajos/');
             
             // Para archivos de trabajos y páginas de taxonomía relacionadas
             if (is_post_type_archive('trabajo') || is_tax('ubicacion') || is_tax('cultivo') || is_tax('empresa') || $is_trabajos_url) {
-                // Si es exactamente /trabajos/ (sin nada después), asegurar que se detecte como archivo de trabajos
-                if ($path === 'trabajos' && !is_tax()) {
-                    // Forzar que sea el archivo del post type, no una taxonomía
+                // Si es /trabajos/ sin filtros, mostrar los últimos 3 trabajos
+                if ($is_trabajos_url && !is_tax() && empty($_GET['ubicacion']) && empty($_GET['cultivo']) && empty($_GET['empresa']) && empty($_GET['s'])) {
                     $query->set('post_type', 'trabajo');
                     $query->set('post_status', 'publish');
-                    // Limpiar cualquier query var de taxonomía que pueda estar presente
-                    $query->set('ubicacion', '');
-                    $query->set('taxonomy', '');
-                    $query->set('term', '');
-                    // Sin filtros, no mostrar resultados (se mostrará la pantalla de búsqueda)
-                    if (empty($_GET['ubicacion']) && empty($_GET['cultivo']) && empty($_GET['empresa']) && empty($_GET['s'])) {
-                        // Establecer posts_per_page a 0 para no mostrar resultados
-                        // El template mostrará la pantalla de búsqueda
-                        $query->set('posts_per_page', 0);
-                    }
+                    $query->set('posts_per_page', 3);
+                    $query->set('orderby', 'date');
+                    $query->set('order', 'DESC');
                 }
                 // Asegurar que solo se muestren trabajos en páginas de taxonomía
                 // IMPORTANTE: Esto debe hacerse ANTES de cualquier otra modificación
@@ -1599,120 +1591,13 @@ if (!function_exists('agrochamba_permalink_jerarquico')) {
 // ==========================================
 if (!function_exists('agrochamba_rewrite_rules')) {
     function agrochamba_rewrite_rules() {
-        // Regla para trabajos individuales: /trabajos/{ubicacion}/{post-slug}/
         add_rewrite_rule(
             '^trabajos/([^/]+)/([^/]+)/?$',
             'index.php?trabajo=$matches[2]',
             'top'
         );
-        
-        // NO agregar regla para /trabajos/{ubicacion-slug}/
-        // porque esto causaría conflicto con el archivo /trabajos/
-        // En su lugar, usamos el hook term_link para modificar los links
-        // y el hook pre_get_posts para detectar correctamente las URLs
     }
     add_action('init', 'agrochamba_rewrite_rules');
-}
-
-// ==========================================
-// 5.1. MODIFICAR LINKS DE TAXONOMÍA UBICACION PARA USAR /trabajos/
-// ==========================================
-if (!function_exists('agrochamba_modify_ubicacion_term_link')) {
-    function agrochamba_modify_ubicacion_term_link($termlink, $term, $taxonomy) {
-        // Solo modificar links de la taxonomía ubicacion
-        if ($taxonomy !== 'ubicacion') {
-            return $termlink;
-        }
-        
-        // Construir URL como /trabajos/{slug}/
-        $trabajos_archive = get_post_type_archive_link('trabajo');
-        if ($trabajos_archive) {
-            $termlink = trailingslashit($trabajos_archive) . $term->slug . '/';
-        }
-        
-        return $termlink;
-    }
-    add_filter('term_link', 'agrochamba_modify_ubicacion_term_link', 10, 3);
-}
-
-// ==========================================
-// 5.2. PREVENIR REDIRECCIONES INCORRECTAS DE /trabajos/
-// ==========================================
-if (!function_exists('agrochamba_prevent_trabajos_redirect')) {
-    function agrochamba_prevent_trabajos_redirect($wp) {
-        // Solo en el frontend
-        if (is_admin()) {
-            return;
-        }
-        
-        // Obtener la URL actual
-        $request_uri = isset($_SERVER['REQUEST_URI']) ? esc_url_raw($_SERVER['REQUEST_URI']) : '';
-        $parsed_uri = parse_url($request_uri);
-        $path = isset($parsed_uri['path']) ? trim($parsed_uri['path'], '/') : '';
-        
-        // Si es exactamente /trabajos/, asegurar que sea el archivo del post type
-        if ($path === 'trabajos') {
-            // Forzar que sea el archivo del post type
-            $wp->query_vars['post_type'] = 'trabajo';
-            $wp->query_vars['post_status'] = 'publish';
-            // Limpiar cualquier query var que pueda causar redirección
-            unset($wp->query_vars['name']);
-            unset($wp->query_vars['p']);
-            unset($wp->query_vars['page_id']);
-            unset($wp->query_vars['ubicacion']);
-            unset($wp->query_vars['taxonomy']);
-            unset($wp->query_vars['term']);
-        }
-    }
-    add_action('parse_request', 'agrochamba_prevent_trabajos_redirect', 1);
-}
-
-// ==========================================
-// 5.3. MANEJAR URLS /trabajos/{ubicacion}/ CORRECTAMENTE
-// ==========================================
-if (!function_exists('agrochamba_handle_trabajos_ubicacion_url')) {
-    function agrochamba_handle_trabajos_ubicacion_url() {
-        // Solo en el frontend
-        if (is_admin()) {
-            return;
-        }
-        
-        // Obtener la URL actual
-        $request_uri = isset($_SERVER['REQUEST_URI']) ? esc_url_raw($_SERVER['REQUEST_URI']) : '';
-        $parsed_uri = parse_url($request_uri);
-        $path = isset($parsed_uri['path']) ? trim($parsed_uri['path'], '/') : '';
-        
-        // Si es /trabajos/{algo}/, verificar si es una ubicación válida
-        if (strpos($path, 'trabajos/') === 0 && $path !== 'trabajos') {
-            $path_parts = explode('/', $path);
-            if (count($path_parts) >= 2) {
-                $second_part = $path_parts[1];
-                
-                // Si hay 3 partes, probablemente es un trabajo individual: /trabajos/{ubicacion}/{post-slug}/
-                if (count($path_parts) >= 3) {
-                    // Dejar que WordPress lo maneje como trabajo individual
-                    return;
-                }
-                
-                // Si solo hay 2 partes, verificar si es una ubicación válida
-                $term = get_term_by('slug', $second_part, 'ubicacion');
-                if ($term && !is_wp_error($term)) {
-                    // Es una ubicación válida, establecer como taxonomía
-                    global $wp_query;
-                    $wp_query->is_tax = true;
-                    $wp_query->is_archive = true;
-                    $wp_query->is_home = false;
-                    $wp_query->is_post_type_archive = false;
-                    $wp_query->is_singular = false;
-                    $wp_query->set('post_type', 'trabajo');
-                    $wp_query->set('post_status', 'publish');
-                    $wp_query->set('taxonomy', 'ubicacion');
-                    $wp_query->set('term', $second_part);
-                }
-            }
-        }
-    }
-    add_action('template_redirect', 'agrochamba_handle_trabajos_ubicacion_url', 1);
 }
 
 // ==========================================

@@ -46,6 +46,12 @@ $show_welcome = isset($_GET['welcome']) && $_GET['welcome'] === '1';
 $has_filters = !empty($ubicacion_filter) || !empty($cultivo_filter) || !empty($empresa_filter) || 
                (isset($_GET['s']) && !empty($_GET['s'])) || is_tax('ubicacion') || 
                is_tax('cultivo') || is_tax('empresa');
+
+// Si estamos en /trabajos/ sin filtros, mostrar los últimos 3 trabajos
+$show_recent_posts = false;
+if (!$has_filters && is_post_type_archive('trabajo') && !is_tax()) {
+    $show_recent_posts = true;
+}
 ?>
 <div class="trabajos-archive-wrapper">
     <?php if ($show_welcome && is_user_logged_in()): ?>
@@ -179,8 +185,358 @@ $has_filters = !empty($ubicacion_filter) || !empty($cultivo_filter) || !empty($e
 
     <!-- Grid de Trabajos -->
     <div class="trabajos-archive-content">
-        <?php if (!$has_filters): ?>
-            <!-- Estado inicial: Sin filtros aplicados -->
+        <?php if ($show_recent_posts): ?>
+            <!-- Mostrar últimos 3 trabajos cuando no hay filtros -->
+        <div class="trabajos-grid">
+            <?php if (have_posts()): ?>
+                <?php while (have_posts()): the_post(); 
+                    $trabajo_id = get_the_ID();
+                    
+                    // Obtener datos del trabajo
+                    $salario_min = get_post_meta($trabajo_id, 'salario_min', true);
+                    $salario_max = get_post_meta($trabajo_id, 'salario_max', true);
+                    $vacantes = get_post_meta($trabajo_id, 'vacantes', true);
+                    $alojamiento = get_post_meta($trabajo_id, 'alojamiento', true);
+                    $transporte = get_post_meta($trabajo_id, 'transporte', true);
+                    $alimentacion = get_post_meta($trabajo_id, 'alimentacion', true);
+                    
+                    // Obtener taxonomías
+                    $ubicaciones = wp_get_post_terms($trabajo_id, 'ubicacion', array('fields' => 'names'));
+                    $cultivos = wp_get_post_terms($trabajo_id, 'cultivo', array('fields' => 'names'));
+                    $empresas = wp_get_post_terms($trabajo_id, 'empresa', array('fields' => 'names'));
+                    
+                    $ubicacion = !empty($ubicaciones) ? $ubicaciones[0] : '';
+                    $cultivo = !empty($cultivos) ? $cultivos[0] : '';
+                    $empresa = !empty($empresas) ? $empresas[0] : '';
+                    
+                    // Imagen destacada - usar tamaño large para mejor calidad
+                    $featured_image_id = get_post_thumbnail_id($trabajo_id);
+                    $featured_image_url = $featured_image_id ? wp_get_attachment_image_url($featured_image_id, 'large') : null;
+                    $featured_image_srcset = $featured_image_id ? wp_get_attachment_image_srcset($featured_image_id, 'large') : null;
+                    $featured_image_sizes = $featured_image_id ? wp_get_attachment_image_sizes($featured_image_id, 'large') : null;
+                    
+                    // Calcular salario
+                    $salario_text = '';
+                    if ($salario_min && $salario_max) {
+                        $salario_text = 'S/ ' . number_format($salario_min, 0) . ' - S/ ' . number_format($salario_max, 0);
+                    } elseif ($salario_min) {
+                        $salario_text = 'S/ ' . number_format($salario_min, 0) . '+';
+                    }
+                    
+                    // Determinar badge
+                    $badge = null;
+                    $badge_class = '';
+                    $post_date = get_the_date('U');
+                    $hours_since = (time() - $post_date) / 3600;
+                    
+                    if ($hours_since <= 48) {
+                        $badge = 'Nuevo';
+                        $badge_class = 'badge-new';
+                    } elseif (($vacantes && intval($vacantes) >= 5) || ($salario_min && intval($salario_min) >= 3000)) {
+                        $badge = 'Urgente';
+                        $badge_class = 'badge-urgent';
+                    } elseif ($alojamiento || $transporte || $alimentacion) {
+                        $badge = 'Con beneficios';
+                        $badge_class = 'badge-benefits';
+                    } elseif ($salario_min && intval($salario_min) >= 2000) {
+                        $badge = 'Buen salario';
+                        $badge_class = 'badge-salary';
+                    }
+                    
+                    // Excerpt
+                    $excerpt = get_the_excerpt();
+                    if (empty($excerpt)) {
+                        $excerpt = wp_trim_words(get_the_content(), 20);
+                    }
+                    
+                    // Obtener contadores
+                    // Las vistas siempre deben ser el valor total almacenado en la BD, independiente de filtros
+                    $views = get_post_meta($trabajo_id, '_trabajo_views', true);
+                    $views_count = intval($views);
+                    // Asegurar que siempre sea un número válido (mínimo 0)
+                    if ($views_count < 0) {
+                        $views_count = 0;
+                    }
+                    
+                    // Contar favoritos (likes)
+                    $favorites_count = 0;
+                    $users = get_users(array('fields' => 'ID'));
+                    foreach ($users as $user_id) {
+                        $favorites = get_user_meta($user_id, 'favorite_jobs', true);
+                        if (is_array($favorites) && in_array($trabajo_id, $favorites)) {
+                            $favorites_count++;
+                        }
+                    }
+                    
+                    // Contar guardados
+                    $saved_count = 0;
+                    foreach ($users as $user_id) {
+                        $saved = get_user_meta($user_id, 'saved_jobs', true);
+                        if (is_array($saved) && in_array($trabajo_id, $saved)) {
+                            $saved_count++;
+                        }
+                    }
+                    
+                    // Contar comentarios
+                    $comments_count = get_comments_number($trabajo_id);
+                    
+                    // Contar compartidos
+                    $shared_count = intval(get_post_meta($trabajo_id, '_trabajo_shared_count', true) ?: 0);
+                    
+                    // Estado del usuario actual
+                    $is_favorite = false;
+                    $is_saved = false;
+                    if (is_user_logged_in()) {
+                        $current_user_id = get_current_user_id();
+                        $user_favorites = get_user_meta($current_user_id, 'favorite_jobs', true);
+                        $user_saved = get_user_meta($current_user_id, 'saved_jobs', true);
+                        
+                        if (is_array($user_favorites) && in_array($trabajo_id, $user_favorites)) {
+                            $is_favorite = true;
+                        }
+                        if (is_array($user_saved) && in_array($trabajo_id, $user_saved)) {
+                            $is_saved = true;
+                        }
+                    }
+                ?>
+                    <article class="trabajo-card" data-job-id="<?php echo esc_attr($trabajo_id); ?>">
+                        <a href="<?php the_permalink(); ?>" class="trabajo-card-link">
+                            <?php if ($featured_image_url): ?>
+                                <div class="trabajo-card-image">
+                                    <img src="<?php echo esc_url($featured_image_url); ?>" 
+                                         alt="<?php echo esc_attr(get_the_title()); ?>"
+                                         <?php if ($featured_image_srcset): ?>
+                                         srcset="<?php echo esc_attr($featured_image_srcset); ?>"
+                                         <?php endif; ?>
+                                         <?php if ($featured_image_sizes): ?>
+                                         sizes="<?php echo esc_attr($featured_image_sizes); ?>"
+                                         <?php endif; ?>
+                                         loading="lazy">
+                                    <?php if ($badge): ?>
+                                        <span class="trabajo-badge <?php echo esc_attr($badge_class); ?>">
+                                            <?php echo esc_html($badge); ?>
+                                        </span>
+                                    <?php endif; ?>
+                                </div>
+                            <?php else: ?>
+                                <div class="trabajo-card-image-placeholder">
+                                    <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                                        <circle cx="8.5" cy="8.5" r="1.5"/>
+                                        <polyline points="21 15 16 10 5 21"/>
+                                    </svg>
+                                    <?php if ($badge): ?>
+                                        <span class="trabajo-badge <?php echo esc_attr($badge_class); ?>">
+                                            <?php echo esc_html($badge); ?>
+                                        </span>
+                                    <?php endif; ?>
+                                </div>
+                            <?php endif; ?>
+                            
+                            <div class="trabajo-card-content">
+                                <h2 class="trabajo-card-title"><?php the_title(); ?></h2>
+                                
+                                <?php if ($empresa): ?>
+                                    <div class="trabajo-card-empresa">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                                        </svg>
+                                        <span><?php echo esc_html($empresa); ?></span>
+                                    </div>
+                                <?php endif; ?>
+                                
+                                <div class="trabajo-card-info">
+                                    <?php if ($ubicacion): ?>
+                                        <div class="info-item">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                                                <circle cx="12" cy="10" r="3"/>
+                                            </svg>
+                                            <span><?php echo esc_html($ubicacion); ?></span>
+                                        </div>
+                                    <?php endif; ?>
+                                    
+                                    <?php if ($salario_text): ?>
+                                        <div class="info-item">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <line x1="12" y1="1" x2="12" y2="23"/>
+                                                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                                            </svg>
+                                            <span><?php echo esc_html($salario_text); ?></span>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+                                
+                                <?php if ($excerpt): ?>
+                                    <p class="trabajo-card-excerpt"><?php echo esc_html(wp_trim_words($excerpt, 15)); ?></p>
+                                <?php endif; ?>
+                                
+                                <div class="trabajo-card-footer">
+                                    <span class="trabajo-card-date">
+                                        <?php echo human_time_diff(get_the_time('U'), current_time('timestamp')) . ' atrás'; ?>
+                                    </span>
+                                    <?php if ($vacantes && intval($vacantes) > 1): ?>
+                                        <span class="trabajo-card-vacantes">
+                                            <?php echo esc_html($vacantes); ?> vacantes
+                                        </span>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </a>
+                        
+                        <!-- Barra de interacciones estilo Facebook -->
+                        <div class="trabajo-card-interactions">
+                            <!-- Contadores -->
+                            <div class="interaction-counters">
+                                <div class="counter-group">
+                                    <!-- Likes siempre visibles -->
+                                    <span class="counter-item">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                                        </svg>
+                                        <span class="counter-value" data-counter="likes"><?php echo esc_html($favorites_count); ?></span>
+                                    </span>
+                                    <!-- Comentarios siempre visibles -->
+                                    <span class="counter-item">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                                        </svg>
+                                        <span class="counter-value" data-counter="comments"><?php echo esc_html($comments_count); ?></span>
+                                    </span>
+                                    <!-- Compartidos siempre visibles -->
+                                    <?php if ($shared_count > 0): ?>
+                                    <span class="counter-item">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <circle cx="18" cy="5" r="3"/>
+                                            <circle cx="6" cy="12" r="3"/>
+                                            <circle cx="18" cy="19" r="3"/>
+                                            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+                                            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                                        </svg>
+                                        <span class="counter-value" data-counter="shared"><?php echo esc_html($shared_count); ?></span>
+                                    </span>
+                                    <?php endif; ?>
+                                </div>
+                                <!-- Vistas siempre visibles (públicas) -->
+                                <div class="counter-group">
+                                    <span class="counter-item views-counter">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                            <circle cx="12" cy="12" r="3"/>
+                                        </svg>
+                                        <span class="counter-value" data-counter="views"><?php echo esc_html($views_count); ?></span>
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            <!-- Botones de acción -->
+                            <div class="interaction-buttons">
+                                <?php if (is_user_logged_in()): ?>
+                                    <button class="interaction-btn like-btn <?php echo $is_favorite ? 'active' : ''; ?>" 
+                                            data-job-id="<?php echo esc_attr($trabajo_id); ?>"
+                                            onclick="event.preventDefault(); toggleLike(<?php echo esc_js($trabajo_id); ?>, this);">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="<?php echo $is_favorite ? 'currentColor' : 'none'; ?>" stroke="currentColor" stroke-width="2">
+                                            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                                        </svg>
+                                        <span class="btn-text">Me gusta</span>
+                                        <span class="btn-count" data-count="<?php echo esc_attr($favorites_count); ?>"><?php echo esc_html($favorites_count > 0 ? $favorites_count : ''); ?></span>
+                                    </button>
+                                    
+                                    <a href="<?php echo esc_url(get_permalink($trabajo_id) . '#comments'); ?>" class="interaction-btn comment-btn">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                                        </svg>
+                                        <span class="btn-text">Comentar</span>
+                                        <?php if ($comments_count > 0): ?>
+                                            <span class="btn-count"><?php echo esc_html($comments_count); ?></span>
+                                        <?php endif; ?>
+                                    </a>
+                                    
+                                    <button class="interaction-btn share-btn" 
+                                            data-job-id="<?php echo esc_attr($trabajo_id); ?>"
+                                            data-job-title="<?php echo esc_attr(get_the_title($trabajo_id)); ?>"
+                                            data-job-url="<?php echo esc_url(get_permalink($trabajo_id)); ?>"
+                                            onclick="event.preventDefault(); shareJob(<?php echo esc_js($trabajo_id); ?>, this);">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                            <path d="M15 14l4 -4l-4 -4" />
+                                            <path d="M19 10h-11a4 4 0 1 0 0 8h1" />
+                                        </svg>
+                                        <span class="btn-text">Compartir</span>
+                                    </button>
+                                    
+                                    <!-- Menú de tres puntos (solo para usuarios logueados) -->
+                                    <div class="more-options-wrapper">
+                                        <button class="interaction-btn more-options-btn" 
+                                                onclick="event.preventDefault(); toggleMoreOptions(this);">
+                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                                <circle cx="12" cy="5" r="2"/>
+                                                <circle cx="12" cy="12" r="2"/>
+                                                <circle cx="12" cy="19" r="2"/>
+                                            </svg>
+                                        </button>
+                                        <div class="more-options-menu" style="display: none;">
+                                            <button class="more-options-item save-btn-menu <?php echo $is_saved ? 'active' : ''; ?>" 
+                                            data-job-id="<?php echo esc_attr($trabajo_id); ?>"
+                                            onclick="event.preventDefault(); toggleSave(<?php echo esc_js($trabajo_id); ?>, this);">
+                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="<?php echo $is_saved ? 'currentColor' : 'none'; ?>" stroke="currentColor" stroke-width="2">
+                                            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+                                        </svg>
+                                                <span><?php echo $is_saved ? 'Guardado' : 'Guardar'; ?></span>
+                                    </button>
+                                        </div>
+                                    </div>
+                                <?php else: ?>
+                                    <!-- Usuario no logueado: redirigir a login -->
+                                    <a href="<?php echo esc_url(wp_login_url(get_permalink($trabajo_id))); ?>" class="interaction-btn like-btn">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                                        </svg>
+                                        <span class="btn-text">Me gusta</span>
+                                        <span class="btn-count" data-count="<?php echo esc_attr($favorites_count); ?>"><?php echo esc_html($favorites_count > 0 ? $favorites_count : ''); ?></span>
+                                    </a>
+                                    
+                                    <a href="<?php echo esc_url(wp_login_url(get_permalink($trabajo_id) . '#comments')); ?>" class="interaction-btn comment-btn">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                                        </svg>
+                                        <span class="btn-text">Comentar</span>
+                                        <?php if ($comments_count > 0): ?>
+                                            <span class="btn-count"><?php echo esc_html($comments_count); ?></span>
+                                        <?php endif; ?>
+                                    </a>
+                                    
+                                    <button class="interaction-btn share-btn" 
+                                            data-job-id="<?php echo esc_attr($trabajo_id); ?>"
+                                            data-job-title="<?php echo esc_attr(get_the_title($trabajo_id)); ?>"
+                                            data-job-url="<?php echo esc_url(get_permalink($trabajo_id)); ?>"
+                                            onclick="event.preventDefault(); shareJob(<?php echo esc_js($trabajo_id); ?>, this);">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                            <path d="M15 14l4 -4l-4 -4" />
+                                            <path d="M19 10h-11a4 4 0 1 0 0 8h1" />
+                                        </svg>
+                                        <span class="btn-text">Compartir</span>
+                                    </button>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </article>
+                <?php endwhile; ?>
+                <?php else: ?>
+                    <div class="trabajos-empty">
+                        <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                            <circle cx="12" cy="10" r="3"/>
+                        </svg>
+                        <h2>No se encontraron trabajos</h2>
+                        <p>Intenta ajustar los filtros o vuelve más tarde</p>
+                        <a href="<?php echo esc_url(get_post_type_archive_link('trabajo')); ?>" class="clear-filters-btn">Limpiar filtros</a>
+                    </div>
+                <?php endif; ?>
+            </div>
+        <?php elseif (!$has_filters): ?>
+            <!-- Estado inicial: Sin filtros aplicados (no debería aparecer ahora) -->
             <div class="no-filters-state">
                 <div class="no-filters-content">
                     <svg width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="no-filters-icon">
@@ -562,20 +918,20 @@ $has_filters = !empty($ubicacion_filter) || !empty($cultivo_filter) || !empty($e
                         </div>
                     </article>
                 <?php endwhile; ?>
-                <?php else: ?>
-                    <div class="trabajos-empty">
-                        <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
-                            <circle cx="12" cy="10" r="3"/>
-                        </svg>
-                        <h2>No se encontraron trabajos</h2>
-                        <p>Intenta ajustar los filtros o vuelve más tarde</p>
+            <?php else: ?>
+                <div class="trabajos-empty">
+                    <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                        <circle cx="12" cy="10" r="3"/>
+                    </svg>
+                    <h2>No se encontraron trabajos</h2>
+                    <p>Intenta ajustar los filtros o vuelve más tarde</p>
                         <a href="<?php echo esc_url(get_post_type_archive_link('trabajo')); ?>" class="clear-filters-btn">
                             Ver todos los trabajos
                         </a>
-                    </div>
-                <?php endif; ?>
-            </div>
+                </div>
+            <?php endif; ?>
+        </div>
         <?php endif; ?>
         
         <!-- Paginación -->
@@ -685,8 +1041,8 @@ $has_filters = !empty($ubicacion_filter) || !empty($cultivo_filter) || !empty($e
                             </svg>
                         </span>
                     </button>
-                </div>
-            <?php endif; ?>
+            </div>
+        <?php endif; ?>
             
             <!-- Paginación (solo si hay filtros) -->
             <?php if (paginate_links($pagination_args)): ?>
@@ -1907,25 +2263,26 @@ function handleUbicacionChange(select) {
         return;
     }
     
-    // Construir URL como /trabajos/{ubicacion}/ en lugar de /ubicacion/{ubicacion}/
-    const baseUrl = '<?php echo esc_url(get_post_type_archive_link('trabajo')); ?>';
-    const ubicacionSlug = selectedValue;
-    
-    // Preservar parámetros de búsqueda si existen
-    const searchInput = document.getElementById('search-input-field');
-    const searchValue = searchInput ? searchInput.value.trim() : '';
-    
-    // Construir URL: /trabajos/{ubicacion-slug}/
-    let targetUrl = baseUrl.replace(/\/$/, '') + '/' + ubicacionSlug + '/';
-    
-    if (searchValue) {
-        // Si hay búsqueda, agregar como parámetro GET
-        const url = new URL(targetUrl, window.location.origin);
-        url.searchParams.set('s', searchValue);
-        targetUrl = url.toString();
+    // Si hay un link de término (taxonomía), usar ese
+    const termLink = selectedOption.getAttribute('data-term-link');
+    if (termLink) {
+        // Preservar parámetros de búsqueda si existen
+        const searchInput = document.getElementById('search-input-field');
+        const searchValue = searchInput ? searchInput.value.trim() : '';
+        
+        if (searchValue) {
+            // Si hay búsqueda, usar parámetros GET en lugar de URL de taxonomía
+            const url = new URL(termLink, window.location.origin);
+            url.searchParams.set('s', searchValue);
+            window.location.href = url.toString();
+        } else {
+            // Si no hay búsqueda, usar URL de taxonomía limpia
+            window.location.href = termLink;
+        }
+    } else {
+        // Fallback: usar formulario con parámetros GET
+        select.form.submit();
     }
-    
-    window.location.href = targetUrl;
 }
 
 // Funciones para interacciones estilo Facebook
