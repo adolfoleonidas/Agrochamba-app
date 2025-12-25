@@ -214,16 +214,31 @@ if (!function_exists('agrochamba_load_archive_trabajo_template')) {
 // Hook adicional para template_include (compatibilidad con Bricks Builder y otros builders)
 if (!function_exists('agrochamba_force_archive_trabajo_template')) {
     function agrochamba_force_archive_trabajo_template($template) {
+        // IMPORTANTE: NO interceptar si es un single post (trabajo individual)
+        if (is_singular('trabajo')) {
+            return $template;
+        }
+        
         // Verificar si es el archivo de trabajos o una taxonomía relacionada
         // Usar múltiples métodos de detección para asegurar compatibilidad
         $is_trabajo_archive = is_post_type_archive('trabajo');
         $is_trabajo_tax = is_tax('ubicacion') || is_tax('cultivo') || is_tax('empresa');
         
         // Verificación adicional por URL (para casos donde WordPress no detecta correctamente)
+        // PERO solo para el archivo base /trabajos/, no para trabajos individuales
         $request_uri = isset($_SERVER['REQUEST_URI']) ? esc_url_raw($_SERVER['REQUEST_URI']) : '';
         $parsed_uri = parse_url($request_uri);
         $path = isset($parsed_uri['path']) ? trim($parsed_uri['path'], '/') : '';
-        $is_trabajos_url = ($path === 'trabajos' || strpos($path, 'trabajos/') === 0);
+        
+        // Solo considerar URLs que sean exactamente 'trabajos' o 'trabajos/' seguido de parámetros de página
+        // NO considerar URLs que tengan más segmentos después de 'trabajos/' (esos son trabajos individuales)
+        $is_trabajos_url = false;
+        if ($path === 'trabajos' || $path === 'trabajos/') {
+            $is_trabajos_url = true;
+        } elseif (preg_match('/^trabajos\/page\/\d+\/?$/', $path)) {
+            // URLs de paginación como /trabajos/page/2/
+            $is_trabajos_url = true;
+        }
         
         if ($is_trabajo_archive || $is_trabajo_tax || $is_trabajos_url) {
             $custom_template = AGROCHAMBA_TEMPLATES_DIR . '/archive-trabajo.php';
