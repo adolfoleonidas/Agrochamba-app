@@ -77,42 +77,6 @@ if (!$has_filters && is_post_type_archive('trabajo') && !is_tax()) {
     <!-- Header del Archivo -->
     <div class="trabajos-archive-header">
         <div class="archive-header-content">
-            <?php
-            // Detectar si estamos en época navideña (diciembre)
-            $current_month = (int) date('n');
-            $is_christmas_season = ($current_month === 12);
-            
-            if ($is_christmas_season):
-                // Obtener la URL del logo desde el directorio de templates
-                $logo_path = AGROCHAMBA_TEMPLATES_DIR . '/agrochamba-logo-2.png';
-                $logo_url = str_replace(ABSPATH, trailingslashit(home_url()), $logo_path);
-                // Asegurar que la URL sea correcta
-                $logo_url = str_replace('\\', '/', $logo_url);
-            ?>
-            <!-- Logo Navideño Animado -->
-            <div class="christmas-logo-container">
-                <div class="snowflakes">
-                    <?php for ($i = 0; $i < 50; $i++): ?>
-                        <div class="snowflake" style="
-                            left: <?php echo rand(0, 100); ?>%;
-                            animation-delay: <?php echo rand(0, 5000) / 1000; ?>s;
-                            animation-duration: <?php echo rand(3000, 8000) / 1000; ?>s;
-                        ">❄</div>
-                    <?php endfor; ?>
-                </div>
-                <div class="christmas-logo-wrapper">
-                    <img src="<?php echo esc_url($logo_url); ?>" alt="AgroChamba" class="christmas-logo">
-                    <div class="sparkles">
-                        <?php for ($i = 0; $i < 8; $i++): ?>
-                            <div class="sparkle sparkle-<?php echo $i + 1; ?>" style="
-                                animation-delay: <?php echo $i * 0.3; ?>s;
-                            ">✨</div>
-                        <?php endfor; ?>
-                    </div>
-                </div>
-            </div>
-            <?php endif; ?>
-            
             <!-- Botón de categoría -->
             <div class="archive-category-badge">
                 <span>Trabajos</span>
@@ -1363,124 +1327,6 @@ if (!$has_filters && is_post_type_archive('trabajo') && !is_tax()) {
     text-align: center;
 }
 
-/* Logo Navideño Animado */
-.christmas-logo-container {
-    position: relative;
-    margin-bottom: 20px;
-    padding: 20px 0;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 100px;
-}
-
-.snowflakes {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    overflow: hidden;
-    z-index: 1;
-}
-
-.snowflake {
-    position: absolute;
-    top: -20px;
-    font-size: 14px;
-    color: #E3F2FD;
-    opacity: 0.7;
-    animation: snowfall linear infinite;
-    text-shadow: 0 0 3px rgba(255, 255, 255, 0.6);
-}
-
-@keyframes snowfall {
-    0% {
-        transform: translateY(0) translateX(0) rotate(0deg);
-        opacity: 0.7;
-    }
-    50% {
-        transform: translateX(30px) rotate(180deg);
-        opacity: 0.5;
-    }
-    100% {
-        transform: translateY(calc(100vh + 100px)) translateX(60px) rotate(360deg);
-        opacity: 0;
-    }
-}
-
-.christmas-logo-wrapper {
-    position: relative;
-    z-index: 2;
-    display: inline-block;
-    animation: logoFloat 3s ease-in-out infinite;
-    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.08));
-}
-
-@keyframes logoFloat {
-    0%, 100% {
-        transform: translateY(0) scale(1);
-    }
-    50% {
-        transform: translateY(-5px) scale(1.01);
-    }
-}
-
-.christmas-logo {
-    max-width: 150px;
-    height: auto;
-    display: block;
-    animation: logoShine 4s ease-in-out infinite;
-    position: relative;
-}
-
-@keyframes logoShine {
-    0%, 100% {
-        filter: brightness(1) drop-shadow(0 0 5px rgba(76, 175, 80, 0.2));
-    }
-    50% {
-        filter: brightness(1.05) drop-shadow(0 0 10px rgba(76, 175, 80, 0.4));
-    }
-}
-
-.sparkles {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    z-index: 3;
-}
-
-.sparkle {
-    position: absolute;
-    font-size: 14px;
-    animation: sparkleAnimation 2s ease-in-out infinite;
-    opacity: 0;
-}
-
-.sparkle-1 { top: 10%; left: 10%; }
-.sparkle-2 { top: 20%; right: 15%; }
-.sparkle-3 { bottom: 15%; left: 20%; }
-.sparkle-4 { bottom: 25%; right: 10%; }
-.sparkle-5 { top: 50%; left: 5%; }
-.sparkle-6 { top: 50%; right: 5%; }
-.sparkle-7 { top: 30%; left: 50%; }
-.sparkle-8 { bottom: 30%; right: 50%; }
-
-@keyframes sparkleAnimation {
-    0%, 100% {
-        opacity: 0;
-        transform: scale(0) rotate(0deg);
-    }
-    50% {
-        opacity: 1;
-        transform: scale(1.1) rotate(180deg);
-    }
-}
-
 .archive-category-badge {
     display: inline-block;
     margin-bottom: 24px;
@@ -2661,24 +2507,6 @@ if (!$has_filters && is_post_type_archive('trabajo') && !is_tax()) {
 }
 
 @media (max-width: 768px) {
-    .christmas-logo-container {
-        padding: 15px 0;
-        min-height: 80px;
-        margin-bottom: 15px;
-    }
-    
-    .christmas-logo {
-        max-width: 120px;
-    }
-    
-    .snowflake {
-        font-size: 12px;
-    }
-    
-    .sparkle {
-        font-size: 12px;
-    }
-    
     .archive-title {
         font-size: 36px;
     }
