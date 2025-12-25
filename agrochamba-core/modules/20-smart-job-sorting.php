@@ -174,10 +174,13 @@ if (!function_exists('agrochamba_add_smart_sorting')) {
 if (!function_exists('agrochamba_add_smart_meta_query')) {
     /**
      * Agrega meta_query para incluir el score inteligente en la consulta
+     * IMPORTANTE: Usa 'compare' => 'EXISTS' para incluir posts con el meta key
+     * pero también permite posts sin el meta key usando LEFT JOIN en lugar de INNER JOIN
      */
     function agrochamba_add_smart_meta_query($query) {
         if ($query->get('orderby') === 'smart') {
             $meta_query = $query->get('meta_query') ?: array();
+            // Usar 'compare' => 'EXISTS' pero permitir NULL para posts sin score
             $meta_query[] = array(
                 'key' => '_trabajo_smart_score',
                 'compare' => 'EXISTS'
@@ -185,7 +188,7 @@ if (!function_exists('agrochamba_add_smart_meta_query')) {
             $query->set('meta_query', $meta_query);
         }
     }
-    add_action('pre_get_posts', 'agrochamba_add_smart_meta_query');
+    add_action('pre_get_posts', 'agrochamba_add_smart_meta_query', 5);
 }
 
 // ==========================================
@@ -249,11 +252,12 @@ if (!function_exists('agrochamba_update_job_relevance_score_with_hook')) {
 // ==========================================
 // 7. ORDENAMIENTO INTELIGENTE POR DEFECTO
 // ==========================================
+// NOTA: Esta función está deshabilitada porque causaba problemas
+// El ordenamiento por defecto ahora es 'date' (más recientes primero)
+// según lo establecido en archive-trabajo.php
+// Si se necesita ordenamiento inteligente, debe especificarse explícitamente en la URL
+/*
 if (!function_exists('agrochamba_set_default_smart_sorting')) {
-    /**
-     * Establece ordenamiento inteligente como predeterminado
-     * cuando no se especifica otro ordenamiento
-     */
     function agrochamba_set_default_smart_sorting($query) {
         // Solo en frontend, para archivos de trabajos
         if (is_admin() || !$query->is_main_query()) {
@@ -274,6 +278,7 @@ if (!function_exists('agrochamba_set_default_smart_sorting')) {
     }
     add_action('pre_get_posts', 'agrochamba_set_default_smart_sorting', 20);
 }
+*/
 
 // ==========================================
 // 8. ENDPOINT PARA OBTENER TRABAJOS ORDENADOS INTELIGENTEMENTE

@@ -313,8 +313,11 @@ if (!function_exists('agrochamba_modify_trabajo_archive_query')) {
             // Para archivos de trabajos y páginas de taxonomía relacionadas
             if (is_post_type_archive('trabajo') || is_tax('ubicacion') || is_tax('cultivo') || is_tax('empresa')) {
                 // Asegurar que solo se muestren trabajos en páginas de taxonomía
+                // IMPORTANTE: Esto debe hacerse ANTES de cualquier otra modificación
                 if (is_tax('ubicacion') || is_tax('cultivo') || is_tax('empresa')) {
                     $query->set('post_type', 'trabajo');
+                    // Asegurar que el post_status sea 'publish'
+                    $query->set('post_status', 'publish');
                 }
                 
                 // Aplicar búsqueda de texto si existe

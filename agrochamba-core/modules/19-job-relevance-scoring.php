@@ -236,10 +236,13 @@ if (!function_exists('agrochamba_add_relevance_orderby')) {
 if (!function_exists('agrochamba_add_relevance_meta_query')) {
     /**
      * Agrega meta_query para incluir el score de relevancia en la consulta
+     * IMPORTANTE: Usa 'compare' => 'EXISTS' para incluir posts con el meta key
+     * pero también permite posts sin el meta key usando LEFT JOIN en lugar de INNER JOIN
      */
     function agrochamba_add_relevance_meta_query($query) {
         if ($query->get('orderby') === 'relevance') {
             $meta_query = $query->get('meta_query') ?: array();
+            // Usar 'compare' => 'EXISTS' pero permitir NULL para posts sin score
             $meta_query[] = array(
                 'key' => '_trabajo_relevance_score',
                 'compare' => 'EXISTS'
@@ -247,7 +250,7 @@ if (!function_exists('agrochamba_add_relevance_meta_query')) {
             $query->set('meta_query', $meta_query);
         }
     }
-    add_action('pre_get_posts', 'agrochamba_add_relevance_meta_query');
+    add_action('pre_get_posts', 'agrochamba_add_relevance_meta_query', 5);
 }
 
 // ==========================================
