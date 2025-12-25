@@ -1856,7 +1856,7 @@ function closeFullscreenSlider() {
                 </div>
                 <h2 class="poll-popup-title">¡Tu opinión es importante!</h2>
                 <p class="poll-popup-description">
-                    Ayúdanos a conocer cuál es la mejor empresa agroindustrial de Ica según tu experiencia laboral.
+                    ¿En qué empresa agroindustrial te sentiste mejor trabajando en Ica?
                 </p>
                 <a href="https://agrochamba.com/blog/encuesta-de-la-mejor-empresa-agroindustrial-iquena/" 
                    class="poll-popup-button" 
@@ -1883,7 +1883,7 @@ function closeFullscreenSlider() {
                 </div>
                 <h2 class="poll-popup-title">¡Los resultados están disponibles!</h2>
                 <p class="poll-popup-description">
-                    La encuesta ha finalizado. Puedes ver los resultados de la mejor empresa agroindustrial de Ica según la opinión de los trabajadores.
+                    La encuesta ha finalizado. Puedes ver los resultados de: ¿En qué empresa agroindustrial te sentiste mejor trabajando en Ica?
                 </p>
                 <a href="https://agrochamba.com/blog/encuesta-de-la-mejor-empresa-agroindustrial-iquena/?results=true&form_id=2375&render_id=0" 
                    class="poll-popup-button" 
