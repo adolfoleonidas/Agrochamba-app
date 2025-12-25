@@ -186,104 +186,7 @@ if (!$has_filters && is_post_type_archive('trabajo') && !is_tax()) {
     <!-- Grid de Trabajos -->
     <div class="trabajos-archive-content">
         <?php if ($show_recent_posts): ?>
-            <!-- Landing page: Estadísticas, Trabajos recientes, luego pantalla de búsqueda -->
-            
-            <!-- Estadísticas Generales -->
-            <?php
-            // Obtener estadísticas
-            $total_jobs = wp_count_posts('trabajo');
-            $jobs_count = intval($total_jobs->publish ?? 0);
-            
-            $empresas_terms = get_terms(array(
-                'taxonomy' => 'empresa',
-                'hide_empty' => true,
-                'fields' => 'count',
-            ));
-            $empresas_count = is_wp_error($empresas_terms) ? 0 : intval($empresas_terms);
-            
-            $ubicaciones_terms = get_terms(array(
-                'taxonomy' => 'ubicacion',
-                'hide_empty' => true,
-                'fields' => 'count',
-            ));
-            $ubicaciones_count = is_wp_error($ubicaciones_terms) ? 0 : intval($ubicaciones_terms);
-            
-            ?>
-            <div class="landing-stats-section">
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
-                                <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
-                            </svg>
-                        </div>
-                        <div class="stat-content">
-                            <div class="stat-number"><?php echo number_format($jobs_count); ?></div>
-                            <div class="stat-label">Trabajos activos</div>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
-                            </svg>
-                        </div>
-                        <div class="stat-content">
-                            <div class="stat-number"><?php echo number_format($empresas_count); ?></div>
-                            <div class="stat-label">Empresas</div>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
-                                <circle cx="12" cy="10" r="3"/>
-                            </svg>
-                        </div>
-                        <div class="stat-content">
-                            <div class="stat-number"><?php echo number_format($ubicaciones_count); ?></div>
-                            <div class="stat-label">Ubicaciones</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- CTA para Empresas -->
-            <?php if (!is_user_logged_in() || !current_user_can('publish_trabajos')): ?>
-            <div class="landing-cta-section">
-                <div class="cta-card">
-                    <div class="cta-content">
-                        <h3 class="cta-title">¿Eres una empresa?</h3>
-                        <p class="cta-description">Publica tus ofertas de trabajo y encuentra el talento que necesitas</p>
-                        <?php if (!is_user_logged_in()): ?>
-                            <a href="<?php echo esc_url(home_url('/publicar-trabajo')); ?>" class="cta-button primary">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                                    <circle cx="8.5" cy="7" r="4"/>
-                                    <line x1="20" y1="8" x2="20" y2="14"/>
-                                    <line x1="23" y1="11" x2="17" y2="11"/>
-                                </svg>
-                                Regístrate como empresa
-                            </a>
-                        <?php else: ?>
-                            <a href="<?php echo esc_url(home_url('/publicar-trabajo')); ?>" class="cta-button primary">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <line x1="12" y1="5" x2="12" y2="19"/>
-                                    <line x1="5" y1="12" x2="19" y2="12"/>
-                                </svg>
-                                Publicar trabajo
-                            </a>
-                        <?php endif; ?>
-                    </div>
-                    <div class="cta-icon">
-                        <svg width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                            <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
-                        </svg>
-                    </div>
-                </div>
-            </div>
-            <?php endif; ?>
+            <!-- Landing page: Trabajos recientes, Estadísticas, luego pantalla de búsqueda -->
             
             <!-- Primero mostrar los últimos 3 trabajos -->
             <?php if (have_posts()): ?>
@@ -647,6 +550,103 @@ if (!$has_filters && is_post_type_archive('trabajo') && !is_tax()) {
                     </div>
                 <?php endif; ?>
             </div>
+            
+            <!-- Estadísticas Generales -->
+            <?php
+            // Obtener estadísticas
+            $total_jobs = wp_count_posts('trabajo');
+            $jobs_count = intval($total_jobs->publish ?? 0);
+            
+            $empresas_terms = get_terms(array(
+                'taxonomy' => 'empresa',
+                'hide_empty' => true,
+                'fields' => 'count',
+            ));
+            $empresas_count = is_wp_error($empresas_terms) ? 0 : intval($empresas_terms);
+            
+            $ubicaciones_terms = get_terms(array(
+                'taxonomy' => 'ubicacion',
+                'hide_empty' => true,
+                'fields' => 'count',
+            ));
+            $ubicaciones_count = is_wp_error($ubicaciones_terms) ? 0 : intval($ubicaciones_terms);
+            
+            ?>
+            <div class="landing-stats-section">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
+                                <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+                            </svg>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-number"><?php echo number_format($jobs_count); ?></div>
+                            <div class="stat-label">Trabajos activos</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                            </svg>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-number"><?php echo number_format($empresas_count); ?></div>
+                            <div class="stat-label">Empresas</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                                <circle cx="12" cy="10" r="3"/>
+                            </svg>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-number"><?php echo number_format($ubicaciones_count); ?></div>
+                            <div class="stat-label">Ubicaciones</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- CTA para Empresas -->
+            <?php if (!is_user_logged_in() || !current_user_can('publish_trabajos')): ?>
+            <div class="landing-cta-section">
+                <div class="cta-card">
+                    <div class="cta-content">
+                        <h3 class="cta-title">¿Eres una empresa?</h3>
+                        <p class="cta-description">Publica tus ofertas de trabajo y encuentra el talento que necesitas</p>
+                        <?php if (!is_user_logged_in()): ?>
+                            <a href="<?php echo esc_url(home_url('/publicar-trabajo')); ?>" class="cta-button primary">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                                    <circle cx="8.5" cy="7" r="4"/>
+                                    <line x1="20" y1="8" x2="20" y2="14"/>
+                                    <line x1="23" y1="11" x2="17" y2="11"/>
+                                </svg>
+                                Regístrate como empresa
+                            </a>
+                        <?php else: ?>
+                            <a href="<?php echo esc_url(home_url('/publicar-trabajo')); ?>" class="cta-button primary">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="12" y1="5" x2="12" y2="19"/>
+                                    <line x1="5" y1="12" x2="19" y2="12"/>
+                                </svg>
+                                Publicar trabajo
+                            </a>
+                        <?php endif; ?>
+                    </div>
+                    <div class="cta-icon">
+                        <svg width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
             
             <!-- Luego mostrar la pantalla de "Comienza tu búsqueda" -->
             <div class="no-filters-state">
