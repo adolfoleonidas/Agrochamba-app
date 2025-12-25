@@ -1263,24 +1263,32 @@ function agrochamba_make_content_clickable($content) {
     position: absolute;
     top: 15px;
     right: 15px;
-    background: transparent;
-    border: none;
+    background: rgba(0, 0, 0, 0.05);
+    border: 2px solid rgba(0, 0, 0, 0.1);
     cursor: pointer;
     padding: 8px;
     color: #666;
-    transition: all 0.2s;
+    transition: all 0.3s ease;
     border-radius: 50%;
-    width: 36px;
-    height: 36px;
+    width: 40px;
+    height: 40px;
     display: flex;
     align-items: center;
     justify-content: center;
+    z-index: 10;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .poll-popup-close:hover {
-    background: #f0f0f0;
+    background: rgba(0, 0, 0, 0.1);
+    border-color: rgba(0, 0, 0, 0.2);
     color: #333;
-    transform: rotate(90deg);
+    transform: rotate(90deg) scale(1.1);
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15);
+}
+
+.poll-popup-close:active {
+    transform: rotate(90deg) scale(0.95);
 }
 
 .poll-popup-icon {
@@ -1831,8 +1839,8 @@ function closeFullscreenSlider() {
 <!-- Popup de Encuesta -->
 <div id="poll-popup-overlay" class="poll-popup-overlay" style="display: none;">
     <div class="poll-popup-container">
-        <button class="poll-popup-close" onclick="closePollPopup()" aria-label="Cerrar">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <button class="poll-popup-close" onclick="closePollPopup(true)" aria-label="Cerrar" title="Cerrar">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                 <line x1="18" y1="6" x2="6" y2="18"/>
                 <line x1="6" y1="6" x2="18" y2="18"/>
             </svg>
