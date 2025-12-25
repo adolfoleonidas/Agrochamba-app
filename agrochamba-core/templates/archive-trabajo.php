@@ -112,7 +112,7 @@ $has_filters = !empty($ubicacion_filter) || !empty($cultivo_filter) || !empty($e
                             <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
                             <circle cx="12" cy="10" r="3"/>
                         </svg>
-                        <select name="ubicacion" class="search-input search-select" onchange="this.form.submit()">
+                        <select name="ubicacion" id="ubicacion-select" class="search-input search-select" onchange="handleUbicacionChange(this)">
                             <option value="">Todas las ubicaciones</option>
                             <?php
                             $ubicaciones = get_terms(array(
@@ -125,6 +125,7 @@ $has_filters = !empty($ubicacion_filter) || !empty($cultivo_filter) || !empty($e
                                 foreach ($ubicaciones as $ubicacion):
                             ?>
                                 <option value="<?php echo esc_attr($ubicacion->slug); ?>" 
+                                        data-term-link="<?php echo esc_url(get_term_link($ubicacion)); ?>"
                                         <?php selected($ubicacion_filter, $ubicacion->slug); ?>>
                                     <?php echo esc_html($ubicacion->name); ?>
                                 </option>
@@ -1894,6 +1895,40 @@ $has_filters = !empty($ubicacion_filter) || !empty($cultivo_filter) || !empty($e
 </style>
 
 <script>
+// Función para manejar el cambio de ubicación
+function handleUbicacionChange(select) {
+    const selectedOption = select.options[select.selectedIndex];
+    const selectedValue = select.value;
+    
+    // Si se selecciona "Todas las ubicaciones" (valor vacío)
+    if (!selectedValue) {
+        // Redirigir a /trabajos/ (archivo principal sin filtros)
+        window.location.href = '<?php echo esc_url(get_post_type_archive_link('trabajo')); ?>';
+        return;
+    }
+    
+    // Si hay un link de término (taxonomía), usar ese
+    const termLink = selectedOption.getAttribute('data-term-link');
+    if (termLink) {
+        // Preservar parámetros de búsqueda si existen
+        const searchInput = document.getElementById('search-input-field');
+        const searchValue = searchInput ? searchInput.value.trim() : '';
+        
+        if (searchValue) {
+            // Si hay búsqueda, usar parámetros GET en lugar de URL de taxonomía
+            const url = new URL(termLink, window.location.origin);
+            url.searchParams.set('s', searchValue);
+            window.location.href = url.toString();
+        } else {
+            // Si no hay búsqueda, usar URL de taxonomía limpia
+            window.location.href = termLink;
+        }
+    } else {
+        // Fallback: usar formulario con parámetros GET
+        select.form.submit();
+    }
+}
+
 // Funciones para interacciones estilo Facebook
 function toggleLike(jobId, button) {
     <?php if (!is_user_logged_in()): ?>
