@@ -186,12 +186,19 @@ if (!function_exists('agrochamba_load_trabajo_template')) {
         if (is_singular('trabajo')) {
             $custom_template = AGROCHAMBA_TEMPLATES_DIR . '/single-trabajo.php';
             if (file_exists($custom_template)) {
+                // Si Bricks Builder está activo, desactivar su template para esta página
+                if (defined('BRICKS_VERSION') || class_exists('Bricks\Builder')) {
+                    // Remover filtros de Bricks que puedan interferir
+                    remove_all_filters('bricks/builder/template');
+                    remove_all_filters('bricks/template');
+                }
                 return $custom_template;
             }
         }
         return $template;
     }
-    add_filter('single_template', 'agrochamba_load_trabajo_template');
+    // Prioridad muy alta (1) para ejecutarse ANTES que otros filtros
+    add_filter('single_template', 'agrochamba_load_trabajo_template', 1);
 }
 
 // Cargar template personalizado para archive de trabajos
