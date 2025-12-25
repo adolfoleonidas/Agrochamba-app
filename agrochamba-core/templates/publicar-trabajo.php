@@ -196,28 +196,53 @@ $rest_url = rest_url('agrochamba/v1/');
                             </svg>
                             Descripción del Trabajo *
                         </label>
-                        <textarea id="job-description" name="description" required rows="8" placeholder="Una descripción detallada permite obtener más visitas. Incluye información sobre el trabajo, requisitos y beneficios."></textarea>
-                        <div class="rich-text-toolbar">
-                            <button type="button" class="toolbar-btn" data-command="bold" title="Negrita">
-                                <strong>B</strong>
-                            </button>
-                            <button type="button" class="toolbar-btn" data-command="italic" title="Cursiva">
-                                <em>I</em>
-                            </button>
-                            <button type="button" class="toolbar-btn" data-command="underline" title="Subrayado">
-                                <u>U</u>
-                            </button>
-                            <button type="button" class="toolbar-btn" data-command="insertUnorderedList" title="Lista">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <line x1="8" y1="6" x2="21" y2="6"/>
-                                    <line x1="8" y1="12" x2="21" y2="12"/>
-                                    <line x1="8" y1="18" x2="21" y2="18"/>
-                                    <line x1="3" y1="6" x2="3.01" y2="6"/>
-                                    <line x1="3" y1="12" x2="3.01" y2="12"/>
-                                    <line x1="3" y1="18" x2="3.01" y2="18"/>
-                                </svg>
-                            </button>
+                        <div class="tiptap-editor-wrapper">
+                            <div id="tiptap-toolbar" class="tiptap-toolbar">
+                                <button type="button" class="tiptap-btn" data-action="bold" title="Negrita">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/>
+                                        <path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/>
+                                    </svg>
+                                </button>
+                                <button type="button" class="tiptap-btn" data-action="italic" title="Cursiva">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="19" y1="4" x2="10" y2="4"/>
+                                        <line x1="14" y1="20" x2="5" y2="20"/>
+                                        <line x1="15" y1="4" x2="9" y2="20"/>
+                                    </svg>
+                                </button>
+                                <button type="button" class="tiptap-btn" data-action="underline" title="Subrayado">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M6 3v7a6 6 0 0 0 6 6 6 6 0 0 0 6-6V3"/>
+                                        <line x1="4" y1="21" x2="20" y2="21"/>
+                                    </svg>
+                                </button>
+                                <div class="tiptap-divider"></div>
+                                <button type="button" class="tiptap-btn" data-action="bulletList" title="Lista con viñetas">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="8" y1="6" x2="21" y2="6"/>
+                                        <line x1="8" y1="12" x2="21" y2="12"/>
+                                        <line x1="8" y1="18" x2="21" y2="18"/>
+                                        <line x1="3" y1="6" x2="3.01" y2="6"/>
+                                        <line x1="3" y1="12" x2="3.01" y2="12"/>
+                                        <line x1="3" y1="18" x2="3.01" y2="18"/>
+                                    </svg>
+                                </button>
+                                <button type="button" class="tiptap-btn" data-action="orderedList" title="Lista numerada">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="10" y1="6" x2="21" y2="6"/>
+                                        <line x1="10" y1="12" x2="21" y2="12"/>
+                                        <line x1="10" y1="18" x2="21" y2="18"/>
+                                        <line x1="4" y1="6" x2="4" y2="6"/>
+                                        <line x1="4" y1="12" x2="4" y2="12"/>
+                                        <line x1="4" y1="18" x2="4" y2="18"/>
+                                    </svg>
+                                </button>
+                            </div>
+                            <div id="tiptap-editor" class="tiptap-editor"></div>
+                            <textarea id="job-description" name="description" required style="display: none;"></textarea>
                         </div>
+                        <p class="field-hint">Usa los botones de formato para resaltar texto importante</p>
                     </div>
                     
                     <!-- Tipo de Publicación (solo para admins) -->
@@ -639,30 +664,115 @@ $rest_url = rest_url('agrochamba/v1/');
     margin-top: 8px;
 }
 
-/* Rich Text Toolbar */
-.rich-text-toolbar {
-    display: flex;
-    gap: 8px;
-    padding: 8px;
-    background: #f5f5f5;
-    border-radius: 8px;
-    margin-top: 8px;
+/* TipTap Editor */
+.tiptap-editor-wrapper {
+    border: 2px solid #e0e0e0;
+    border-radius: 12px;
+    overflow: hidden;
+    transition: all 0.3s;
 }
 
-.toolbar-btn {
-    padding: 6px 12px;
-    background: #fff;
-    border: 1px solid #e0e0e0;
+.tiptap-editor-wrapper:focus-within {
+    border-color: #4CAF50;
+    box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+}
+
+.tiptap-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 12px;
+    background: #f8f9fa;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.tiptap-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    background: transparent;
+    border: none;
     border-radius: 6px;
     cursor: pointer;
+    color: #666;
     transition: all 0.2s;
-    font-size: 14px;
 }
 
-.toolbar-btn:hover {
+.tiptap-btn:hover {
+    background: #e8f5e9;
+    color: #4CAF50;
+}
+
+.tiptap-btn.is-active {
     background: #4CAF50;
     color: #fff;
-    border-color: #4CAF50;
+}
+
+.tiptap-btn svg {
+    flex-shrink: 0;
+}
+
+.tiptap-divider {
+    width: 1px;
+    height: 20px;
+    background: #e0e0e0;
+    margin: 0 4px;
+}
+
+.tiptap-editor {
+    min-height: 200px;
+    max-height: 400px;
+    padding: 16px;
+    overflow-y: auto;
+    font-size: 16px;
+    line-height: 1.6;
+    color: #333;
+    background: #fff;
+}
+
+.tiptap-editor:focus {
+    outline: none;
+}
+
+.tiptap-editor p {
+    margin: 0 0 12px 0;
+}
+
+.tiptap-editor p:last-child {
+    margin-bottom: 0;
+}
+
+.tiptap-editor p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    float: left;
+    color: #999;
+    pointer-events: none;
+    height: 0;
+}
+
+.tiptap-editor ul,
+.tiptap-editor ol {
+    padding-left: 24px;
+    margin: 12px 0;
+}
+
+.tiptap-editor li {
+    margin: 4px 0;
+}
+
+.tiptap-editor strong {
+    font-weight: 700;
+}
+
+.tiptap-editor em {
+    font-style: italic;
+}
+
+.tiptap-editor u {
+    text-decoration: underline;
 }
 
 /* Selector de Tipo de Publicación */
@@ -1100,6 +1210,160 @@ $rest_url = rest_url('agrochamba/v1/');
         });
     });
     
+    // Inicializar TipTap Editor
+    let editor = null;
+    const tiptapEditor = document.getElementById('tiptap-editor');
+    const descriptionTextarea = document.getElementById('job-description');
+    
+    if (tiptapEditor && descriptionTextarea) {
+        // Cargar TipTap desde CDN usando unpkg (mejor compatibilidad)
+        const loadTipTap = () => {
+            return new Promise((resolve, reject) => {
+                if (window.tiptap && window.tiptap.Editor) {
+                    resolve();
+                    return;
+                }
+                
+                // Cargar TipTap bundle completo desde unpkg
+                const script = document.createElement('script');
+                script.src = 'https://unpkg.com/@tiptap/core@2.1.13/dist/index.umd.js';
+                script.onload = () => {
+                    // Cargar StarterKit
+                    const starterKitScript = document.createElement('script');
+                    starterKitScript.src = 'https://unpkg.com/@tiptap/starter-kit@2.1.13/dist/index.umd.js';
+                    starterKitScript.onload = () => {
+                        // Cargar Underline
+                        const underlineScript = document.createElement('script');
+                        underlineScript.src = 'https://unpkg.com/@tiptap/extension-underline@2.1.13/dist/index.umd.js';
+                        underlineScript.onload = () => {
+                            resolve();
+                        };
+                        underlineScript.onerror = reject;
+                        document.head.appendChild(underlineScript);
+                    };
+                    starterKitScript.onerror = reject;
+                    document.head.appendChild(starterKitScript);
+                };
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        };
+        
+        loadTipTap().then(() => {
+            // Acceder a TipTap desde el objeto global
+            const tiptapCore = window.tiptapCore || window;
+            const tiptapStarterKit = window.tiptapStarterKit || window;
+            const tiptapUnderline = window.tiptapUnderline || window;
+            
+            const Editor = tiptapCore.Editor || (window.tiptap && window.tiptap.Editor);
+            const StarterKit = tiptapStarterKit.StarterKit || (window.tiptapStarterKit && window.tiptapStarterKit.StarterKit);
+            const Underline = tiptapUnderline.Underline || (window.tiptapUnderline && window.tiptapUnderline.Underline);
+            
+            if (!Editor || !StarterKit) {
+                throw new Error('TipTap no se cargó correctamente');
+            }
+            
+            editor = new Editor({
+                element: tiptapEditor,
+                extensions: [
+                    StarterKit.configure({
+                        heading: false,
+                        code: false,
+                        codeBlock: false,
+                        blockquote: false,
+                        horizontalRule: false,
+                    }),
+                    Underline,
+                ],
+                content: descriptionTextarea.value || '',
+                editorProps: {
+                    attributes: {
+                        class: 'tiptap-content',
+                        'data-placeholder': 'Una descripción detallada permite obtener más visitas. Incluye información sobre el trabajo, requisitos y beneficios.',
+                    },
+                },
+                onUpdate: ({ editor }) => {
+                    // Actualizar textarea oculto con el HTML
+                    descriptionTextarea.value = editor.getHTML();
+                },
+            });
+            
+            // Configurar botones de la toolbar
+            const toolbarButtons = document.querySelectorAll('.tiptap-btn');
+            toolbarButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const action = btn.getAttribute('data-action');
+                    
+                    switch (action) {
+                        case 'bold':
+                            editor.chain().focus().toggleBold().run();
+                            break;
+                        case 'italic':
+                            editor.chain().focus().toggleItalic().run();
+                            break;
+                        case 'underline':
+                            editor.chain().focus().toggleUnderline().run();
+                            break;
+                        case 'bulletList':
+                            editor.chain().focus().toggleBulletList().run();
+                            break;
+                        case 'orderedList':
+                            editor.chain().focus().toggleOrderedList().run();
+                            break;
+                    }
+                    
+                    // Actualizar estado de botones
+                    updateToolbarButtons();
+                });
+            });
+            
+            // Función para actualizar el estado visual de los botones
+            const updateToolbarButtons = () => {
+                toolbarButtons.forEach(btn => {
+                    const action = btn.getAttribute('data-action');
+                    let isActive = false;
+                    
+                    switch (action) {
+                        case 'bold':
+                            isActive = editor.isActive('bold');
+                            break;
+                        case 'italic':
+                            isActive = editor.isActive('italic');
+                            break;
+                        case 'underline':
+                            isActive = editor.isActive('underline');
+                            break;
+                        case 'bulletList':
+                            isActive = editor.isActive('bulletList');
+                            break;
+                        case 'orderedList':
+                            isActive = editor.isActive('orderedList');
+                            break;
+                    }
+                    
+                    if (isActive) {
+                        btn.classList.add('is-active');
+                    } else {
+                        btn.classList.remove('is-active');
+                    }
+                });
+            };
+            
+            // Actualizar botones cuando cambia la selección
+            editor.on('selectionUpdate', updateToolbarButtons);
+            editor.on('transaction', updateToolbarButtons);
+            
+            // Inicializar estado de botones
+            updateToolbarButtons();
+        }).catch(error => {
+            console.error('Error loading TipTap:', error);
+            // Fallback: mostrar textarea si TipTap no se carga
+            tiptapEditor.style.display = 'none';
+            descriptionTextarea.style.display = 'block';
+            descriptionTextarea.required = true;
+        });
+    }
+    
     // Validación de título con SEO
     const titleInput = document.getElementById('job-title');
     const titleLength = document.getElementById('title-length');
@@ -1153,7 +1417,20 @@ $rest_url = rest_url('agrochamba/v1/');
             
             // Validaciones básicas
             const title = document.getElementById('job-title').value.trim();
-            const description = document.getElementById('job-description').value.trim();
+            // Obtener contenido del editor TipTap o del textarea
+            let description = '';
+            if (editor) {
+                description = editor.getHTML().trim();
+                // Si está vacío, verificar si solo tiene párrafos vacíos
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = description;
+                const textContent = tempDiv.textContent || tempDiv.innerText || '';
+                if (!textContent.trim()) {
+                    description = '';
+                }
+            } else {
+                description = document.getElementById('job-description').value.trim();
+            }
             const postType = document.querySelector('input[name="post_type"]:checked')?.value || 'trabajo';
             const ubicacionId = document.getElementById('job-ubicacion')?.value;
             
@@ -1167,6 +1444,11 @@ $rest_url = rest_url('agrochamba/v1/');
                 errorMsg.textContent = 'La descripción es obligatoria';
                 errorMsg.style.display = 'block';
                 return;
+            }
+            
+            // Actualizar textarea oculto con el contenido del editor
+            if (editor) {
+                descriptionTextarea.value = description;
             }
             
             if (postType === 'trabajo' && !ubicacionId) {
@@ -1262,6 +1544,11 @@ $rest_url = rest_url('agrochamba/v1/');
                     publishForm.reset();
                     selectedImages.length = 0;
                     renderImageGallery();
+                    
+                    // Limpiar editor TipTap
+                    if (editor) {
+                        editor.commands.clearContent();
+                    }
                     
                     // Redirigir después de 3 segundos
                     setTimeout(() => {
