@@ -77,61 +77,61 @@ $rest_url = rest_url('agrochamba/v1/');
 <div class="publicar-trabajo-wrapper">
     <div class="publicar-trabajo-container">
         <?php if (!$is_logged_in): ?>
-            <!-- Formulario de Registro de Empresa -->
-            <div class="empresa-register-section">
-                <div class="register-header">
-                    <h1 class="register-title">Regístrate como Empresa</h1>
-                    <p class="register-subtitle">Crea tu cuenta y comienza a publicar ofertas de trabajo</p>
+            <!-- Mensaje para usuarios no logueados -->
+            <div class="login-required-section">
+                <div class="login-required-header">
+                    <div class="login-required-icon">
+                        <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                        </svg>
+                    </div>
+                    <h1 class="login-required-title">Acceso Requerido</h1>
+                    <p class="login-required-subtitle">Para publicar trabajos necesitas tener una cuenta. Puedes registrarte como empresa o como usuario normal.</p>
                 </div>
                 
-                <form id="empresa-register-form" class="empresa-register-form">
-                    <div class="form-group">
-                        <label for="register-username">Nombre de usuario *</label>
-                        <input type="text" id="register-username" name="username" required minlength="3">
-                        <span class="field-error" id="username-error"></span>
-                    </div>
+                <div class="login-required-actions">
+                    <a href="<?php echo esc_url(home_url('/registro')); ?>" class="btn-primary btn-large">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                            <circle cx="8.5" cy="7" r="4"/>
+                            <line x1="20" y1="8" x2="20" y2="14"/>
+                            <line x1="23" y1="11" x2="17" y2="11"/>
+                        </svg>
+                        <span>Registrarse</span>
+                    </a>
                     
-                    <div class="form-group">
-                        <label for="register-email">Correo electrónico *</label>
-                        <input type="email" id="register-email" name="email" required>
-                        <span class="field-error" id="email-error"></span>
+                    <a href="<?php echo esc_url(wp_login_url(home_url('/publicar-trabajo'))); ?>" class="btn-secondary btn-large">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+                            <polyline points="10 17 15 12 10 7"/>
+                            <line x1="15" y1="12" x2="3" y2="12"/>
+                        </svg>
+                        <span>Iniciar Sesión</span>
+                    </a>
+                </div>
+                
+                <div class="login-required-info">
+                    <div class="info-card">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <line x1="12" y1="16" x2="12" y2="12"/>
+                            <line x1="12" y1="8" x2="12.01" y2="8"/>
+                        </svg>
+                        <div>
+                            <h3>¿Ya tienes cuenta?</h3>
+                            <p>Si ya estás registrado, solo necesitas iniciar sesión para acceder al panel de empresas.</p>
+                        </div>
                     </div>
-                    
-                    <div class="form-group">
-                        <label for="register-password">Contraseña *</label>
-                        <input type="password" id="register-password" name="password" required minlength="6">
-                        <span class="field-error" id="password-error"></span>
+                    <div class="info-card">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                        </svg>
+                        <div>
+                            <h3>Registro de Empresa</h3>
+                            <p>Al registrarte, puedes elegir crear una cuenta de empresa para publicar trabajos, o una cuenta normal para comentar y buscar empleo.</p>
+                        </div>
                     </div>
-                    
-                    <div class="form-group">
-                        <label for="register-ruc">RUC *</label>
-                        <input type="text" id="register-ruc" name="ruc" required pattern="[0-9]{8,11}">
-                        <span class="field-error" id="ruc-error"></span>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="register-razon-social">Razón Social *</label>
-                        <input type="text" id="register-razon-social" name="razon_social" required>
-                        <span class="field-error" id="razon-social-error"></span>
-                    </div>
-                    
-                    <div class="form-actions">
-                        <button type="submit" class="btn-primary" id="register-submit-btn">
-                            <span class="btn-text">Registrarse</span>
-                            <span class="btn-spinner" style="display: none;">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
-                                </svg>
-                            </span>
-                        </button>
-                        <p class="form-footer">
-                            ¿Ya tienes cuenta? <a href="<?php echo esc_url(wp_login_url(home_url('/publicar-trabajo'))); ?>">Inicia sesión</a>
-                        </p>
-                    </div>
-                    
-                    <div id="register-error-message" class="error-message" style="display: none;"></div>
-                    <div id="register-success-message" class="success-message" style="display: none;"></div>
-                </form>
+                </div>
             </div>
         <?php else: ?>
             <!-- Dashboard de Empresa -->
@@ -755,31 +755,138 @@ $rest_url = rest_url('agrochamba/v1/');
     overflow: hidden;
 }
 
-.form-header,
-.register-header {
+.form-header {
     background: linear-gradient(135deg, #1a237e 0%, #283593 100%);
     padding: 40px;
     text-align: center;
     color: #fff;
 }
 
-.form-title,
-.register-title {
+.form-title {
     font-size: 32px;
     font-weight: 800;
     margin: 0 0 8px 0;
 }
 
-.form-subtitle,
-.register-subtitle {
+.form-subtitle {
     font-size: 16px;
     opacity: 0.9;
     margin: 0;
 }
 
-.publicar-trabajo-form,
-.empresa-register-form {
+.publicar-trabajo-form {
     padding: 40px;
+}
+
+/* Sección de Login Requerido */
+.login-required-section {
+    padding: 60px 40px;
+    text-align: center;
+}
+
+.login-required-header {
+    margin-bottom: 40px;
+}
+
+.login-required-icon {
+    width: 120px;
+    height: 120px;
+    margin: 0 auto 24px;
+    background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%);
+    border-radius: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #4CAF50;
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.2);
+}
+
+.login-required-title {
+    font-size: 36px;
+    font-weight: 800;
+    color: #1a237e;
+    margin: 0 0 12px 0;
+}
+
+.login-required-subtitle {
+    font-size: 18px;
+    color: #666;
+    margin: 0;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+    line-height: 1.6;
+}
+
+.login-required-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    max-width: 400px;
+    margin: 0 auto 40px;
+}
+
+.btn-large {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 18px 32px;
+    font-size: 18px;
+    font-weight: 700;
+    border-radius: 12px;
+    text-decoration: none;
+    transition: all 0.3s;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.btn-large:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+}
+
+.btn-large svg {
+    flex-shrink: 0;
+}
+
+.login-required-info {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 24px;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.info-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 24px;
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    text-align: left;
+}
+
+.info-card svg {
+    flex-shrink: 0;
+    color: #4CAF50;
+    margin-top: 4px;
+}
+
+.info-card h3 {
+    font-size: 18px;
+    font-weight: 700;
+    color: #333;
+    margin: 0 0 8px 0;
+}
+
+.info-card p {
+    font-size: 14px;
+    color: #666;
+    margin: 0;
+    line-height: 1.6;
 }
 
 .form-section {
@@ -1616,19 +1723,37 @@ $rest_url = rest_url('agrochamba/v1/');
         padding: 20px 10px;
     }
     
-    .publicar-trabajo-form,
-    .empresa-register-form {
+    .publicar-trabajo-form {
         padding: 24px 20px;
     }
     
-    .form-header,
-    .register-header {
+    .form-header {
         padding: 30px 20px;
     }
     
-    .form-title,
-    .register-title {
+    .form-title {
         font-size: 24px;
+    }
+    
+    .login-required-section {
+        padding: 40px 20px;
+    }
+    
+    .login-required-title {
+        font-size: 28px;
+    }
+    
+    .login-required-subtitle {
+        font-size: 16px;
+    }
+    
+    .login-required-icon {
+        width: 100px;
+        height: 100px;
+    }
+    
+    .login-required-info {
+        grid-template-columns: 1fr;
     }
     
     .form-row {
@@ -1687,104 +1812,8 @@ $rest_url = rest_url('agrochamba/v1/');
     const restNonce = '<?php echo esc_js($rest_nonce); ?>';
     
     <?php if (!$is_logged_in): ?>
-    // Manejar registro de empresa
-    const registerForm = document.getElementById('empresa-register-form');
-    if (registerForm) {
-        registerForm.addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const submitBtn = document.getElementById('register-submit-btn');
-            const btnText = submitBtn.querySelector('.btn-text');
-            const btnSpinner = submitBtn.querySelector('.btn-spinner');
-            const errorMsg = document.getElementById('register-error-message');
-            const successMsg = document.getElementById('register-success-message');
-            
-            // Limpiar errores previos
-            document.querySelectorAll('.field-error').forEach(el => el.textContent = '');
-            errorMsg.style.display = 'none';
-            successMsg.style.display = 'none';
-            
-            // Obtener datos del formulario
-            const formData = {
-                username: document.getElementById('register-username').value.trim(),
-                email: document.getElementById('register-email').value.trim(),
-                password: document.getElementById('register-password').value,
-                ruc: document.getElementById('register-ruc').value.trim(),
-                razon_social: document.getElementById('register-razon-social').value.trim()
-            };
-            
-            // Validaciones básicas
-            let hasErrors = false;
-            if (formData.username.length < 3) {
-                document.getElementById('username-error').textContent = 'El nombre de usuario debe tener al menos 3 caracteres';
-                hasErrors = true;
-            }
-            if (formData.password.length < 6) {
-                document.getElementById('password-error').textContent = 'La contraseña debe tener al menos 6 caracteres';
-                hasErrors = true;
-            }
-            if (!/^\d{8,11}$/.test(formData.ruc)) {
-                document.getElementById('ruc-error').textContent = 'El RUC debe tener entre 8 y 11 dígitos';
-                hasErrors = true;
-            }
-            
-            if (hasErrors) return;
-            
-            // Deshabilitar botón y mostrar spinner
-            submitBtn.disabled = true;
-            btnText.style.display = 'none';
-            btnSpinner.style.display = 'inline-block';
-            
-            try {
-                const response = await fetch(restUrl + 'register-company', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-WP-Nonce': restNonce
-                    },
-                    credentials: 'same-origin',
-                    body: JSON.stringify(formData)
-                });
-                
-                const data = await response.json();
-                
-                if (data.token) {
-                    // Registro exitoso - hacer login automático
-                    successMsg.textContent = '¡Registro exitoso! Redirigiendo...';
-                    successMsg.style.display = 'block';
-                    
-                    // Guardar token y hacer login
-                    localStorage.setItem('wp_token', data.token);
-                    
-                    // Recargar la página para mostrar el formulario de publicación
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 1500);
-                } else {
-                    // Mostrar errores
-                    const errorText = data.message || 'Error al registrar la empresa';
-                    errorMsg.textContent = errorText;
-                    errorMsg.style.display = 'block';
-                    
-                    // Mostrar errores específicos de campos
-                    if (data.code === 'rest_user_exists') {
-                        document.getElementById('username-error').textContent = 'Este nombre de usuario ya está en uso';
-                    }
-                    if (data.code === 'rest_email_exists') {
-                        document.getElementById('email-error').textContent = 'Este correo ya está registrado';
-                    }
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                errorMsg.textContent = 'Error de conexión. Por favor, intenta nuevamente.';
-                errorMsg.style.display = 'block';
-            } finally {
-                submitBtn.disabled = false;
-                btnText.style.display = 'inline';
-                btnSpinner.style.display = 'none';
-            }
-        });
-    }
+    // No hay JavaScript necesario para usuarios no logueados
+    // Los botones redirigen directamente a las páginas de registro/login
     <?php else: ?>
     // Manejar publicación de trabajo
     const publishForm = document.getElementById('publicar-trabajo-form');
