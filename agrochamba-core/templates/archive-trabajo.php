@@ -1726,6 +1726,40 @@ function toggleSave(jobId, button) {
 // La búsqueda ahora se maneja con el formulario HTML estándar
 // No necesitamos funciones JavaScript adicionales para los filtros
 
+// Asegurar que los botones de compartir y menú de tres puntos siempre sean visibles
+document.addEventListener('DOMContentLoaded', function() {
+    // Forzar visibilidad de botones de interacción
+    const interactionButtons = document.querySelectorAll('.interaction-buttons');
+    interactionButtons.forEach(function(container) {
+        container.style.display = 'flex';
+        container.style.visibility = 'visible';
+        container.style.opacity = '1';
+    });
+    
+    // Forzar visibilidad de botones de compartir
+    const shareButtons = document.querySelectorAll('.share-btn');
+    shareButtons.forEach(function(btn) {
+        btn.style.display = 'flex';
+        btn.style.visibility = 'visible';
+        btn.style.opacity = '1';
+    });
+    
+    // Forzar visibilidad de menú de tres puntos
+    const moreOptionsWrappers = document.querySelectorAll('.more-options-wrapper');
+    moreOptionsWrappers.forEach(function(wrapper) {
+        wrapper.style.display = 'flex';
+        wrapper.style.visibility = 'visible';
+        wrapper.style.opacity = '1';
+    });
+    
+    const moreOptionsButtons = document.querySelectorAll('.more-options-btn');
+    moreOptionsButtons.forEach(function(btn) {
+        btn.style.display = 'flex';
+        btn.style.visibility = 'visible';
+        btn.style.opacity = '1';
+    });
+});
+
 // Función para compartir trabajo
 function shareJob(jobId, button) {
     const jobTitle = button.getAttribute('data-job-title');
