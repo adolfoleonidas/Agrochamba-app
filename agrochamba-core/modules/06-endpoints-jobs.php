@@ -399,6 +399,11 @@ if (!function_exists('agrochamba_update_job')) {
         $user = get_userdata($user_id);
         $post_id = intval($request->get_param('id'));
         $params = $request->get_json_params();
+        
+        // Solo employers y administradores pueden actualizar trabajos
+        if (!in_array('employer', $user->roles) && !in_array('administrator', $user->roles)) {
+            return new WP_Error('rest_forbidden', 'Solo las empresas pueden gestionar trabajos.', array('status' => 403));
+        }
 
         // Verificar que el trabajo existe
         $post = get_post($post_id);
@@ -636,6 +641,11 @@ if (!function_exists('agrochamba_get_current_user_jobs')) {
         if (0 === $current_user->ID) {
             return new WP_Error('rest_not_logged_in', 'No has iniciado sesión.', array('status' => 401));
         }
+        
+        // Solo employers y administradores pueden ver sus trabajos
+        if (!in_array('employer', $current_user->roles) && !in_array('administrator', $current_user->roles)) {
+            return new WP_Error('rest_forbidden', 'Solo las empresas pueden gestionar trabajos.', array('status' => 403));
+        }
 
         // Parámetros de paginación
         $page = max(1, intval($request->get_param('page')) ?: 1);
@@ -771,6 +781,11 @@ if (!function_exists('agrochamba_get_single_job')) {
             return new WP_Error('rest_not_found', 'Trabajo no encontrado.', array('status' => 404));
         }
 
+        // Solo employers y administradores pueden obtener trabajos para editar
+        if (!in_array('employer', $current_user->roles) && !in_array('administrator', $current_user->roles)) {
+            return new WP_Error('rest_forbidden', 'Solo las empresas pueden gestionar trabajos.', array('status' => 403));
+        }
+        
         // Verificar que el usuario es el autor o es administrador
         if ($post->post_author != $current_user->ID && !in_array('administrator', $current_user->roles)) {
             return new WP_Error('rest_forbidden', 'No tienes permiso para ver este trabajo.', array('status' => 403));
@@ -1299,7 +1314,11 @@ add_action('rest_api_init', function () {
                 'methods' => 'GET',
                 'callback' => 'agrochamba_get_single_job',
                 'permission_callback' => function () {
-                    return is_user_logged_in();
+                    if (!is_user_logged_in()) {
+                        return false;
+                    }
+                    $user = wp_get_current_user();
+                    return in_array('employer', $user->roles) || in_array('administrator', $user->roles);
                 },
                 'args' => array(
                     'id' => array(
@@ -1314,7 +1333,11 @@ add_action('rest_api_init', function () {
                 'methods' => 'PUT',
                 'callback' => 'agrochamba_update_job',
                 'permission_callback' => function () {
-                    return is_user_logged_in();
+                    if (!is_user_logged_in()) {
+                        return false;
+                    }
+                    $user = wp_get_current_user();
+                    return in_array('employer', $user->roles) || in_array('administrator', $user->roles);
                 },
                 'args' => array(
                     'id' => array(
@@ -1333,7 +1356,13 @@ add_action('rest_api_init', function () {
         register_rest_route('agrochamba/v1', '/me/jobs', array(
             'methods' => 'GET',
             'callback' => 'agrochamba_get_current_user_jobs',
-            'permission_callback' => 'is_user_logged_in',
+            'permission_callback' => function () {
+                if (!is_user_logged_in()) {
+                    return false;
+                }
+                $user = wp_get_current_user();
+                return in_array('employer', $user->roles) || in_array('administrator', $user->roles);
+            },
             'args' => array(
                 'page' => array(
                     'default' => 1,

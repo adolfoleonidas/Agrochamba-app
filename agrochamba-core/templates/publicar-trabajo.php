@@ -16,7 +16,8 @@ $is_logged_in = is_user_logged_in();
 $current_user_id = $is_logged_in ? get_current_user_id() : null;
 $current_user = $is_logged_in ? wp_get_current_user() : null;
 $is_admin = $is_logged_in && current_user_can('administrator');
-$is_employer = $is_logged_in && current_user_can('publish_trabajos');
+// Verificar si es employer usando el rol directamente
+$is_employer = $is_logged_in && ($is_admin || (isset($current_user->roles) && in_array('employer', $current_user->roles)));
 
 // Obtener empresa del usuario si es employer
 $user_company_id = null;
@@ -129,6 +130,61 @@ $rest_url = rest_url('agrochamba/v1/');
                         <div>
                             <h3>Registro de Empresa</h3>
                             <p>Al registrarte, puedes elegir crear una cuenta de empresa para publicar trabajos, o una cuenta normal para comentar y buscar empleo.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        <?php elseif (!$is_employer): ?>
+            <!-- Mensaje para usuarios normales (no empresas) -->
+            <div class="login-required-section">
+                <div class="login-required-header">
+                    <div class="login-required-icon">
+                        <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                        </svg>
+                    </div>
+                    <h1 class="login-required-title">Acceso Restringido</h1>
+                    <p class="login-required-subtitle">Esta página es exclusiva para empresas. Solo las empresas pueden publicar y gestionar trabajos.</p>
+                </div>
+                
+                <div class="login-required-actions">
+                    <a href="<?php echo esc_url(home_url('/trabajos')); ?>" class="btn-primary btn-large">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
+                            <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+                        </svg>
+                        <span>Ver Trabajos Disponibles</span>
+                    </a>
+                    
+                    <a href="<?php echo esc_url(home_url('/registro?role=employer')); ?>" class="btn-secondary btn-large">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                            <line x1="9" y1="3" x2="9" y2="21"/>
+                        </svg>
+                        <span>Registrarse como Empresa</span>
+                    </a>
+                </div>
+                
+                <div class="login-required-info">
+                    <div class="info-card">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <line x1="12" y1="16" x2="12" y2="12"/>
+                            <line x1="12" y1="8" x2="12.01" y2="8"/>
+                        </svg>
+                        <div>
+                            <h3>¿Eres una empresa?</h3>
+                            <p>Si quieres publicar trabajos, necesitas registrarte como empresa. Puedes hacerlo desde la página de registro.</p>
+                        </div>
+                    </div>
+                    <div class="info-card">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                            <circle cx="12" cy="7" r="4"/>
+                        </svg>
+                        <div>
+                            <h3>¿Buscas trabajo?</h3>
+                            <p>Si eres un trabajador buscando empleo, puedes explorar las ofertas disponibles en nuestra plataforma.</p>
                         </div>
                     </div>
                 </div>
