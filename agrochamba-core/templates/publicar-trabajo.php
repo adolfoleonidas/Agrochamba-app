@@ -1216,65 +1216,97 @@ $rest_url = rest_url('agrochamba/v1/');
     const descriptionTextarea = document.getElementById('job-description');
     
     if (tiptapEditor && descriptionTextarea) {
-        // Cargar TipTap desde CDN usando unpkg (mejor compatibilidad)
+        // Cargar TipTap desde CDN usando jsDelivr (mejor compatibilidad con UMD)
         const loadTipTap = () => {
             return new Promise((resolve, reject) => {
+                // Verificar si ya está cargado
                 if (window.tiptap && window.tiptap.Editor) {
                     resolve();
                     return;
                 }
                 
-                // Cargar TipTap bundle completo desde unpkg
-                const script = document.createElement('script');
-                script.src = 'https://unpkg.com/@tiptap/core@2.1.13/dist/index.umd.js';
-                script.onload = () => {
-                    // Cargar StarterKit
-                    const starterKitScript = document.createElement('script');
-                    starterKitScript.src = 'https://unpkg.com/@tiptap/starter-kit@2.1.13/dist/index.umd.js';
-                    starterKitScript.onload = () => {
-                        // Cargar Underline
-                        const underlineScript = document.createElement('script');
-                        underlineScript.src = 'https://unpkg.com/@tiptap/extension-underline@2.1.13/dist/index.umd.js';
-                        underlineScript.onload = () => {
-                            resolve();
-                        };
-                        underlineScript.onerror = reject;
-                        document.head.appendChild(underlineScript);
-                    };
-                    starterKitScript.onerror = reject;
-                    document.head.appendChild(starterKitScript);
+                let coreLoaded = false;
+                let starterKitLoaded = false;
+                let underlineLoaded = false;
+                
+                const checkAllLoaded = () => {
+                    if (coreLoaded && starterKitLoaded && underlineLoaded) {
+                        resolve();
+                    }
                 };
-                script.onerror = reject;
-                document.head.appendChild(script);
+                
+                // Cargar Core
+                const coreScript = document.createElement('script');
+                coreScript.src = 'https://cdn.jsdelivr.net/npm/@tiptap/core@2.1.13/dist/index.umd.js';
+                coreScript.onload = () => {
+                    coreLoaded = true;
+                    checkAllLoaded();
+                };
+                coreScript.onerror = () => {
+                    console.error('Error loading TipTap Core');
+                    reject(new Error('Error loading TipTap Core'));
+                };
+                document.head.appendChild(coreScript);
+                
+                // Cargar StarterKit
+                const starterKitScript = document.createElement('script');
+                starterKitScript.src = 'https://cdn.jsdelivr.net/npm/@tiptap/starter-kit@2.1.13/dist/index.umd.js';
+                starterKitScript.onload = () => {
+                    starterKitLoaded = true;
+                    checkAllLoaded();
+                };
+                starterKitScript.onerror = () => {
+                    console.error('Error loading TipTap StarterKit');
+                    reject(new Error('Error loading TipTap StarterKit'));
+                };
+                document.head.appendChild(starterKitScript);
+                
+                // Cargar Underline
+                const underlineScript = document.createElement('script');
+                underlineScript.src = 'https://cdn.jsdelivr.net/npm/@tiptap/extension-underline@2.1.13/dist/index.umd.js';
+                underlineScript.onload = () => {
+                    underlineLoaded = true;
+                    checkAllLoaded();
+                };
+                underlineScript.onerror = () => {
+                    console.error('Error loading TipTap Underline');
+                    // Underline no es crítico, continuar sin él
+                    underlineLoaded = true;
+                    checkAllLoaded();
+                };
+                document.head.appendChild(underlineScript);
             });
         };
         
         loadTipTap().then(() => {
-            // Acceder a TipTap desde el objeto global
-            const tiptapCore = window.tiptapCore || window;
-            const tiptapStarterKit = window.tiptapStarterKit || window;
-            const tiptapUnderline = window.tiptapUnderline || window;
-            
-            const Editor = tiptapCore.Editor || (window.tiptap && window.tiptap.Editor);
-            const StarterKit = tiptapStarterKit.StarterKit || (window.tiptapStarterKit && window.tiptapStarterKit.StarterKit);
-            const Underline = tiptapUnderline.Underline || (window.tiptapUnderline && window.tiptapUnderline.Underline);
+            // Acceder a TipTap desde el objeto global (los módulos UMD exponen en window)
+            // Los módulos UMD de TipTap se exponen directamente en window con su nombre
+            const Editor = window.tiptap?.Editor || window.Editor;
+            const StarterKit = window.tiptapStarterKit?.StarterKit || window.StarterKit;
+            const Underline = window.tiptapUnderline?.Underline || window.Underline;
             
             if (!Editor || !StarterKit) {
                 throw new Error('TipTap no se cargó correctamente');
             }
             
+            const extensions = [
+                StarterKit.configure({
+                    heading: false,
+                    code: false,
+                    codeBlock: false,
+                    blockquote: false,
+                    horizontalRule: false,
+                })
+            ];
+            
+            // Agregar Underline solo si está disponible
+            if (Underline) {
+                extensions.push(Underline);
+            }
+            
             editor = new Editor({
                 element: tiptapEditor,
-                extensions: [
-                    StarterKit.configure({
-                        heading: false,
-                        code: false,
-                        codeBlock: false,
-                        blockquote: false,
-                        horizontalRule: false,
-                    }),
-                    Underline,
-                ],
+                extensions: extensions,
                 content: descriptionTextarea.value || '',
                 editorProps: {
                     attributes: {
@@ -1302,7 +1334,9 @@ $rest_url = rest_url('agrochamba/v1/');
                             editor.chain().focus().toggleItalic().run();
                             break;
                         case 'underline':
-                            editor.chain().focus().toggleUnderline().run();
+                            if (editor.can().toggleUnderline()) {
+                                editor.chain().focus().toggleUnderline().run();
+                            }
                             break;
                         case 'bulletList':
                             editor.chain().focus().toggleBulletList().run();
@@ -1331,7 +1365,7 @@ $rest_url = rest_url('agrochamba/v1/');
                             isActive = editor.isActive('italic');
                             break;
                         case 'underline':
-                            isActive = editor.isActive('underline');
+                            isActive = editor.isActive('underline') || false;
                             break;
                         case 'bulletList':
                             isActive = editor.isActive('bulletList');
