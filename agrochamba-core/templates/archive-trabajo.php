@@ -186,7 +186,131 @@ if (!$has_filters && is_post_type_archive('trabajo') && !is_tax()) {
     <!-- Grid de Trabajos -->
     <div class="trabajos-archive-content">
         <?php if ($show_recent_posts): ?>
-            <!-- Landing page: Trabajos recientes primero, luego pantalla de búsqueda -->
+            <!-- Landing page: Estadísticas, Trabajos recientes, luego pantalla de búsqueda -->
+            
+            <!-- Estadísticas Generales -->
+            <?php
+            // Obtener estadísticas
+            $total_jobs = wp_count_posts('trabajo');
+            $jobs_count = intval($total_jobs->publish ?? 0);
+            
+            $empresas_terms = get_terms(array(
+                'taxonomy' => 'empresa',
+                'hide_empty' => true,
+                'fields' => 'count',
+            ));
+            $empresas_count = is_wp_error($empresas_terms) ? 0 : intval($empresas_terms);
+            
+            $ubicaciones_terms = get_terms(array(
+                'taxonomy' => 'ubicacion',
+                'hide_empty' => true,
+                'fields' => 'count',
+            ));
+            $ubicaciones_count = is_wp_error($ubicaciones_terms) ? 0 : intval($ubicaciones_terms);
+            
+            // Trabajos con beneficios
+            $benefits_query = new WP_Query(array(
+                'post_type' => 'trabajo',
+                'post_status' => 'publish',
+                'posts_per_page' => -1,
+                'meta_query' => array(
+                    'relation' => 'OR',
+                    array('key' => 'alojamiento', 'value' => '1', 'compare' => '='),
+                    array('key' => 'transporte', 'value' => '1', 'compare' => '='),
+                    array('key' => 'alimentacion', 'value' => '1', 'compare' => '='),
+                ),
+                'fields' => 'ids',
+            ));
+            $benefits_count = $benefits_query->found_posts;
+            ?>
+            <div class="landing-stats-section">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
+                                <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+                            </svg>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-number"><?php echo number_format($jobs_count); ?></div>
+                            <div class="stat-label">Trabajos activos</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                            </svg>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-number"><?php echo number_format($empresas_count); ?></div>
+                            <div class="stat-label">Empresas</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                                <circle cx="12" cy="10" r="3"/>
+                            </svg>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-number"><?php echo number_format($ubicaciones_count); ?></div>
+                            <div class="stat-label">Ubicaciones</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                                <polyline points="22 4 12 14.01 9 11.01"/>
+                            </svg>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-number"><?php echo number_format($benefits_count); ?></div>
+                            <div class="stat-label">Con beneficios</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- CTA para Empresas -->
+            <?php if (!is_user_logged_in() || !current_user_can('publish_trabajos')): ?>
+            <div class="landing-cta-section">
+                <div class="cta-card">
+                    <div class="cta-content">
+                        <h3 class="cta-title">¿Eres una empresa?</h3>
+                        <p class="cta-description">Publica tus ofertas de trabajo y encuentra el talento que necesitas</p>
+                        <?php if (!is_user_logged_in()): ?>
+                            <a href="<?php echo esc_url(wp_registration_url()); ?>" class="cta-button primary">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                                    <circle cx="8.5" cy="7" r="4"/>
+                                    <line x1="20" y1="8" x2="20" y2="14"/>
+                                    <line x1="23" y1="11" x2="17" y2="11"/>
+                                </svg>
+                                Regístrate como empresa
+                            </a>
+                        <?php else: ?>
+                            <a href="<?php echo esc_url(admin_url('post-new.php?post_type=trabajo')); ?>" class="cta-button primary">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="12" y1="5" x2="12" y2="19"/>
+                                    <line x1="5" y1="12" x2="19" y2="12"/>
+                                </svg>
+                                Publicar trabajo
+                            </a>
+                        <?php endif; ?>
+                    </div>
+                    <div class="cta-icon">
+                        <svg width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+            
             <!-- Primero mostrar los últimos 3 trabajos -->
             <?php if (have_posts()): ?>
                 <div class="recent-jobs-section">
@@ -567,6 +691,47 @@ if (!$has_filters && is_post_type_archive('trabajo') && !is_tax()) {
                             Selecciona una ubicación, busca por empresa o puesto, o explora nuestras ofertas disponibles.
                         </p>
                     </div>
+                    <!-- Filtros Rápidos -->
+                    <div class="quick-filters-section">
+                        <h3 class="suggestions-title">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+                            </svg>
+                            Filtros rápidos
+                        </h3>
+                        <div class="quick-filters-grid">
+                            <a href="<?php echo esc_url(add_query_arg(array('benefits' => '1'), get_post_type_archive_link('trabajo'))); ?>" class="quick-filter-chip benefits-filter">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                                    <polyline points="22 4 12 14.01 9 11.01"/>
+                                </svg>
+                                <span>Con beneficios</span>
+                            </a>
+                            <a href="<?php echo esc_url(add_query_arg(array('salary' => '2000'), get_post_type_archive_link('trabajo'))); ?>" class="quick-filter-chip salary-filter">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="12" y1="1" x2="12" y2="23"/>
+                                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                                </svg>
+                                <span>Buen salario</span>
+                            </a>
+                            <a href="<?php echo esc_url(add_query_arg(array('urgent' => '1'), get_post_type_archive_link('trabajo'))); ?>" class="quick-filter-chip urgent-filter">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <polyline points="12 6 12 12 16 14"/>
+                                </svg>
+                                <span>Urgente</span>
+                            </a>
+                            <a href="<?php echo esc_url(add_query_arg(array('new' => '1'), get_post_type_archive_link('trabajo'))); ?>" class="quick-filter-chip new-filter">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <line x1="12" y1="8" x2="12" y2="12"/>
+                                    <line x1="12" y1="16" x2="12.01" y2="16"/>
+                                </svg>
+                                <span>Nuevos</span>
+                            </a>
+                        </div>
+                    </div>
+                    
                     <div class="no-filters-suggestions">
                         <h3 class="suggestions-title">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -602,6 +767,39 @@ if (!$has_filters && is_post_type_archive('trabajo') && !is_tax()) {
                             ?>
                         </div>
                     </div>
+                    
+                    <!-- Cultivos Populares -->
+                    <?php
+                    $popular_cultivos = get_terms(array(
+                        'taxonomy' => 'cultivo',
+                        'hide_empty' => true,
+                        'number' => 6,
+                        'orderby' => 'count',
+                        'order' => 'DESC',
+                    ));
+                    
+                    if (!empty($popular_cultivos) && !is_wp_error($popular_cultivos)):
+                    ?>
+                    <div class="no-filters-suggestions" style="margin-top: 50px;">
+                        <h3 class="suggestions-title">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                            </svg>
+                            Cultivos populares
+                        </h3>
+                        <div class="popular-locations">
+                            <?php foreach ($popular_cultivos as $cultivo): ?>
+                                <a href="<?php echo esc_url(get_term_link($cultivo)); ?>" class="location-chip cultivo-chip">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                                    </svg>
+                                    <span class="location-name"><?php echo esc_html($cultivo->name); ?></span>
+                                    <span class="location-count"><?php echo esc_html($cultivo->count); ?></span>
+                                </a>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                    <?php endif; ?>
                 </div>
             </div>
         <?php elseif (!$has_filters): ?>
@@ -1685,6 +1883,282 @@ if (!$has_filters && is_post_type_archive('trabajo') && !is_tax()) {
     box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
 }
 
+/* Estadísticas Generales */
+.landing-stats-section {
+    margin-bottom: 60px;
+    padding: 0 20px;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 24px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.stat-card {
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    border-radius: 16px;
+    padding: 32px 24px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    border: 1px solid rgba(76, 175, 80, 0.1);
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: linear-gradient(180deg, #4CAF50 0%, #45a049 100%);
+}
+
+.stat-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(76, 175, 80, 0.15);
+}
+
+.stat-icon {
+    flex-shrink: 0;
+    width: 64px;
+    height: 64px;
+    background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #4CAF50;
+}
+
+.stat-content {
+    flex: 1;
+}
+
+.stat-number {
+    font-size: 36px;
+    font-weight: 800;
+    color: #1a237e;
+    line-height: 1;
+    margin-bottom: 4px;
+    background: linear-gradient(135deg, #1a237e 0%, #4CAF50 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.stat-label {
+    font-size: 14px;
+    color: #666;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* CTA para Empresas */
+.landing-cta-section {
+    margin-bottom: 60px;
+    padding: 0 20px;
+}
+
+.cta-card {
+    max-width: 1000px;
+    margin: 0 auto;
+    background: linear-gradient(135deg, #1a237e 0%, #283593 100%);
+    border-radius: 20px;
+    padding: 50px 60px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 40px;
+    box-shadow: 0 8px 32px rgba(26, 35, 126, 0.3);
+    position: relative;
+    overflow: hidden;
+}
+
+.cta-card::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(76, 175, 80, 0.1) 0%, transparent 70%);
+    animation: rotate 20s linear infinite;
+}
+
+@keyframes rotate {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.cta-content {
+    flex: 1;
+    position: relative;
+    z-index: 1;
+}
+
+.cta-title {
+    font-size: 32px;
+    font-weight: 800;
+    color: #fff;
+    margin: 0 0 12px 0;
+    line-height: 1.2;
+}
+
+.cta-description {
+    font-size: 18px;
+    color: rgba(255, 255, 255, 0.9);
+    margin: 0 0 24px 0;
+    line-height: 1.6;
+}
+
+.cta-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 32px;
+    background: #4CAF50;
+    color: #fff;
+    text-decoration: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 700;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
+    border: none;
+    cursor: pointer;
+}
+
+.cta-button:hover {
+    background: #45a049;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(76, 175, 80, 0.5);
+    color: #fff;
+}
+
+.cta-button svg {
+    flex-shrink: 0;
+}
+
+.cta-icon {
+    flex-shrink: 0;
+    color: rgba(255, 255, 255, 0.1);
+    position: relative;
+    z-index: 1;
+}
+
+/* Filtros Rápidos */
+.quick-filters-section {
+    margin-top: 50px;
+    padding-top: 50px;
+    border-top: 2px solid #e8f5e9;
+}
+
+.quick-filters-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    justify-content: center;
+    align-items: center;
+}
+
+.quick-filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 24px;
+    background: #fff;
+    border: 2px solid #e0e0e0;
+    border-radius: 30px;
+    text-decoration: none;
+    color: #333;
+    font-weight: 600;
+    font-size: 15px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    position: relative;
+    overflow: hidden;
+}
+
+.quick-filter-chip::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    transition: left 0.5s;
+}
+
+.quick-filter-chip:hover::before {
+    left: 100%;
+}
+
+.quick-filter-chip svg {
+    flex-shrink: 0;
+    transition: transform 0.3s;
+}
+
+.quick-filter-chip:hover svg {
+    transform: scale(1.1);
+}
+
+.quick-filter-chip.benefits-filter:hover {
+    background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%);
+    border-color: #4CAF50;
+    color: #2E7D32;
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(76, 175, 80, 0.3);
+}
+
+.quick-filter-chip.salary-filter:hover {
+    background: linear-gradient(135deg, #FFF9C4 0%, #FFF59D 100%);
+    border-color: #F57F17;
+    color: #F57F17;
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(245, 127, 23, 0.3);
+}
+
+.quick-filter-chip.urgent-filter:hover {
+    background: linear-gradient(135deg, #FFEBEE 0%, #FFCDD2 100%);
+    border-color: #D32F2F;
+    color: #D32F2F;
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(211, 47, 47, 0.3);
+}
+
+.quick-filter-chip.new-filter:hover {
+    background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%);
+    border-color: #1976D2;
+    color: #1976D2;
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(25, 118, 210, 0.3);
+}
+
+.cultivo-chip {
+    background: linear-gradient(135deg, #FFF3E0 0%, #FFE0B2 100%);
+    border-color: #FF9800;
+}
+
+.cultivo-chip:hover {
+    background: linear-gradient(135deg, #FF9800 0%, #F57C00 100%);
+    border-color: #FF9800;
+    color: #fff;
+}
+
 /* Sección de Trabajos Recientes */
 .recent-jobs-section {
     margin-bottom: 80px;
@@ -1911,6 +2385,59 @@ if (!$has_filters && is_post_type_archive('trabajo') && !is_tax()) {
 }
 
 @media (max-width: 768px) {
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+    }
+    
+    .stat-card {
+        padding: 24px 20px;
+        flex-direction: column;
+        text-align: center;
+        gap: 16px;
+    }
+    
+    .stat-icon {
+        width: 56px;
+        height: 56px;
+    }
+    
+    .stat-number {
+        font-size: 28px;
+    }
+    
+    .stat-label {
+        font-size: 12px;
+    }
+    
+    .cta-card {
+        flex-direction: column;
+        padding: 40px 30px;
+        text-align: center;
+    }
+    
+    .cta-title {
+        font-size: 24px;
+    }
+    
+    .cta-description {
+        font-size: 16px;
+    }
+    
+    .cta-icon {
+        width: 80px;
+        height: 80px;
+    }
+    
+    .quick-filters-grid {
+        gap: 12px;
+    }
+    
+    .quick-filter-chip {
+        font-size: 14px;
+        padding: 12px 20px;
+    }
+    
     .recent-jobs-title {
         font-size: 32px;
         flex-direction: column;
