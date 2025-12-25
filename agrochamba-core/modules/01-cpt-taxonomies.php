@@ -508,7 +508,7 @@ if (!function_exists('agrochamba_registrar_taxonomias')) {
             'show_in_quick_edit'    => true,
             'show_in_rest'          => true,
             'rest_base'             => 'ubicacion',
-            'rewrite'               => array('slug' => 'ubicacion'),
+            'rewrite'               => array('slug' => 'trabajos'),
         ));
 
         // EMPRESA

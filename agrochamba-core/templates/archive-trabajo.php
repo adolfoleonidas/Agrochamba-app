@@ -1907,26 +1907,25 @@ function handleUbicacionChange(select) {
         return;
     }
     
-    // Si hay un link de término (taxonomía), usar ese
-    const termLink = selectedOption.getAttribute('data-term-link');
-    if (termLink) {
-        // Preservar parámetros de búsqueda si existen
-        const searchInput = document.getElementById('search-input-field');
-        const searchValue = searchInput ? searchInput.value.trim() : '';
-        
-        if (searchValue) {
-            // Si hay búsqueda, usar parámetros GET en lugar de URL de taxonomía
-            const url = new URL(termLink, window.location.origin);
-            url.searchParams.set('s', searchValue);
-            window.location.href = url.toString();
-        } else {
-            // Si no hay búsqueda, usar URL de taxonomía limpia
-            window.location.href = termLink;
-        }
-    } else {
-        // Fallback: usar formulario con parámetros GET
-        select.form.submit();
+    // Construir URL como /trabajos/{ubicacion}/ en lugar de /ubicacion/{ubicacion}/
+    const baseUrl = '<?php echo esc_url(get_post_type_archive_link('trabajo')); ?>';
+    const ubicacionSlug = selectedValue;
+    
+    // Preservar parámetros de búsqueda si existen
+    const searchInput = document.getElementById('search-input-field');
+    const searchValue = searchInput ? searchInput.value.trim() : '';
+    
+    // Construir URL: /trabajos/{ubicacion-slug}/
+    let targetUrl = baseUrl.replace(/\/$/, '') + '/' + ubicacionSlug + '/';
+    
+    if (searchValue) {
+        // Si hay búsqueda, agregar como parámetro GET
+        const url = new URL(targetUrl, window.location.origin);
+        url.searchParams.set('s', searchValue);
+        targetUrl = url.toString();
     }
+    
+    window.location.href = targetUrl;
 }
 
 // Funciones para interacciones estilo Facebook
