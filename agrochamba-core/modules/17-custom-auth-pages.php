@@ -866,6 +866,30 @@ if (!function_exists('agrochamba_create_auth_pages')) {
             }
         }
 
+        // Crear página de publicar trabajo
+        $publicar_trabajo_page = get_page_by_path('publicar-trabajo');
+        if (!$publicar_trabajo_page) {
+            $publicar_trabajo_page_id = wp_insert_post(array(
+                'post_title' => 'Publicar Trabajo',
+                'post_name' => 'publicar-trabajo',
+                'post_content' => '',
+                'post_status' => 'publish',
+                'post_type' => 'page'
+            ));
+            
+            if ($publicar_trabajo_page_id && !is_wp_error($publicar_trabajo_page_id)) {
+                // Asignar template después de crear la página
+                update_post_meta($publicar_trabajo_page_id, '_wp_page_template', 'publicar-trabajo.php');
+                update_option('agrochamba_publicar_trabajo_page_id', $publicar_trabajo_page_id);
+            }
+        } else {
+            // Si la página ya existe, asegurar que tenga el template correcto
+            $current_template = get_page_template_slug($publicar_trabajo_page->ID);
+            if ($current_template !== 'publicar-trabajo.php') {
+                update_post_meta($publicar_trabajo_page->ID, '_wp_page_template', 'publicar-trabajo.php');
+            }
+        }
+
         // Crear página de registro
         $register_page = get_page_by_path('registro');
         if (!$register_page) {
@@ -1360,6 +1384,23 @@ if (!function_exists('agrochamba_load_auth_templates')) {
                 dirname(AGROCHAMBA_PLUGIN_DIR) . '/agrochamba-core/templates/lostpassword.php'
             );
             foreach ($lostpassword_paths as $template_path) {
+                if (file_exists($template_path)) {
+                    return $template_path;
+                }
+            }
+        }
+        
+        // Verificar por URL de publicar trabajo
+        $is_publicar_trabajo_page = strpos($request_uri, '/publicar-trabajo') !== false;
+        
+        // Cargar template de publicar trabajo
+        if ($page_slug === 'publicar-trabajo' || $page_template === 'publicar-trabajo.php' || ($is_publicar_trabajo_page && empty($page_slug))) {
+            $publicar_trabajo_paths = array(
+                AGROCHAMBA_TEMPLATES_DIR . '/publicar-trabajo.php',
+                AGROCHAMBA_PLUGIN_DIR . '/templates/publicar-trabajo.php',
+                dirname(AGROCHAMBA_PLUGIN_DIR) . '/agrochamba-core/templates/publicar-trabajo.php'
+            );
+            foreach ($publicar_trabajo_paths as $template_path) {
                 if (file_exists($template_path)) {
                     return $template_path;
                 }

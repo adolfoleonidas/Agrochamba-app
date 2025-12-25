@@ -319,7 +319,7 @@ if (!$has_filters && is_post_type_archive('trabajo') && !is_tax()) {
                         <h3 class="cta-title">¿Eres una empresa?</h3>
                         <p class="cta-description">Publica tus ofertas de trabajo y encuentra el talento que necesitas</p>
                         <?php if (!is_user_logged_in()): ?>
-                            <a href="<?php echo esc_url(wp_registration_url()); ?>" class="cta-button primary">
+                            <a href="<?php echo esc_url(home_url('/publicar-trabajo')); ?>" class="cta-button primary">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
                                     <circle cx="8.5" cy="7" r="4"/>
@@ -329,7 +329,7 @@ if (!$has_filters && is_post_type_archive('trabajo') && !is_tax()) {
                                 Regístrate como empresa
                             </a>
                         <?php else: ?>
-                            <a href="<?php echo esc_url(admin_url('post-new.php?post_type=trabajo')); ?>" class="cta-button primary">
+                            <a href="<?php echo esc_url(home_url('/publicar-trabajo')); ?>" class="cta-button primary">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <line x1="12" y1="5" x2="12" y2="19"/>
                                     <line x1="5" y1="12" x2="19" y2="12"/>
