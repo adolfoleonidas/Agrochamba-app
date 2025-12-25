@@ -240,7 +240,6 @@ if (!$has_filters && is_post_type_archive('trabajo') && !is_tax()) {
                     </h2>
                 </div>
                 <div class="trabajos-grid">
-            <?php if (have_posts()): ?>
                 <?php while (have_posts()): the_post(); 
                     $trabajo_id = get_the_ID();
                     
