@@ -1204,6 +1204,18 @@ function agrochamba_make_content_clickable($content) {
     gap: 15px;
 }
 
+.trabajo-poll-section {
+    margin-top: 40px;
+    padding: 40px 0;
+    border-top: 2px solid #e0e0e0;
+}
+
+.poll-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
 .info-sidebar-item {
     display: flex;
     flex-direction: column;
@@ -1640,6 +1652,13 @@ function closeFullscreenSlider() {
     }
 }
 </script>
+
+<!-- Sección de Encuesta Forminator -->
+<div class="trabajo-poll-section">
+    <div class="poll-container">
+        <?php echo do_shortcode('[forminator_poll id="2375"]'); ?>
+    </div>
+</div>
 
 <!-- Sección de Comentarios -->
 <div class="trabajo-comments-section" id="comments">
