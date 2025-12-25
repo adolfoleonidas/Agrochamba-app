@@ -1636,7 +1636,7 @@ if (!function_exists('agrochamba_modify_ubicacion_term_link')) {
 }
 
 // ==========================================
-// 5.2. MANEJAR URLS /trabajos/{ubicacion}/ CORRECTAMENTE
+// 5.2. MANEJAR URLS /trabajos/{ubicacion}/ CORRECTAMENTE Y PREVENIR REDIRECCIONES
 // ==========================================
 if (!function_exists('agrochamba_handle_trabajos_ubicacion_url')) {
     function agrochamba_handle_trabajos_ubicacion_url() {
@@ -1653,14 +1653,20 @@ if (!function_exists('agrochamba_handle_trabajos_ubicacion_url')) {
         // Si es exactamente /trabajos/, asegurar que sea el archivo del post type
         if ($path === 'trabajos') {
             // Verificar que realmente sea el archivo del post type
-            if (!is_post_type_archive('trabajo')) {
+            global $wp_query;
+            if (!$wp_query->is_post_type_archive('trabajo')) {
                 // Forzar que sea el archivo del post type
-                global $wp_query;
                 $wp_query->is_post_type_archive = true;
                 $wp_query->is_archive = true;
                 $wp_query->is_home = false;
+                $wp_query->is_tax = false;
+                $wp_query->is_singular = false;
                 $wp_query->set('post_type', 'trabajo');
                 $wp_query->set('post_status', 'publish');
+                // Limpiar cualquier query var de taxonomía
+                $wp_query->set('ubicacion', '');
+                $wp_query->set('taxonomy', '');
+                $wp_query->set('term', '');
             }
             return;
         }
@@ -1671,7 +1677,13 @@ if (!function_exists('agrochamba_handle_trabajos_ubicacion_url')) {
             if (count($path_parts) >= 2) {
                 $second_part = $path_parts[1];
                 
-                // Verificar si existe un término de ubicación con ese slug
+                // Si hay 3 partes, probablemente es un trabajo individual: /trabajos/{ubicacion}/{post-slug}/
+                if (count($path_parts) >= 3) {
+                    // Dejar que WordPress lo maneje como trabajo individual
+                    return;
+                }
+                
+                // Si solo hay 2 partes, verificar si es una ubicación válida
                 $term = get_term_by('slug', $second_part, 'ubicacion');
                 if ($term && !is_wp_error($term)) {
                     // Es una ubicación válida, establecer como taxonomía
@@ -1679,10 +1691,15 @@ if (!function_exists('agrochamba_handle_trabajos_ubicacion_url')) {
                     $wp_query->is_tax = true;
                     $wp_query->is_archive = true;
                     $wp_query->is_home = false;
+                    $wp_query->is_post_type_archive = false;
+                    $wp_query->is_singular = false;
                     $wp_query->set('post_type', 'trabajo');
                     $wp_query->set('post_status', 'publish');
                     $wp_query->set('taxonomy', 'ubicacion');
                     $wp_query->set('term', $second_part);
+                } else {
+                    // No es una ubicación válida, podría ser un trabajo individual sin ubicación
+                    // Dejar que WordPress lo maneje normalmente
                 }
             }
         }
