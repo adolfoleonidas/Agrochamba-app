@@ -1204,16 +1204,191 @@ function agrochamba_make_content_clickable($content) {
     gap: 15px;
 }
 
-.trabajo-poll-section {
-    margin-top: 40px;
-    padding: 40px 0;
-    border-top: 2px solid #e0e0e0;
+/* ==========================================
+   ESTILOS DE POPUP DE ENCUESTA
+   ========================================== */
+.poll-popup-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.3s ease;
 }
 
-.poll-container {
-    max-width: 900px;
-    margin: 0 auto;
-    padding: 0 20px;
+.poll-popup-overlay.show {
+    display: flex;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(50px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.poll-popup-container {
+    position: relative;
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    border-radius: 20px;
+    padding: 40px;
+    max-width: 500px;
+    width: 90%;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    animation: slideUp 0.4s ease;
+    text-align: center;
+    border: 2px solid #e0e0e0;
+}
+
+.poll-popup-close {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    color: #666;
+    transition: all 0.2s;
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.poll-popup-close:hover {
+    background: #f0f0f0;
+    color: #333;
+    transform: rotate(90deg);
+}
+
+.poll-popup-icon {
+    margin: 0 auto 20px;
+    width: 80px;
+    height: 80px;
+    background: linear-gradient(135deg, #1877f2 0%, #0066cc 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    box-shadow: 0 8px 20px rgba(24, 119, 242, 0.3);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+}
+
+.poll-popup-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin: 0 0 15px 0;
+    line-height: 1.2;
+}
+
+.poll-popup-description {
+    font-size: 16px;
+    color: #666;
+    line-height: 1.6;
+    margin: 0 0 30px 0;
+}
+
+.poll-popup-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 32px;
+    background: linear-gradient(135deg, #1877f2 0%, #0066cc 100%);
+    color: white;
+    text-decoration: none;
+    border-radius: 12px;
+    font-size: 18px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(24, 119, 242, 0.4);
+    margin-bottom: 15px;
+}
+
+.poll-popup-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(24, 119, 242, 0.5);
+    background: linear-gradient(135deg, #1565c0 0%, #0052a3 100%);
+}
+
+.poll-popup-button svg {
+    transition: transform 0.3s ease;
+}
+
+.poll-popup-button:hover svg {
+    transform: translateX(4px);
+}
+
+.poll-popup-skip {
+    background: transparent;
+    border: none;
+    color: #999;
+    font-size: 14px;
+    cursor: pointer;
+    padding: 8px 16px;
+    transition: color 0.2s;
+    text-decoration: underline;
+}
+
+.poll-popup-skip:hover {
+    color: #666;
+}
+
+@media (max-width: 768px) {
+    .poll-popup-container {
+        padding: 30px 20px;
+        max-width: 90%;
+    }
+    
+    .poll-popup-title {
+        font-size: 24px;
+    }
+    
+    .poll-popup-description {
+        font-size: 14px;
+    }
+    
+    .poll-popup-button {
+        padding: 14px 24px;
+        font-size: 16px;
+    }
+    
+    .poll-popup-icon {
+        width: 64px;
+        height: 64px;
+    }
 }
 
 .info-sidebar-item {
@@ -1653,10 +1828,40 @@ function closeFullscreenSlider() {
 }
 </script>
 
-<!-- Sección de Encuesta Forminator -->
-<div class="trabajo-poll-section">
-    <div class="poll-container">
-        <?php echo do_shortcode('[forminator_poll id="2375"]'); ?>
+<!-- Popup de Encuesta -->
+<div id="poll-popup-overlay" class="poll-popup-overlay" style="display: none;">
+    <div class="poll-popup-container">
+        <button class="poll-popup-close" onclick="closePollPopup()" aria-label="Cerrar">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+        </button>
+        <div class="poll-popup-content">
+            <div class="poll-popup-icon">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 11l3 3L22 4"/>
+                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                </svg>
+            </div>
+            <h2 class="poll-popup-title">¡Tu opinión es importante!</h2>
+            <p class="poll-popup-description">
+                Ayúdanos a conocer cuál es la mejor empresa agroindustrial de Ica según tu experiencia laboral.
+            </p>
+            <a href="https://agrochamba.com/blog/encuesta-de-la-mejor-empresa-agroindustrial-iquena/" 
+               class="poll-popup-button" 
+               target="_blank"
+               onclick="trackPollClick()">
+                Participar en la encuesta
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="5" y1="12" x2="19" y2="12"/>
+                    <polyline points="12 5 19 12 12 19"/>
+                </svg>
+            </a>
+            <button class="poll-popup-skip" onclick="closePollPopup(true)">
+                Tal vez después
+            </button>
+        </div>
     </div>
 </div>
 
@@ -2336,6 +2541,107 @@ function closeFullscreenSlider() {
             });
         }
     }
+})();
+
+// Sistema de Popup de Encuesta
+(function() {
+    const POLL_POPUP_KEY = 'agrochamba_poll_popup_closed';
+    const POLL_POPUP_DELAY = 3000; // Mostrar después de 3 segundos
+    const POLL_POPUP_SCROLL_TRIGGER = 0.5; // Mostrar cuando el usuario haya scrolleado 50% de la página
+    
+    let popupShown = false;
+    let scrollTriggered = false;
+    
+    function shouldShowPopup() {
+        // Verificar si el usuario ya cerró el popup en esta sesión
+        if (sessionStorage.getItem(POLL_POPUP_KEY)) {
+            return false;
+        }
+        return true;
+    }
+    
+    function showPollPopup() {
+        if (popupShown || !shouldShowPopup()) {
+            return;
+        }
+        
+        const overlay = document.getElementById('poll-popup-overlay');
+        if (overlay) {
+            overlay.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+            popupShown = true;
+            
+            // Agregar animación de entrada
+            setTimeout(() => {
+                overlay.classList.add('show');
+            }, 10);
+        }
+    }
+    
+    function closePollPopup(skip = false) {
+        const overlay = document.getElementById('poll-popup-overlay');
+        if (overlay) {
+            overlay.style.display = 'none';
+            document.body.style.overflow = '';
+            
+            // Guardar en sessionStorage para no mostrar de nuevo en esta sesión
+            if (skip) {
+                sessionStorage.setItem(POLL_POPUP_KEY, '1');
+            }
+        }
+    }
+    
+    function trackPollClick() {
+        // Opcional: rastrear clics en el botón de encuesta
+        // Aquí podrías agregar analytics si lo deseas
+        console.log('Usuario hizo clic en participar en la encuesta');
+    }
+    
+    // Hacer funciones globales para que puedan ser llamadas desde el HTML
+    window.closePollPopup = closePollPopup;
+    window.trackPollClick = trackPollClick;
+    
+    // Mostrar popup después de un delay
+    document.addEventListener('DOMContentLoaded', function() {
+        setTimeout(function() {
+            if (shouldShowPopup()) {
+                showPollPopup();
+            }
+        }, POLL_POPUP_DELAY);
+        
+        // Mostrar popup cuando el usuario haga scroll (solo una vez)
+        window.addEventListener('scroll', function() {
+            if (!scrollTriggered && shouldShowPopup()) {
+                const scrollPercent = (window.scrollY + window.innerHeight) / document.documentElement.scrollHeight;
+                if (scrollPercent >= POLL_POPUP_SCROLL_TRIGGER) {
+                    scrollTriggered = true;
+                    if (!popupShown) {
+                        showPollPopup();
+                    }
+                }
+            }
+        }, { once: false });
+        
+        // Cerrar popup al hacer clic fuera del contenedor
+        const overlay = document.getElementById('poll-popup-overlay');
+        if (overlay) {
+            overlay.addEventListener('click', function(e) {
+                if (e.target === overlay) {
+                    closePollPopup(true);
+                }
+            });
+        }
+        
+        // Cerrar popup con tecla ESC
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                const overlay = document.getElementById('poll-popup-overlay');
+                if (overlay && overlay.style.display === 'flex') {
+                    closePollPopup(true);
+                }
+            }
+        });
+    });
 })();
 </script>
 
