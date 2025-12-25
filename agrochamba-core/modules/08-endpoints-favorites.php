@@ -620,13 +620,66 @@ if (!function_exists('agrochamba_get_job_counters')) {
             }
         }
 
+        // Contar compartidos
+        $shared_count = intval(get_post_meta($job_id, '_trabajo_shared_count', true) ?: 0);
+
         return new WP_REST_Response(array(
             'likes' => $favorites_count,
             'saved' => $saved_count,
             'comments' => $comments_count,
             'views' => $views_count,
+            'shared' => $shared_count,
             'is_favorite' => $is_favorite,
             'is_saved' => $is_saved,
+        ), 200);
+    }
+}
+
+// ==========================================
+// ENDPOINT PARA REGISTRAR COMPARTIDOS
+// ==========================================
+if (!function_exists('agrochamba_register_share_endpoint')) {
+    function agrochamba_register_share_endpoint() {
+        register_rest_route('agrochamba/v1', '/jobs/(?P<id>\d+)/share', array(
+            'methods' => 'POST',
+            'callback' => 'agrochamba_track_job_share',
+            'permission_callback' => '__return_true',
+            'args' => array(
+                'id' => array(
+                    'required' => true,
+                    'validate_callback' => function($param) {
+                        return is_numeric($param);
+                    }
+                ),
+            ),
+        ));
+    }
+    add_action('rest_api_init', 'agrochamba_register_share_endpoint');
+}
+
+if (!function_exists('agrochamba_track_job_share')) {
+    /**
+     * Endpoint para registrar cuando se comparte un trabajo
+     */
+    function agrochamba_track_job_share($request) {
+        $job_id = intval($request->get_param('id'));
+        
+        if ($job_id <= 0) {
+            return new WP_Error('invalid_job_id', 'ID de trabajo inválido.', array('status' => 400));
+        }
+        
+        $job = get_post($job_id);
+        if (!$job || $job->post_type !== 'trabajo') {
+            return new WP_Error('job_not_found', 'Trabajo no encontrado.', array('status' => 404));
+        }
+        
+        // Incrementar contador de compartidos
+        $new_count = agrochamba_increment_job_shared_count($job_id);
+        
+        return new WP_REST_Response(array(
+            'success' => true,
+            'shared_count' => $new_count,
+            'message' => 'Compartido registrado correctamente.'
         ), 200);
     }
 }

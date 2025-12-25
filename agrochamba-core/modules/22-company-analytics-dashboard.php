@@ -76,6 +76,7 @@ if (!function_exists('agrochamba_get_company_jobs_stats')) {
             'total_likes' => 0,
             'total_comments' => 0,
             'total_saved' => 0,
+            'total_shared' => 0,
             'jobs' => array(),
         );
         
@@ -86,6 +87,7 @@ if (!function_exists('agrochamba_get_company_jobs_stats')) {
             $stats['total_likes'] += $job_stats['likes'];
             $stats['total_comments'] += $job_stats['comments'];
             $stats['total_saved'] += $job_stats['saved'];
+            $stats['total_shared'] += $job_stats['shared'];
             
             if ($job_stats['views'] > 0) {
                 $stats['active_jobs']++;
@@ -103,7 +105,7 @@ if (!function_exists('agrochamba_get_company_jobs_stats')) {
         if ($stats['total_jobs'] > 0) {
             $stats['average_views_per_job'] = round($stats['total_views'] / $stats['total_jobs'], 2);
             $stats['average_engagement_rate'] = round(
-                (($stats['total_likes'] + $stats['total_comments'] + $stats['total_saved']) / max(1, $stats['total_views'])) * 100,
+                (($stats['total_likes'] + $stats['total_comments'] + $stats['total_saved'] + $stats['total_shared']) / max(1, $stats['total_views'])) * 100,
                 2
             );
         } else {
@@ -145,13 +147,16 @@ if (!function_exists('agrochamba_get_job_stats')) {
         // Comentarios
         $comments = get_comments_number($job_id);
         
+        // Compartidos
+        $shared = intval(get_post_meta($job_id, '_trabajo_shared_count', true) ?: 0);
+        
         // Score de relevancia
         $relevance_score = floatval(get_post_meta($job_id, '_trabajo_relevance_score', true) ?: 0);
         
         // Engagement rate
         $engagement_rate = 0;
         if ($views > 0) {
-            $engagement_rate = round((($likes + $comments + $saved) / $views) * 100, 2);
+            $engagement_rate = round((($likes + $comments + $saved + $shared) / $views) * 100, 2);
         }
         
         return array(
@@ -159,6 +164,7 @@ if (!function_exists('agrochamba_get_job_stats')) {
             'likes' => $likes,
             'comments' => $comments,
             'saved' => $saved,
+            'shared' => $shared,
             'relevance_score' => $relevance_score,
             'engagement_rate' => $engagement_rate,
         );
@@ -251,6 +257,7 @@ if (!function_exists('agrochamba_get_company_trends')) {
                     'total_likes' => 0,
                     'total_comments' => 0,
                     'total_saved' => 0,
+                    'total_shared' => 0,
                 );
             }
             
@@ -261,6 +268,7 @@ if (!function_exists('agrochamba_get_company_trends')) {
             $trends[$period_key]['total_likes'] += $job_stats['likes'];
             $trends[$period_key]['total_comments'] += $job_stats['comments'];
             $trends[$period_key]['total_saved'] += $job_stats['saved'];
+            $trends[$period_key]['total_shared'] += $job_stats['shared'];
         }
         
         // Ordenar por fecha
@@ -318,6 +326,7 @@ if (!function_exists('agrochamba_get_company_performance_by_category')) {
                             'total_likes' => 0,
                             'total_comments' => 0,
                             'total_saved' => 0,
+                            'total_shared' => 0,
                         );
                     }
                     
@@ -326,6 +335,7 @@ if (!function_exists('agrochamba_get_company_performance_by_category')) {
                     $category_stats[$term_id]['total_likes'] += $job_stats['likes'];
                     $category_stats[$term_id]['total_comments'] += $job_stats['comments'];
                     $category_stats[$term_id]['total_saved'] += $job_stats['saved'];
+                    $category_stats[$term_id]['total_shared'] += $job_stats['shared'];
                 }
             }
         }
@@ -335,7 +345,7 @@ if (!function_exists('agrochamba_get_company_performance_by_category')) {
             if ($stats['jobs_count'] > 0) {
                 $stats['average_views'] = round($stats['total_views'] / $stats['jobs_count'], 2);
                 $stats['average_engagement_rate'] = round(
-                    (($stats['total_likes'] + $stats['total_comments'] + $stats['total_saved']) / max(1, $stats['total_views'])) * 100,
+                    (($stats['total_likes'] + $stats['total_comments'] + $stats['total_saved'] + $stats['total_shared']) / max(1, $stats['total_views'])) * 100,
                     2
                 );
             } else {
@@ -491,6 +501,7 @@ if (!function_exists('agrochamba_get_analytics_dashboard')) {
                 'total_likes' => $stats['total_likes'],
                 'total_comments' => $stats['total_comments'],
                 'total_saved' => $stats['total_saved'],
+                'total_shared' => $stats['total_shared'],
                 'average_views_per_job' => $stats['average_views_per_job'],
                 'average_engagement_rate' => $stats['average_engagement_rate'],
             ),

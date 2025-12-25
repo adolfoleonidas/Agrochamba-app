@@ -123,12 +123,25 @@ if (!function_exists('agrochamba_get_job_saved_count')) {
 if (!function_exists('agrochamba_get_job_shared_count')) {
     /**
      * Obtiene el número de compartidos de un trabajo
-     * Por ahora retorna 0, pero se puede implementar tracking de compartidos
      */
     function agrochamba_get_job_shared_count($job_id) {
-        // Por ahora retornar 0, pero se puede implementar:
-        // return intval(get_post_meta($job_id, '_trabajo_shared_count', true) ?: 0);
-        return 0;
+        return intval(get_post_meta($job_id, '_trabajo_shared_count', true) ?: 0);
+    }
+}
+
+if (!function_exists('agrochamba_increment_job_shared_count')) {
+    /**
+     * Incrementa el contador de compartidos de un trabajo
+     */
+    function agrochamba_increment_job_shared_count($job_id) {
+        $current_count = agrochamba_get_job_shared_count($job_id);
+        $new_count = $current_count + 1;
+        update_post_meta($job_id, '_trabajo_shared_count', $new_count);
+        
+        // Disparar hook para recalcular score de relevancia
+        do_action('agrochamba_job_shared', $job_id);
+        
+        return $new_count;
     }
 }
 
@@ -194,6 +207,11 @@ add_action('agrochamba_job_view_counted', function($job_id) {
 // Recalcular cuando se publica un nuevo trabajo
 add_action('publish_trabajo', function($post_id) {
     agrochamba_update_job_relevance_score($post_id);
+}, 10, 1);
+
+// Recalcular cuando se comparte un trabajo
+add_action('agrochamba_job_shared', function($job_id) {
+    agrochamba_update_job_relevance_score($job_id);
 }, 10, 1);
 
 // ==========================================

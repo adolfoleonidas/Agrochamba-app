@@ -247,6 +247,9 @@ $orderby_filter = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']
                     // Contar comentarios
                     $comments_count = get_comments_number($trabajo_id);
                     
+                    // Contar compartidos
+                    $shared_count = intval(get_post_meta($trabajo_id, '_trabajo_shared_count', true) ?: 0);
+                    
                     // Estado del usuario actual
                     $is_favorite = false;
                     $is_saved = false;
@@ -367,6 +370,19 @@ $orderby_filter = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']
                                         </svg>
                                         <span class="counter-value" data-counter="comments"><?php echo esc_html($comments_count); ?></span>
                                     </span>
+                                    <!-- Compartidos siempre visibles -->
+                                    <?php if ($shared_count > 0): ?>
+                                    <span class="counter-item">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <circle cx="18" cy="5" r="3"/>
+                                            <circle cx="6" cy="12" r="3"/>
+                                            <circle cx="18" cy="19" r="3"/>
+                                            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+                                            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                                        </svg>
+                                        <span class="counter-value" data-counter="shared"><?php echo esc_html($shared_count); ?></span>
+                                    </span>
+                                    <?php endif; ?>
                                 </div>
                                 <!-- Vistas siempre visibles (públicas) -->
                                 <div class="counter-group">
@@ -1629,6 +1645,66 @@ function shareJob(jobId, button) {
     const jobUrl = button.getAttribute('data-job-url');
     const jobText = 'Mira esta oportunidad de trabajo: ' + jobTitle;
     
+    // Función para registrar el compartido en el servidor
+    const trackShare = function() {
+        fetch('<?php echo esc_url(rest_url('agrochamba/v1/jobs/')); ?>' + jobId + '/share', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-WP-Nonce': '<?php echo wp_create_nonce('wp_rest'); ?>'
+            },
+            credentials: 'same-origin'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Actualizar contador en el botón
+                const btnCount = button.querySelector('.btn-count');
+                if (btnCount) {
+                    const currentCount = parseInt(btnCount.getAttribute('data-count') || 0);
+                    const newCount = currentCount + 1;
+                    btnCount.setAttribute('data-count', newCount);
+                    btnCount.textContent = newCount;
+                } else {
+                    // Crear contador si no existe
+                    const span = document.createElement('span');
+                    span.className = 'btn-count';
+                    span.setAttribute('data-count', data.shared_count);
+                    span.textContent = data.shared_count;
+                    button.appendChild(span);
+                }
+                
+                // Actualizar contador en la sección de contadores
+                const card = button.closest('.trabajo-card');
+                const sharedCounter = card.querySelector('[data-counter="shared"]');
+                if (sharedCounter) {
+                    sharedCounter.textContent = data.shared_count;
+                } else {
+                    // Crear contador si no existe
+                    const counterGroup = card.querySelector('.counter-group');
+                    if (counterGroup) {
+                        const counterItem = document.createElement('span');
+                        counterItem.className = 'counter-item';
+                        counterItem.innerHTML = `
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="18" cy="5" r="3"/>
+                                <circle cx="6" cy="12" r="3"/>
+                                <circle cx="18" cy="19" r="3"/>
+                                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+                                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                            </svg>
+                            <span class="counter-value" data-counter="shared">${data.shared_count}</span>
+                        `;
+                        counterGroup.appendChild(counterItem);
+                    }
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error al registrar compartido:', error);
+        });
+    };
+    
     // Intentar usar Web Share API (similar a Facebook)
     if (navigator.share) {
         navigator.share({
@@ -1638,20 +1714,21 @@ function shareJob(jobId, button) {
         })
         .then(() => {
             console.log('Compartido exitosamente');
+            trackShare(); // Registrar el compartido
         })
         .catch((error) => {
             console.log('Error al compartir:', error);
             // Si falla, mostrar menú de opciones
-            showShareMenu(button, jobTitle, jobUrl, jobText);
+            showShareMenu(button, jobTitle, jobUrl, jobText, trackShare);
         });
     } else {
         // Fallback: mostrar menú de opciones de compartir
-        showShareMenu(button, jobTitle, jobUrl, jobText);
+        showShareMenu(button, jobTitle, jobUrl, jobText, trackShare);
     }
 }
 
 // Función para mostrar menú de compartir
-function showShareMenu(button, jobTitle, jobUrl, jobText) {
+function showShareMenu(button, jobTitle, jobUrl, jobText, trackShareCallback) {
     // Cerrar otros menús abiertos
     closeAllMenus();
     
@@ -2013,6 +2090,33 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (data.comments !== currentComments) {
                         commentsCounter.textContent = data.comments;
                     }
+                }
+            }
+            
+            // Actualizar contador de compartidos
+            if (data.shared !== undefined) {
+                const sharedCounter = card.querySelector('[data-counter="shared"]');
+                const shareBtn = card.querySelector('.share-btn');
+                const shareBtnCount = shareBtn ? shareBtn.querySelector('.btn-count') : null;
+                
+                if (sharedCounter) {
+                    sharedCounter.textContent = data.shared;
+                }
+                
+                if (shareBtnCount) {
+                    shareBtnCount.setAttribute('data-count', data.shared);
+                    if (data.shared > 0) {
+                        shareBtnCount.textContent = data.shared;
+                    } else {
+                        shareBtnCount.textContent = '';
+                    }
+                } else if (shareBtn && data.shared > 0) {
+                    // Crear contador en el botón si no existe
+                    const span = document.createElement('span');
+                    span.className = 'btn-count';
+                    span.setAttribute('data-count', data.shared);
+                    span.textContent = data.shared;
+                    shareBtn.appendChild(span);
                 }
             }
         });
