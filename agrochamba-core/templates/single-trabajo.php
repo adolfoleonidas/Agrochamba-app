@@ -1838,29 +1838,59 @@ function closeFullscreenSlider() {
             </svg>
         </button>
         <div class="poll-popup-content">
-            <div class="poll-popup-icon">
-                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M9 11l3 3L22 4"/>
-                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
-                </svg>
+            <!-- Contenido para votar (antes del 30 de diciembre) -->
+            <div id="poll-content-vote" style="display: none;">
+                <div class="poll-popup-icon">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 11l3 3L22 4"/>
+                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                    </svg>
+                </div>
+                <h2 class="poll-popup-title">¡Tu opinión es importante!</h2>
+                <p class="poll-popup-description">
+                    Ayúdanos a conocer cuál es la mejor empresa agroindustrial de Ica según tu experiencia laboral.
+                </p>
+                <a href="https://agrochamba.com/blog/encuesta-de-la-mejor-empresa-agroindustrial-iquena/" 
+                   class="poll-popup-button" 
+                   target="_blank"
+                   onclick="trackPollClick()">
+                    Participar en la encuesta
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="5" y1="12" x2="19" y2="12"/>
+                        <polyline points="12 5 19 12 12 19"/>
+                    </svg>
+                </a>
+                <button class="poll-popup-skip" onclick="closePollPopup(true)">
+                    Tal vez después
+                </button>
             </div>
-            <h2 class="poll-popup-title">¡Tu opinión es importante!</h2>
-            <p class="poll-popup-description">
-                Ayúdanos a conocer cuál es la mejor empresa agroindustrial de Ica según tu experiencia laboral.
-            </p>
-            <a href="https://agrochamba.com/blog/encuesta-de-la-mejor-empresa-agroindustrial-iquena/" 
-               class="poll-popup-button" 
-               target="_blank"
-               onclick="trackPollClick()">
-                Participar en la encuesta
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="5" y1="12" x2="19" y2="12"/>
-                    <polyline points="12 5 19 12 12 19"/>
-                </svg>
-            </a>
-            <button class="poll-popup-skip" onclick="closePollPopup(true)">
-                Tal vez después
-            </button>
+            
+            <!-- Contenido para ver resultados (después del 30 de diciembre) -->
+            <div id="poll-content-results" style="display: none;">
+                <div class="poll-popup-icon">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 17A7 7 0 1 1 16 10"/>
+                        <polyline points="15 8 9 8 9 14"/>
+                    </svg>
+                </div>
+                <h2 class="poll-popup-title">¡Los resultados están disponibles!</h2>
+                <p class="poll-popup-description">
+                    La encuesta ha finalizado. Puedes ver los resultados de la mejor empresa agroindustrial de Ica según la opinión de los trabajadores.
+                </p>
+                <a href="https://agrochamba.com/blog/encuesta-de-la-mejor-empresa-agroindustrial-iquena/?results=true&form_id=2375&render_id=0" 
+                   class="poll-popup-button" 
+                   target="_blank"
+                   onclick="trackPollClick()">
+                    Ver resultados
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="5" y1="12" x2="19" y2="12"/>
+                        <polyline points="12 5 19 12 12 19"/>
+                    </svg>
+                </a>
+                <button class="poll-popup-skip" onclick="closePollPopup(true)">
+                    Cerrar
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -2548,9 +2578,35 @@ function closeFullscreenSlider() {
     const POLL_POPUP_KEY = 'agrochamba_poll_popup_closed';
     const POLL_POPUP_DELAY = 3000; // Mostrar después de 3 segundos
     const POLL_POPUP_SCROLL_TRIGGER = 0.5; // Mostrar cuando el usuario haya scrolleado 50% de la página
+    const POLL_EXPIRY_DATE = new Date('2025-12-31T00:00:00'); // 30 de diciembre de 2025 (incluye todo el día 30)
     
     let popupShown = false;
     let scrollTriggered = false;
+    
+    // Verificar si la encuesta ya venció
+    function isPollExpired() {
+        const now = new Date();
+        // Comparar solo la fecha (sin hora) para incluir todo el día 30
+        const expiryDateOnly = new Date(POLL_EXPIRY_DATE.getFullYear(), POLL_EXPIRY_DATE.getMonth(), POLL_EXPIRY_DATE.getDate());
+        const nowDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        return nowDateOnly > expiryDateOnly;
+    }
+    
+    // Configurar el contenido del popup según si la encuesta venció o no
+    function setupPollContent() {
+        const voteContent = document.getElementById('poll-content-vote');
+        const resultsContent = document.getElementById('poll-content-results');
+        
+        if (isPollExpired()) {
+            // Mostrar contenido de resultados
+            if (voteContent) voteContent.style.display = 'none';
+            if (resultsContent) resultsContent.style.display = 'block';
+        } else {
+            // Mostrar contenido para votar
+            if (voteContent) voteContent.style.display = 'block';
+            if (resultsContent) resultsContent.style.display = 'none';
+        }
+    }
     
     function shouldShowPopup() {
         // Verificar si el usuario ya cerró el popup en esta sesión
@@ -2564,6 +2620,9 @@ function closeFullscreenSlider() {
         if (popupShown || !shouldShowPopup()) {
             return;
         }
+        
+        // Configurar el contenido antes de mostrar
+        setupPollContent();
         
         const overlay = document.getElementById('poll-popup-overlay');
         if (overlay) {
@@ -2603,6 +2662,9 @@ function closeFullscreenSlider() {
     
     // Mostrar popup después de un delay
     document.addEventListener('DOMContentLoaded', function() {
+        // Configurar el contenido al cargar la página
+        setupPollContent();
+        
         setTimeout(function() {
             if (shouldShowPopup()) {
                 showPollPopup();
