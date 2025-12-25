@@ -666,12 +666,6 @@ $rest_url = rest_url('agrochamba/v1/');
                                 <span>💬 Permitir comentarios</span>
                             </label>
                         </div>
-                        <div class="form-group">
-                            <label class="checkbox-option">
-                                <input type="checkbox" name="publish_to_facebook" value="1">
-                                <span>📱 Publicar también en Facebook</span>
-                            </label>
-                        </div>
                     </div>
                     
                     <!-- Botones de Acción -->
@@ -2218,8 +2212,7 @@ $rest_url = rest_url('agrochamba/v1/');
                     alojamiento: formData.get('alojamiento') === '1' ? 1 : 0,
                     transporte: formData.get('transporte') === '1' ? 1 : 0,
                     alimentacion: formData.get('alimentacion') === '1' ? 1 : 0,
-                    comentarios_habilitados: formData.get('comentarios_habilitados') === '1' ? 1 : 0,
-                    publish_to_facebook: formData.get('publish_to_facebook') === '1' ? 1 : 0
+                    comentarios_habilitados: formData.get('comentarios_habilitados') === '1' ? 1 : 0
                 };
                 
                 // Agregar categoría si es blog
