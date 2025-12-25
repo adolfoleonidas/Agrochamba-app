@@ -3569,7 +3569,23 @@ document.addEventListener('DOMContentLoaded', function() {
 // Función para compartir trabajo
 function shareJob(jobId, button) {
     const jobTitle = button.getAttribute('data-job-title');
-    const jobUrl = button.getAttribute('data-job-url');
+    
+    // Obtener la URL directamente del enlace del permalink (URL limpia como en la barra de direcciones)
+    const card = button.closest('.trabajo-card');
+    const permalinkLink = card ? card.querySelector('.trabajo-card-link') : null;
+    let jobUrl = permalinkLink ? permalinkLink.getAttribute('href') : button.getAttribute('data-job-url');
+    
+    // Si la URL está codificada, decodificarla para que sea igual a la de la barra de direcciones
+    try {
+        // Decodificar solo si está codificada
+        if (jobUrl && jobUrl.includes('%')) {
+            jobUrl = decodeURIComponent(jobUrl);
+        }
+    } catch (e) {
+        // Si falla la decodificación, usar la URL original
+        console.log('No se pudo decodificar la URL:', e);
+    }
+    
     const jobText = 'Mira esta oportunidad de trabajo: ' + jobTitle;
     
     // Función para registrar el compartido en el servidor
