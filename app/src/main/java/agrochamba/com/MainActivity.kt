@@ -159,10 +159,15 @@ fun MainAppScreen() {
     val isUserEnterprise = remember(userRoles) { 
         userRoles.contains("employer") || userRoles.contains("administrator")
     }
+    // Solo administradores pueden publicar
+    val isAdmin = remember(userRoles) {
+        userRoles.contains("administrator")
+    }
     
     // Log para debugging
-    LaunchedEffect(isUserEnterprise, userRoles) {
+    LaunchedEffect(isUserEnterprise, isAdmin, userRoles) {
         android.util.Log.d("MainAppScreen", "isUserEnterprise: $isUserEnterprise")
+        android.util.Log.d("MainAppScreen", "isAdmin: $isAdmin")
         android.util.Log.d("MainAppScreen", "Roles del usuario: $userRoles")
     }
 
@@ -187,7 +192,8 @@ fun MainAppScreen() {
             }
         },
         floatingActionButton = {
-            if (isUserEnterprise) {
+            // Solo mostrar botón de publicar si es administrador
+            if (isAdmin) {
                 FloatingActionButton(onClick = { navController.navigate(Screen.CreateJob.route) }) {
                     Icon(Icons.Default.Add, contentDescription = "Publicar Anuncio")
                 }
