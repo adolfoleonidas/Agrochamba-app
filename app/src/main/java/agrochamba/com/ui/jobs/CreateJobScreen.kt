@@ -61,22 +61,6 @@ import coil.compose.AsyncImage
 fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel = viewModel(key = "create_job")) {
     val uiState = viewModel.uiState
     val context = LocalContext.current
-    
-    // Verificar que solo administradores pueden acceder
-    val isAdmin = AuthManager.isUserAdmin()
-    
-    // Si no es admin, redirigir y mostrar mensaje
-    LaunchedEffect(isAdmin) {
-        if (!isAdmin) {
-            Toast.makeText(context, "Solo los administradores pueden publicar trabajos", Toast.LENGTH_LONG).show()
-            navController.popBackStack()
-        }
-    }
-    
-    // No mostrar contenido si no es admin
-    if (!isAdmin) {
-        return
-    }
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetMultipleContents(),
@@ -103,6 +87,7 @@ fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel 
     var comentariosHabilitados by remember { mutableStateOf(true) }
     
     // Selector de tipo de publicación (solo para admins)
+    val isAdmin = AuthManager.isUserAdmin()
     var tipoPublicacion by remember { mutableStateOf("trabajo") } // "trabajo" o "post" (blog)
     
     var showMoreOptions by remember { mutableStateOf(false) }
@@ -565,11 +550,14 @@ fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel 
                         onCheckedChange = { comentariosHabilitados = it }
                     )
                     
-                    BenefitSwitch(
-                        text = "Publicar también en Facebook",
-                        checked = publishToFacebook,
-                        onCheckedChange = { publishToFacebook = it }
-                    )
+                    // Solo mostrar opción de Facebook para administradores
+                    if (isAdmin) {
+                        BenefitSwitch(
+                            text = "Publicar también en Facebook",
+                            checked = publishToFacebook,
+                            onCheckedChange = { publishToFacebook = it }
+                        )
+                    }
                     OptionRow(
                         icon = Icons.Default.Public,
                         text = "Todo el mundo puede ver esta publicación",

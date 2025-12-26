@@ -673,11 +673,14 @@ fun EditJobScreen(
                         onCheckedChange = { comentariosHabilitados = it }
                     )
                     
-                    BenefitSwitch(
-                        text = "Publicar también en Facebook",
-                        checked = publishToFacebook,
-                        onCheckedChange = { publishToFacebook = it }
-                    )
+                    // Solo mostrar opción de Facebook para administradores
+                    if (isAdmin) {
+                        BenefitSwitch(
+                            text = "Publicar también en Facebook",
+                            checked = publishToFacebook,
+                            onCheckedChange = { publishToFacebook = it }
+                        )
+                    }
                     OptionRow(
                         icon = Icons.Default.Public,
                         text = "Todo el mundo puede ver esta publicación",

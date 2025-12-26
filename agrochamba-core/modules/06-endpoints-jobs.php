@@ -341,11 +341,13 @@ if (!function_exists('agrochamba_create_job')) {
             update_post_meta($post_id, 'gallery_ids', array_map('intval', $gallery_ids));
         }
 
-        // Publicar en Facebook SOLO si el usuario lo solicitó explícitamente
+        // Publicar en Facebook SOLO si el usuario lo solicitó explícitamente Y es administrador
         $facebook_result = null;
         $publish_to_facebook = isset($params['publish_to_facebook']) && filter_var($params['publish_to_facebook'], FILTER_VALIDATE_BOOLEAN);
         
-        if ($publish_to_facebook && function_exists('agrochamba_post_to_facebook')) {
+        // Solo permitir publicación en Facebook a administradores
+        $is_admin = in_array('administrator', $user->roles);
+        if ($publish_to_facebook && $is_admin && function_exists('agrochamba_post_to_facebook')) {
             // Preparar datos para Facebook incluyendo todas las imágenes y preferencias del usuario
             $job_data_for_facebook = array_merge($params, array(
                 'featured_media' => isset($params['featured_media']) ? $params['featured_media'] : get_post_thumbnail_id($post_id),
@@ -355,6 +357,9 @@ if (!function_exists('agrochamba_create_job')) {
                 'facebook_shorten_content' => isset($params['facebook_shorten_content']) ? filter_var($params['facebook_shorten_content'], FILTER_VALIDATE_BOOLEAN) : false,
             ));
             $facebook_result = agrochamba_post_to_facebook($post_id, $job_data_for_facebook);
+        } elseif ($publish_to_facebook && !$is_admin) {
+            // Si una empresa intenta publicar en Facebook, ignorar silenciosamente
+            error_log('AgroChamba: Usuario no administrador intentó publicar en Facebook. Ignorado.');
         }
 
         // Mensaje según el tipo de post
@@ -620,11 +625,47 @@ if (!function_exists('agrochamba_update_job')) {
             }
         }
 
-        return new WP_REST_Response(array(
+        // Publicar en Facebook SOLO si el usuario lo solicitó explícitamente Y es administrador
+        $facebook_result = null;
+        $publish_to_facebook = isset($params['publish_to_facebook']) && filter_var($params['publish_to_facebook'], FILTER_VALIDATE_BOOLEAN);
+        
+        // Solo permitir publicación en Facebook a administradores
+        $is_admin = in_array('administrator', $user->roles);
+        if ($publish_to_facebook && $is_admin && function_exists('agrochamba_post_to_facebook')) {
+            // Preparar datos para Facebook incluyendo todas las imágenes y preferencias del usuario
+            $job_data_for_facebook = array_merge($params, array(
+                'featured_media' => isset($params['featured_media']) ? $params['featured_media'] : get_post_thumbnail_id($post_id),
+                'gallery_ids' => isset($params['gallery_ids']) && is_array($params['gallery_ids']) ? array_map('intval', $params['gallery_ids']) : array(),
+                // Incluir preferencias del usuario desde la app
+                'facebook_use_link_preview' => isset($params['facebook_use_link_preview']) ? filter_var($params['facebook_use_link_preview'], FILTER_VALIDATE_BOOLEAN) : false,
+                'facebook_shorten_content' => isset($params['facebook_shorten_content']) ? filter_var($params['facebook_shorten_content'], FILTER_VALIDATE_BOOLEAN) : false,
+            ));
+            $facebook_result = agrochamba_post_to_facebook($post_id, $job_data_for_facebook);
+        } elseif ($publish_to_facebook && !$is_admin) {
+            // Si una empresa intenta publicar en Facebook, ignorar silenciosamente
+            error_log('AgroChamba: Usuario no administrador intentó publicar en Facebook al actualizar. Ignorado.');
+        }
+
+        $response_data = array(
             'success' => true,
             'message' => 'Trabajo actualizado correctamente.',
             'post_id' => $post_id
-        ), 200);
+        );
+
+        // Agregar información de Facebook si se publicó
+        if ($facebook_result && !is_wp_error($facebook_result)) {
+            $response_data['facebook'] = array(
+                'published' => true,
+                'facebook_post_id' => isset($facebook_result['facebook_post_id']) ? $facebook_result['facebook_post_id'] : null,
+            );
+        } elseif ($facebook_result && is_wp_error($facebook_result)) {
+            $response_data['facebook'] = array(
+                'published' => false,
+                'error' => $facebook_result->get_error_message(),
+            );
+        }
+
+        return new WP_REST_Response($response_data, 200);
     }
 }
 
