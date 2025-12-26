@@ -83,10 +83,20 @@ class UserRepositoryImpl : UserRepository {
 
     override suspend fun sendPasswordReset(email: String): Result<Unit> {
         return try {
-            WordPressApi.retrofitService.forgotPassword(
-                mapOf("user" to email)
+            val response = WordPressApi.retrofitService.forgotPassword(
+                mapOf("user_login" to email)
             )
-            Result.Success(Unit)
+            if (response.isSuccessful) {
+                Result.Success(Unit)
+            } else {
+                // Intentar leer el mensaje de error del cuerpo de la respuesta
+                val errorMessage = try {
+                    response.errorBody()?.string() ?: "Error al enviar el código de restablecimiento"
+                } catch (e: Exception) {
+                    "Error al enviar el código de restablecimiento"
+                }
+                Result.Error(Exception(errorMessage))
+            }
         } catch (e: Exception) {
             Result.Error(e)
         }

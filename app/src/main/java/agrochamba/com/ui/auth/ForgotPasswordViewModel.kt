@@ -34,7 +34,7 @@ class ForgotPasswordViewModel @Inject constructor(
                     is agrochamba.com.util.Result.Success -> {
                         _uiState.value = _uiState.value.copy(
                             isLoading = false,
-                            successMessage = "Si el correo existe, te enviamos un enlace para restablecer la contraseña.",
+                            successMessage = "Si el usuario existe, se ha enviado un código de 6 dígitos a tu correo electrónico. Revisa tu bandeja de entrada y spam.",
                             passwordResetSuccess = true
                         )
                     }

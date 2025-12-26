@@ -2,26 +2,22 @@ package agrochamba.com.domain.usecase.auth
 
 import agrochamba.com.domain.repository.UserRepository
 import agrochamba.com.util.Result
-import android.util.Patterns
 
 /**
- * Caso de uso para enviar correo de restablecimiento de contraseña.
+ * Caso de uso para enviar código de restablecimiento de contraseña.
+ * Acepta tanto correo electrónico como nombre de usuario.
  */
 class SendPasswordResetUseCase(
     private val userRepository: UserRepository
 ) {
-    suspend operator fun invoke(email: String): Result<Unit> {
-        val trimmedEmail = email.trim()
+    suspend operator fun invoke(userLogin: String): Result<Unit> {
+        val trimmedLogin = userLogin.trim()
         
-        if (trimmedEmail.isBlank()) {
-            return Result.Error(Exception("Ingresa tu correo electrónico."))
+        if (trimmedLogin.isBlank()) {
+            return Result.Error(Exception("Por favor, ingresa tu usuario o correo electrónico."))
         }
         
-        if (!Patterns.EMAIL_ADDRESS.matcher(trimmedEmail).matches()) {
-            return Result.Error(Exception("Correo electrónico inválido."))
-        }
-        
-        return userRepository.sendPasswordReset(trimmedEmail)
+        return userRepository.sendPasswordReset(trimmedLogin)
     }
 }
 

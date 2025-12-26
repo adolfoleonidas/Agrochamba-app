@@ -9,6 +9,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.runtime.collectAsState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -31,7 +33,7 @@ fun ForgotPasswordScreen(navController: NavController, viewModel: ForgotPassword
 
     LaunchedEffect(uiState.passwordResetSuccess) {
         if (uiState.passwordResetSuccess) {
-            Toast.makeText(context, uiState.successMessage ?: "Si el correo existe, te enviamos un enlace para restablecer la contraseña.", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, uiState.successMessage ?: "Si el usuario existe, se ha enviado un código de 6 dígitos a tu correo electrónico. Revisa tu bandeja de entrada y spam.", Toast.LENGTH_LONG).show()
             navController.popBackStack()
         }
     }
@@ -80,16 +82,72 @@ private fun Step1_AskForCode(viewModel: ForgotPasswordViewModel, userLogin: Stri
             CircularProgressIndicator()
         } else {
             Button(
-                onClick = { viewModel.requestPasswordReset(userLogin) },
-                modifier = Modifier.fillMaxWidth().height(48.dp)
+                onClick = { 
+                    if (userLogin.isNotBlank()) {
+                        viewModel.requestPasswordReset(userLogin)
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                enabled = userLogin.isNotBlank()
             ) {
-                Text("Enviar correo de restablecimiento")
+                Text("Enviar código de restablecimiento")
             }
         }
 
         uiState.error?.let {
             Spacer(modifier = Modifier.height(16.dp))
-            Text(text = it, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer
+                )
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Error,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                    Text(
+                        text = it,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        textAlign = TextAlign.Start,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+        }
+
+        uiState.successMessage?.let {
+            Spacer(modifier = Modifier.height(16.dp))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                )
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CheckCircle,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = it,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        textAlign = TextAlign.Start,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
         }
     }
 }

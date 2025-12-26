@@ -37,16 +37,24 @@ object WordPressErrorMapper {
         return when (ex) {
             is HttpException -> {
                 when (ex.code()) {
-                    400 -> Exception("Correo electrónico inválido.")
-                    404 -> Exception("Si el correo existe, te enviaremos un enlace para restablecer la contraseña.")
+                    400 -> Exception("Usuario o correo no puede estar vacío.")
+                    404 -> Exception("Si el usuario existe, se ha enviado un código de 6 dígitos a tu correo electrónico.")
                     429 -> Exception("Demasiados intentos. Inténtalo más tarde.")
                     500, 502, 503 -> Exception("Error del servidor. Inténtalo más tarde.")
-                    else -> Exception(ex.message ?: "No se pudo enviar el correo de restablecimiento.")
+                    else -> {
+                        // Intentar leer el mensaje del cuerpo de la respuesta
+                        val errorMessage = try {
+                            ex.response()?.errorBody()?.string() ?: ex.message()
+                        } catch (e: Exception) {
+                            ex.message()
+                        }
+                        Exception(errorMessage ?: "Error al enviar el código de restablecimiento. Por favor, intenta nuevamente.")
+                    }
                 }
             }
             is java.net.UnknownHostException -> Exception("Sin conexión a internet. Revisa tu conexión e inténtalo de nuevo.")
             is java.net.SocketTimeoutException -> Exception("Tiempo de espera agotado. Inténtalo de nuevo.")
-            else -> Exception(ex.message ?: "No se pudo enviar el correo de restablecimiento.")
+            else -> Exception(ex.message ?: "Error de conexión. Por favor, verifica tu conexión a internet e intenta nuevamente.")
         }
     }
 }
