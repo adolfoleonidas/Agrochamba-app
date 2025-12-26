@@ -334,14 +334,34 @@ if (!function_exists('agrochamba_handle_lost_password_request')) {
             update_user_meta($user_data->ID, 'agrochamba_reset_code', $reset_code);
             update_user_meta($user_data->ID, 'agrochamba_reset_timestamp', time());
 
-            // Enviar correo
+            // Preparar correo
             $subject = 'Tu código de recuperación para Agrochamba';
             $message = "Hola " . $user_data->display_name . ",\n\n";
             $message .= "Tu código para restablecer tu contraseña es: " . $reset_code . "\n\n";
             $message .= "Este código expirará en 15 minutos.\n\n";
-            $message .= "Si no solicitaste esto, puedes ignorar este correo.\n";
+            $message .= "Si no solicitaste esto, puedes ignorar este correo.\n\n";
+            $message .= "Saludos,\n";
+            $message .= "El equipo de AgroChamba\n";
             
-            wp_mail($user_data->user_email, $subject, $message);
+            // Headers del correo
+            $headers = array(
+                'Content-Type: text/plain; charset=UTF-8',
+                'From: AgroChamba <' . get_option('admin_email') . '>'
+            );
+            
+            // Intentar enviar el correo
+            $email_sent = wp_mail($user_data->user_email, $subject, $message, $headers);
+            
+            // Log para debugging (solo en modo debug)
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log(sprintf(
+                    'AgroChamba Password Reset: Código %s generado para usuario %s (%d). Email enviado: %s',
+                    $reset_code,
+                    $user_data->user_email,
+                    $user_data->ID,
+                    $email_sent ? 'Sí' : 'No'
+                ));
+            }
         }
         
         // Por seguridad, siempre enviamos una respuesta exitosa

@@ -205,6 +205,27 @@ html.bricks-html {
     font-size: 14px;
 }
 
+#lostpassword-message-container {
+    margin-bottom: 0;
+}
+
+#lostpassword-message-container .auth-error-message,
+#lostpassword-message-container .auth-success-message {
+    margin-bottom: 24px;
+    animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 .auth-error-message svg,
 .auth-success-message svg {
     flex-shrink: 0;
@@ -507,7 +528,8 @@ html.bricks-html {
                     <span>Se ha enviado un correo con las instrucciones para restablecer tu contraseña.</span>
                 </div>
             <?php else: ?>
-                <form name="lostpasswordform" id="lostpasswordform" action="<?php echo esc_url(wp_lostpassword_url()); ?>" method="post" class="auth-form">
+                <div id="lostpassword-message-container"></div>
+                <form name="lostpasswordform" id="lostpasswordform" class="auth-form">
                     <div class="form-group">
                         <svg class="form-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
@@ -524,10 +546,8 @@ html.bricks-html {
                             value="<?php echo isset($_GET['login']) ? esc_attr($_GET['login']) : ''; ?>">
                     </div>
 
-                    <?php wp_nonce_field('lost_password', 'wp_lostpassword_nonce'); ?>
-
-                    <button type="submit" class="auth-submit-btn">
-                        Enviar correo de restablecimiento
+                    <button type="submit" class="auth-submit-btn" id="lostpassword-submit-btn">
+                        Enviar código de restablecimiento
                     </button>
                 </form>
             <?php endif; ?>
@@ -583,25 +603,98 @@ observer.observe(document.body, {
     subtree: true
 });
 
-// Manejar envío del formulario
+// Función para mostrar mensajes
+function showLostPasswordMessage(message, type) {
+    const container = document.getElementById('lostpassword-message-container');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    
+    const messageDiv = document.createElement('div');
+    messageDiv.className = type === 'error' ? 'auth-error-message' : 'auth-success-message';
+    
+    const iconSvg = type === 'error' 
+        ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>'
+        : '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>';
+    
+    messageDiv.innerHTML = iconSvg + '<span>' + message + '</span>';
+    container.appendChild(messageDiv);
+    
+    // Scroll al mensaje
+    messageDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// Manejar envío del formulario usando REST API
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('lostpasswordform');
-    if (form) {
-        form.addEventListener('submit', function(e) {
-            const submitBtn = form.querySelector('.auth-submit-btn');
-            const userLogin = document.getElementById('user_login').value.trim();
+    if (!form) return;
+    
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const submitBtn = document.getElementById('lostpassword-submit-btn');
+        const userLoginInput = document.getElementById('user_login');
+        const userLogin = userLoginInput.value.trim();
+        
+        // Limpiar mensajes anteriores
+        const messageContainer = document.getElementById('lostpassword-message-container');
+        if (messageContainer) {
+            messageContainer.innerHTML = '';
+        }
+        
+        // Validación básica
+        if (!userLogin) {
+            showLostPasswordMessage('Por favor, ingresa tu usuario o correo electrónico.', 'error');
+            userLoginInput.focus();
+            return false;
+        }
+        
+        // Mostrar estado de carga
+        const originalText = submitBtn.textContent;
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Enviando...';
+        
+        try {
+            // Llamar al endpoint REST API
+            const response = await fetch('<?php echo esc_url(rest_url('agrochamba/v1/lost-password')); ?>', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    user_login: userLogin
+                })
+            });
             
-            if (!userLogin) {
-                e.preventDefault();
-                alert('Por favor, ingresa tu usuario o correo electrónico.');
-                return false;
+            const data = await response.json();
+            
+            if (!response.ok) {
+                // Error del servidor
+                const errorMessage = data.message || 'Error al enviar el código. Por favor, intenta nuevamente.';
+                showLostPasswordMessage(errorMessage, 'error');
+            } else {
+                // Éxito
+                showLostPasswordMessage('Si el usuario existe, se ha enviado un código de 6 dígitos a tu correo electrónico. Revisa tu bandeja de entrada y spam.', 'success');
+                
+                // Limpiar el campo
+                userLoginInput.value = '';
+                
+                // Opcional: Redirigir a página de ingreso de código después de 3 segundos
+                // setTimeout(() => {
+                //     window.location.href = '<?php echo esc_url(add_query_arg('step', 'code', wp_lostpassword_url())); ?>';
+                // }, 3000);
             }
-            
-            // Mostrar estado de carga
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Enviando...';
-        });
-    }
+        } catch (error) {
+            console.error('Error:', error);
+            showLostPasswordMessage('Error de conexión. Por favor, verifica tu conexión a internet e intenta nuevamente.', 'error');
+        } finally {
+            // Restaurar botón
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+        }
+        
+        return false;
+    });
 });
 </script>
 
