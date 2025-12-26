@@ -1,0 +1,9 @@
+# Template para key.properties
+# Copia este archivo a key.properties y completa con tus datos reales
+# IMPORTANTE: key.properties NO debe subirse a Git
+
+storePassword=TU_CONTRASEÑA_DEL_KEYSTORE
+keyPassword=TU_CONTRASEÑA_DE_LA_CLAVE
+keyAlias=agrochamba
+storeFile=../agrochamba-release.jks
+
