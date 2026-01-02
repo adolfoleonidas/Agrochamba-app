@@ -66,6 +66,7 @@ if (!AGROCHAMBA_USE_MODULE_LOADER) {
             '20-smart-job-sorting.php',        // Ordenamiento inteligente de trabajos
             '21-personalized-recommendations.php', // Sistema de recomendaciones personalizadas
             '22-company-analytics-dashboard.php',   // Dashboard de analytics para empresas
+            '23-supabase-sync.php',            // Sincronización Supabase ↔ WordPress
         );
 
         // Cargar cada módulo

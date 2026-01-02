@@ -20,3 +20,14 @@ local.properties
 app/key.properties
 app/keystore/
 *.key
+
+# WordPress - Archivos con valores sensibles
+# El archivo VALORES-PARA-DESARROLLADOR.md contiene JWT_SECRET real
+# Usar VALORES-PARA-DESARROLLADOR.template.md en su lugar
+agrochamba-core/docs/VALORES-PARA-DESARROLLADOR.md
+
+# Archivos de configuración con secrets
+wp-config.php
+.env
+.env.local
+.env.production
