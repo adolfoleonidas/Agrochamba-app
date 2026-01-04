@@ -1,3 +1,6 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -17,8 +20,8 @@ android {
         applicationId = "com.agrochamba"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 5
+        versionName = "1.0.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -34,13 +37,17 @@ android {
         create("release") {
             val keystorePropertiesFile = rootProject.file("app/key.properties")
             if (keystorePropertiesFile.exists()) {
-                val keystoreProperties = java.util.Properties()
-                keystoreProperties.load(java.io.FileInputStream(keystorePropertiesFile))
+                val keystoreProperties = Properties().apply {
+                    load(FileInputStream(keystorePropertiesFile))
+                }
                 
-                storeFile = file(keystoreProperties["storeFile"] as String)
-                storePassword = keystoreProperties["storePassword"] as String
-                keyAlias = keystoreProperties["keyAlias"] as String
-                keyPassword = keystoreProperties["keyPassword"] as String
+                val storeFileProp = keystoreProperties.getProperty("storeFile")
+                if (storeFileProp != null && rootProject.file(storeFileProp).exists()) {
+                    storeFile = file(storeFileProp)
+                    storePassword = keystoreProperties.getProperty("storePassword") ?: ""
+                    keyAlias = keystoreProperties.getProperty("keyAlias") ?: ""
+                    keyPassword = keystoreProperties.getProperty("keyPassword") ?: ""
+                }
             }
         }
     }
@@ -49,7 +56,20 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            signingConfig = signingConfigs.getByName("release")
+            // Solo usar signingConfig si el keystore está configurado
+            val keystorePropertiesFile = rootProject.file("app/key.properties")
+            val keystoreFile = if (keystorePropertiesFile.exists()) {
+                val keystoreProperties = Properties().apply {
+                    load(FileInputStream(keystorePropertiesFile))
+                }
+                val storeFileProp = keystoreProperties.getProperty("storeFile")
+                if (storeFileProp != null) rootProject.file(storeFileProp) else null
+            } else null
+            
+            if (keystoreFile != null && keystoreFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+            
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
