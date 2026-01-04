@@ -1,8 +1,6 @@
 package agrochamba.com
 
 import android.os.Bundle
-import android.webkit.WebView
-import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import dagger.hilt.android.AndroidEntryPoint
@@ -26,7 +24,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -57,6 +54,7 @@ import agrochamba.com.ui.jobs.ModerationScreen
 import agrochamba.com.ui.jobs.MyJobsScreen
 import agrochamba.com.ui.jobs.SavedScreen
 import agrochamba.com.ui.theme.AgrochambaTheme
+import agrochamba.com.ui.WebViewScreen
 
 sealed class Screen(val route: String, val label: String? = null, val icon: ImageVector? = null) {
     object Jobs : Screen("jobs", "Chambas", Icons.Default.Work)
@@ -159,15 +157,10 @@ fun MainAppScreen() {
     val isUserEnterprise = remember(userRoles) { 
         userRoles.contains("employer") || userRoles.contains("administrator")
     }
-    // Solo administradores pueden publicar
-    val isAdmin = remember(userRoles) {
-        userRoles.contains("administrator")
-    }
     
     // Log para debugging
-    LaunchedEffect(isUserEnterprise, isAdmin, userRoles) {
+    LaunchedEffect(isUserEnterprise, userRoles) {
         android.util.Log.d("MainAppScreen", "isUserEnterprise: $isUserEnterprise")
-        android.util.Log.d("MainAppScreen", "isAdmin: $isAdmin")
         android.util.Log.d("MainAppScreen", "Roles del usuario: $userRoles")
     }
 
@@ -192,8 +185,7 @@ fun MainAppScreen() {
             }
         },
         floatingActionButton = {
-            // Solo mostrar botón de publicar si es administrador
-            if (isAdmin) {
+            if (isUserEnterprise) {
                 FloatingActionButton(onClick = { navController.navigate(Screen.CreateJob.route) }) {
                     Icon(Icons.Default.Add, contentDescription = "Publicar Anuncio")
                 }
@@ -256,13 +248,3 @@ fun MainAppScreen() {
     }
 }
 
-@Composable
-fun WebViewScreen(url: String) {
-    AndroidView(factory = {
-        WebView(it).apply {
-            webViewClient = WebViewClient()
-            settings.javaScriptEnabled = true
-            loadUrl(url)
-        }
-    })
-}
