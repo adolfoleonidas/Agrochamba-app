@@ -32,6 +32,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import agrochamba.com.ui.common.MenuItem
+import agrochamba.com.ui.common.MenuItemWithBadge
 import agrochamba.com.ui.common.MenuItemWithCount
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -44,6 +45,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -62,9 +65,13 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import agrochamba.com.Screen
 import agrochamba.com.data.AuthManager
+import agrochamba.com.data.ModerationNotificationManager
+import agrochamba.com.data.WordPressApi
+import agrochamba.com.ui.jobs.ModerationViewModel
 import agrochamba.com.utils.htmlToString
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -74,6 +81,31 @@ fun ProfileScreen(navController: NavController, viewModel: ProfileViewModel = vi
     val displayName = profile?.displayName ?: AuthManager.userDisplayName ?: "Usuario"
     val username = AuthManager.userDisplayName?.lowercase()?.replace(" ", "") ?: "usuario"
     val profilePhotoUrl = profile?.profilePhotoUrl
+    
+    // Observar el contador de trabajos pendientes
+    val pendingJobsCount by ModerationNotificationManager.pendingJobsCount.collectAsState()
+    
+    // Cargar trabajos pendientes si el usuario es administrador
+    LaunchedEffect(Unit) {
+        if (AuthManager.isUserAdmin()) {
+            // Cargar trabajos pendientes para actualizar el contador
+            val token = AuthManager.token
+            if (token != null) {
+                try {
+                    val authHeader = "Bearer $token"
+                    val response = WordPressApi.retrofitService.getPendingJobs(authHeader, page = 1, perPage = 100)
+                    ModerationNotificationManager.updatePendingJobsCount(response.jobs.size)
+                } catch (e: Exception) {
+                    android.util.Log.e("ProfileScreen", "Error al cargar trabajos pendientes: ${e.message}")
+                    // En caso de error, mantener el contador en 0
+                    ModerationNotificationManager.updatePendingJobsCount(0)
+                }
+            }
+        } else {
+            // Si no es admin, resetear el contador
+            ModerationNotificationManager.resetCount()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -191,9 +223,10 @@ fun ProfileScreen(navController: NavController, viewModel: ProfileViewModel = vi
 
             if (AuthManager.isUserAdmin()) {
                 item {
-                    MenuItem(
+                    MenuItemWithBadge(
                         icon = Icons.Default.Settings,
                         title = "Moderar Trabajos",
+                        badgeCount = pendingJobsCount,
                         onClick = { navController.navigate(Screen.Moderation.route) }
                     )
                 }

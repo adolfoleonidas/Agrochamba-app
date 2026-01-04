@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import agrochamba.com.data.AuthManager
 import agrochamba.com.data.JobPost
+import agrochamba.com.data.ModerationNotificationManager
 import agrochamba.com.data.PendingJobPost
 import agrochamba.com.data.WordPressApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -41,6 +42,8 @@ class ModerationViewModel : ViewModel() {
                     pendingJobs = jobs,
                     isLoading = false
                 )
+                // Actualizar el contador de notificaciones
+                ModerationNotificationManager.updatePendingJobsCount(jobs.size)
             } catch (e: retrofit2.HttpException) {
                 val errorMessage = try {
                     val errorBody = e.response()?.errorBody()?.string()
@@ -64,22 +67,32 @@ class ModerationViewModel : ViewModel() {
         }
     }
 
-    fun approveJob(jobId: Int) {
+    fun approveJob(jobId: Int, publishChannels: String = "web") {
         val token = AuthManager.token ?: return
         _uiState.value = _uiState.value.copy(isLoading = true, error = null, successMessage = null)
         
         viewModelScope.launch {
             try {
                 val authHeader = "Bearer $token"
-                val response = WordPressApi.retrofitService.approveJob(authHeader, jobId)
+                val body = mapOf("publish_channels" to publishChannels)
+                val response = WordPressApi.retrofitService.approveJob(authHeader, jobId, body)
                 
                 if (response.isSuccessful) {
-                    android.util.Log.d("ModerationViewModel", "Trabajo $jobId aprobado correctamente")
+                    val channelsText = when (publishChannels) {
+                        "web" -> "AgroChamba web"
+                        "facebook" -> "Facebook"
+                        "both" -> "AgroChamba web y Facebook"
+                        else -> "AgroChamba web"
+                    }
+                    android.util.Log.d("ModerationViewModel", "Trabajo $jobId aprobado correctamente para: $channelsText")
+                    val updatedJobs = _uiState.value.pendingJobs.filter { it.id != jobId }
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        successMessage = "Trabajo aprobado correctamente",
-                        pendingJobs = _uiState.value.pendingJobs.filter { it.id != jobId }
+                        successMessage = "Trabajo aprobado y publicado en $channelsText",
+                        pendingJobs = updatedJobs
                     )
+                    // Actualizar el contador de notificaciones
+                    ModerationNotificationManager.updatePendingJobsCount(updatedJobs.size)
                 } else {
                     val errorBody = response.errorBody()?.string()
                     android.util.Log.e("ModerationViewModel", "Error al aprobar trabajo: ${response.code()}, Body: $errorBody")
@@ -110,11 +123,14 @@ class ModerationViewModel : ViewModel() {
                 
                 if (response.isSuccessful) {
                     android.util.Log.d("ModerationViewModel", "Trabajo $jobId rechazado correctamente")
+                    val updatedJobs = _uiState.value.pendingJobs.filter { it.id != jobId }
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         successMessage = "Trabajo rechazado correctamente",
-                        pendingJobs = _uiState.value.pendingJobs.filter { it.id != jobId }
+                        pendingJobs = updatedJobs
                     )
+                    // Actualizar el contador de notificaciones
+                    ModerationNotificationManager.updatePendingJobsCount(updatedJobs.size)
                 } else {
                     val errorBody = response.errorBody()?.string()
                     android.util.Log.e("ModerationViewModel", "Error al rechazar trabajo: ${response.code()}, Body: $errorBody")

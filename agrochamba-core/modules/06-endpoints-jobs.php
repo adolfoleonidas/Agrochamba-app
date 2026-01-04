@@ -341,38 +341,78 @@ if (!function_exists('agrochamba_create_job')) {
             update_post_meta($post_id, 'gallery_ids', array_map('intval', $gallery_ids));
         }
 
-        // Publicar en Facebook SOLO si el usuario lo solicitó explícitamente Y es administrador
+        // ==========================================
+        // PUBLICACIÓN EN FACEBOOK - LÓGICA DIFERENCIADA
+        // ==========================================
         $facebook_result = null;
         $publish_to_facebook = isset($params['publish_to_facebook']) && filter_var($params['publish_to_facebook'], FILTER_VALIDATE_BOOLEAN);
+        $is_administrator = in_array('administrator', $user->roles);
+        $is_employer = in_array('employer', $user->roles);
         
-        // Solo permitir publicación en Facebook a administradores
-        $is_admin = in_array('administrator', $user->roles);
-        if ($publish_to_facebook && $is_admin && function_exists('agrochamba_post_to_facebook')) {
-            // Preparar datos para Facebook incluyendo todas las imágenes y preferencias del usuario
-            $job_data_for_facebook = array_merge($params, array(
-                'featured_media' => isset($params['featured_media']) ? $params['featured_media'] : get_post_thumbnail_id($post_id),
-                'gallery_ids' => !empty($gallery_ids) ? $gallery_ids : array(),
-                // Incluir preferencias del usuario desde la app
-                'facebook_use_link_preview' => isset($params['facebook_use_link_preview']) ? filter_var($params['facebook_use_link_preview'], FILTER_VALIDATE_BOOLEAN) : false,
-                'facebook_shorten_content' => isset($params['facebook_shorten_content']) ? filter_var($params['facebook_shorten_content'], FILTER_VALIDATE_BOOLEAN) : false,
-            ));
-            $facebook_result = agrochamba_post_to_facebook($post_id, $job_data_for_facebook);
-        } elseif ($publish_to_facebook && !$is_admin) {
-            // Si una empresa intenta publicar en Facebook, ignorar silenciosamente
-            error_log('AgroChamba: Usuario no administrador intentó publicar en Facebook. Ignorado.');
+        if ($publish_to_facebook) {
+            // Guardar preferencias de Facebook en meta
+            update_post_meta($post_id, 'facebook_use_link_preview', isset($params['facebook_use_link_preview']) ? filter_var($params['facebook_use_link_preview'], FILTER_VALIDATE_BOOLEAN) : false);
+            update_post_meta($post_id, 'facebook_shorten_content', isset($params['facebook_shorten_content']) ? filter_var($params['facebook_shorten_content'], FILTER_VALIDATE_BOOLEAN) : false);
+            
+            if ($is_administrator) {
+                // ADMINISTRADORES: Publicar directamente en Facebook sin moderación
+                if (function_exists('agrochamba_post_to_facebook')) {
+                    $job_data_for_facebook = array_merge($params, array(
+                        'featured_media' => isset($params['featured_media']) ? $params['featured_media'] : get_post_thumbnail_id($post_id),
+                        'gallery_ids' => !empty($gallery_ids) ? $gallery_ids : array(),
+                        'facebook_use_link_preview' => isset($params['facebook_use_link_preview']) ? filter_var($params['facebook_use_link_preview'], FILTER_VALIDATE_BOOLEAN) : false,
+                        'facebook_shorten_content' => isset($params['facebook_shorten_content']) ? filter_var($params['facebook_shorten_content'], FILTER_VALIDATE_BOOLEAN) : false,
+                    ));
+                    $facebook_result = agrochamba_post_to_facebook($post_id, $job_data_for_facebook);
+                    
+                    // Guardar que se publicó en Facebook
+                    if ($facebook_result && !is_wp_error($facebook_result)) {
+                        update_post_meta($post_id, '_facebook_published', true);
+                        if (isset($facebook_result['facebook_post_id'])) {
+                            update_post_meta($post_id, 'facebook_post_id', $facebook_result['facebook_post_id']);
+                        }
+                    }
+                }
+            } elseif ($is_employer) {
+                // EMPRESAS: Guardar intención de publicación en Facebook para moderación
+                // NO publicar hasta que el administrador lo apruebe
+                update_post_meta($post_id, '_facebook_publish_requested', true);
+                update_post_meta($post_id, '_facebook_publish_channels', 'pending'); // Pendiente de aprobación
+            }
         }
 
-        // Mensaje según el tipo de post
+        // Mensaje según el tipo de post y rol del usuario
         $post_type_label = ($post_type === 'post') ? 'Artículo de blog' : 'Trabajo';
+        $message = '';
+        
+        if ($post_status === 'pending') {
+            if ($is_employer && $publish_to_facebook) {
+                $message = $post_type_label . ' creado y enviado para revisión. Será publicado en AgroChamba y Facebook una vez aprobado por un administrador.';
+            } elseif ($is_employer) {
+                $message = $post_type_label . ' creado y enviado para revisión. Será publicado una vez aprobado por un administrador.';
+            } else {
+                $message = $post_type_label . ' creado correctamente.';
+            }
+        } else {
+            $message = $post_type_label . ' creado correctamente.';
+        }
+        
         $response_data = array(
             'success' => true,
-            'message' => $post_status === 'pending' 
-                ? $post_type_label . ' creado y enviado para revisión. Será publicado una vez aprobado por un administrador.' 
-                : $post_type_label . ' creado correctamente.',
+            'message' => $message,
             'post_id' => $post_id,
             'status' => $post_status,
             'post_type' => $post_type
         );
+        
+        // Agregar información sobre solicitud de Facebook para empresas
+        if ($is_employer && $publish_to_facebook) {
+            $response_data['facebook'] = array(
+                'requested' => true,
+                'status' => 'pending_moderation',
+                'message' => 'La publicación en Facebook será evaluada durante la moderación.'
+            );
+        }
 
         // Agregar información de Facebook si se publicó
         if ($facebook_result && !is_wp_error($facebook_result)) {
@@ -625,47 +665,11 @@ if (!function_exists('agrochamba_update_job')) {
             }
         }
 
-        // Publicar en Facebook SOLO si el usuario lo solicitó explícitamente Y es administrador
-        $facebook_result = null;
-        $publish_to_facebook = isset($params['publish_to_facebook']) && filter_var($params['publish_to_facebook'], FILTER_VALIDATE_BOOLEAN);
-        
-        // Solo permitir publicación en Facebook a administradores
-        $is_admin = in_array('administrator', $user->roles);
-        if ($publish_to_facebook && $is_admin && function_exists('agrochamba_post_to_facebook')) {
-            // Preparar datos para Facebook incluyendo todas las imágenes y preferencias del usuario
-            $job_data_for_facebook = array_merge($params, array(
-                'featured_media' => isset($params['featured_media']) ? $params['featured_media'] : get_post_thumbnail_id($post_id),
-                'gallery_ids' => isset($params['gallery_ids']) && is_array($params['gallery_ids']) ? array_map('intval', $params['gallery_ids']) : array(),
-                // Incluir preferencias del usuario desde la app
-                'facebook_use_link_preview' => isset($params['facebook_use_link_preview']) ? filter_var($params['facebook_use_link_preview'], FILTER_VALIDATE_BOOLEAN) : false,
-                'facebook_shorten_content' => isset($params['facebook_shorten_content']) ? filter_var($params['facebook_shorten_content'], FILTER_VALIDATE_BOOLEAN) : false,
-            ));
-            $facebook_result = agrochamba_post_to_facebook($post_id, $job_data_for_facebook);
-        } elseif ($publish_to_facebook && !$is_admin) {
-            // Si una empresa intenta publicar en Facebook, ignorar silenciosamente
-            error_log('AgroChamba: Usuario no administrador intentó publicar en Facebook al actualizar. Ignorado.');
-        }
-
-        $response_data = array(
+        return new WP_REST_Response(array(
             'success' => true,
             'message' => 'Trabajo actualizado correctamente.',
             'post_id' => $post_id
-        );
-
-        // Agregar información de Facebook si se publicó
-        if ($facebook_result && !is_wp_error($facebook_result)) {
-            $response_data['facebook'] = array(
-                'published' => true,
-                'facebook_post_id' => isset($facebook_result['facebook_post_id']) ? $facebook_result['facebook_post_id'] : null,
-            );
-        } elseif ($facebook_result && is_wp_error($facebook_result)) {
-            $response_data['facebook'] = array(
-                'published' => false,
-                'error' => $facebook_result->get_error_message(),
-            );
-        }
-
-        return new WP_REST_Response($response_data, 200);
+        ), 200);
     }
 }
 
@@ -1208,6 +1212,11 @@ if (!function_exists('agrochamba_get_pending_jobs')) {
                 $post_data['salario_max'] = get_post_meta($post->ID, 'salario_max', true);
                 $post_data['vacantes'] = get_post_meta($post->ID, 'vacantes', true);
                 
+                // Agregar información sobre solicitud de publicación en Facebook
+                $post_data['facebook_publish_requested'] = (bool) get_post_meta($post->ID, '_facebook_publish_requested', true);
+                $post_data['facebook_use_link_preview'] = get_post_meta($post->ID, 'facebook_use_link_preview', true);
+                $post_data['facebook_shorten_content'] = get_post_meta($post->ID, 'facebook_shorten_content', true);
+                
                 $pending_jobs[] = $post_data;
             }
             wp_reset_postdata();
@@ -1244,37 +1253,139 @@ if (!function_exists('agrochamba_approve_job')) {
         }
 
         $post_id = intval($request->get_param('id'));
+        $params = $request->get_json_params();
         $post = get_post($post_id);
 
         if (!$post || $post->post_type !== 'trabajo') {
             return new WP_Error('rest_not_found', 'Trabajo no encontrado.', array('status' => 404));
         }
 
-        // Cambiar estado a publicado
-        $updated = wp_update_post(array(
-            'ID' => $post_id,
-            'post_status' => 'publish'
-        ));
-
-        if (is_wp_error($updated)) {
-            return new WP_Error('rest_update_error', 'Error al aprobar el trabajo: ' . $updated->get_error_message(), array('status' => 500));
+        // Obtener canales de publicación solicitados (por defecto: solo web)
+        // Valores posibles: 'web', 'facebook', 'both'
+        $publish_channels = isset($params['publish_channels']) ? sanitize_text_field($params['publish_channels']) : 'web';
+        
+        // Validar canales
+        $valid_channels = array('web', 'facebook', 'both');
+        if (!in_array($publish_channels, $valid_channels)) {
+            $publish_channels = 'web'; // Por defecto solo web
         }
+        
+        // Determinar qué canales están aprobados
+        $publish_web = ($publish_channels === 'web' || $publish_channels === 'both');
+        $publish_facebook = ($publish_channels === 'facebook' || $publish_channels === 'both');
+        
+        // Verificar si el trabajo tenía intención de publicar en Facebook
+        $facebook_requested = get_post_meta($post_id, '_facebook_publish_requested', true);
+        
+        // Si se intenta publicar en Facebook pero no fue solicitado, solo publicar en web
+        if ($publish_facebook && !$facebook_requested) {
+            $publish_facebook = false;
+            $publish_channels = 'web';
+        }
+        
+        $facebook_result = null;
+        $facebook_error = null;
+        
+        // Publicar en web si está aprobado
+        if ($publish_web) {
+            $updated = wp_update_post(array(
+                'ID' => $post_id,
+                'post_status' => 'publish'
+            ));
 
-        // Intentar publicar en Facebook si está habilitado
-        if (function_exists('agrochamba_post_to_facebook')) {
+            if (is_wp_error($updated)) {
+                return new WP_Error('rest_update_error', 'Error al aprobar el trabajo: ' . $updated->get_error_message(), array('status' => 500));
+            }
+        } else {
+            // Si no se aprueba para web, mantener en pending
+            // (aunque esto es poco común, podría ser útil para casos especiales)
+            update_post_meta($post_id, '_approval_status', 'partial');
+            update_post_meta($post_id, '_approved_channels', $publish_channels);
+            return new WP_REST_Response(array(
+                'success' => true,
+                'message' => 'Trabajo aprobado solo para Facebook. No se publicará en la web.',
+                'post_id' => $post_id,
+                'channels' => $publish_channels
+            ), 200);
+        }
+        
+        // Publicar en Facebook si está aprobado y fue solicitado
+        if ($publish_facebook && $facebook_requested && function_exists('agrochamba_post_to_facebook')) {
+            // Obtener preferencias de Facebook guardadas
+            $facebook_use_link_preview = get_post_meta($post_id, 'facebook_use_link_preview', true);
+            $facebook_shorten_content = get_post_meta($post_id, 'facebook_shorten_content', true);
+            $gallery_ids = get_post_meta($post_id, 'gallery_ids', true);
+            if (!is_array($gallery_ids)) {
+                $gallery_ids = array();
+            }
+            
             $job_data = array(
                 'title' => $post->post_title,
                 'content' => $post->post_content,
                 'featured_media' => get_post_thumbnail_id($post_id),
+                'gallery_ids' => $gallery_ids,
+                'facebook_use_link_preview' => $facebook_use_link_preview,
+                'facebook_shorten_content' => $facebook_shorten_content,
             );
-            agrochamba_post_to_facebook($post_id, $job_data);
+            
+            $facebook_result = agrochamba_post_to_facebook($post_id, $job_data);
+            
+            if (is_wp_error($facebook_result)) {
+                $facebook_error = $facebook_result->get_error_message();
+                error_log('AgroChamba Facebook Error al aprobar trabajo ' . $post_id . ': ' . $facebook_error);
+            } else {
+                // Guardar que se publicó en Facebook
+                update_post_meta($post_id, '_facebook_published', true);
+                if (isset($facebook_result['facebook_post_id'])) {
+                    update_post_meta($post_id, 'facebook_post_id', $facebook_result['facebook_post_id']);
+                }
+            }
+        }
+        
+        // Guardar información de canales aprobados
+        update_post_meta($post_id, '_approved_channels', $publish_channels);
+        update_post_meta($post_id, '_approval_date', current_time('mysql'));
+        
+        // Limpiar meta de solicitud pendiente
+        delete_post_meta($post_id, '_facebook_publish_requested');
+        delete_post_meta($post_id, '_facebook_publish_channels');
+        
+        // Construir mensaje de respuesta
+        $channels_text = array();
+        if ($publish_web) {
+            $channels_text[] = 'AgroChamba web';
+        }
+        if ($publish_facebook && !is_wp_error($facebook_result)) {
+            $channels_text[] = 'Facebook';
+        }
+        
+        $message = 'Trabajo aprobado y publicado en ' . implode(' y ', $channels_text) . '.';
+        if ($facebook_error) {
+            $message .= ' Error al publicar en Facebook: ' . $facebook_error;
+        }
+        
+        $response_data = array(
+            'success' => true,
+            'message' => $message,
+            'post_id' => $post_id,
+            'channels' => $publish_channels,
+            'published_web' => $publish_web,
+            'published_facebook' => ($publish_facebook && !is_wp_error($facebook_result))
+        );
+        
+        if ($facebook_result && !is_wp_error($facebook_result)) {
+            $response_data['facebook'] = array(
+                'published' => true,
+                'facebook_post_id' => isset($facebook_result['facebook_post_id']) ? $facebook_result['facebook_post_id'] : null
+            );
+        } elseif ($facebook_error) {
+            $response_data['facebook'] = array(
+                'published' => false,
+                'error' => $facebook_error
+            );
         }
 
-        return new WP_REST_Response(array(
-            'success' => true,
-            'message' => 'Trabajo aprobado y publicado correctamente.',
-            'post_id' => $post_id
-        ), 200);
+        return new WP_REST_Response($response_data, 200);
     }
 }
 

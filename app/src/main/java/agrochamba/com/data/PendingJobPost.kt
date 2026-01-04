@@ -24,7 +24,11 @@ data class PendingJobPost(
     @Json(name = "tipo_puesto") val tipoPuesto: EmpresaData? = null, // Puede ser String o objeto TaxonomyData
     @Json(name = "salario_min") val salarioMin: String? = null,
     @Json(name = "salario_max") val salarioMax: String? = null,
-    val vacantes: String? = null
+    val vacantes: String? = null,
+    // Información sobre solicitud de publicación en Facebook
+    @Json(name = "facebook_publish_requested") val facebookPublishRequested: Boolean? = false,
+    @Json(name = "facebook_use_link_preview") val facebookUseLinkPreview: Boolean? = false,
+    @Json(name = "facebook_shorten_content") val facebookShortenContent: Boolean? = false
 ) {
     /**
      * Obtener el nombre de la empresa como string

@@ -14,12 +14,12 @@ android {
     // (el applicationId de producción puede ser distinto)
     namespace = "agrochamba.com"
     // Establecer compileSdk con el valor numérico directamente en Kotlin DSL
-    compileSdk = 36
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.agrochamba"
         minSdk = 24
-        targetSdk = 36
+        targetSdk = 35
         versionCode = 5
         versionName = "1.0.4"
 

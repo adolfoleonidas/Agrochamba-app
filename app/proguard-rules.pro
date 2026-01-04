@@ -24,6 +24,8 @@
 
 # Mantener anotaciones, firmas genéricas y metadatos de runtime útiles
 -keepattributes Signature, *Annotation*, InnerClasses, EnclosingMethod
+-keepattributes RuntimeVisibleAnnotations, RuntimeVisibleParameterAnnotations
+-keepattributes *Annotation*
 
 # Retrofit y OkHttp/Okio
 -dontwarn retrofit2.**
@@ -37,6 +39,30 @@
 -keep class com.squareup.moshi.** { *; }
 -keep class kotlin.Metadata { *; }
 -keep @com.squareup.moshi.JsonClass class * { *; }
+
+# Preservar clases de datos de Kotlin para Moshi (KotlinJsonAdapterFactory usa reflexión)
+# Esto es crítico: Moshi necesita acceso a constructores y propiedades en tiempo de ejecución
+-keep class agrochamba.com.data.** { *; }
+-keepclassmembers class agrochamba.com.data.** {
+    <init>(...);
+}
+
+# Preservar constructores y propiedades de clases de datos
+-keepclassmembers class agrochamba.com.data.** {
+    <fields>;
+}
+
+# Preservar clases de respuesta de Retrofit con anotaciones @Json
+-keepclasseswithmembers class agrochamba.com.data.** {
+    @com.squareup.moshi.Json <fields>;
+}
+
+# Preservar clases genéricas usadas por Retrofit
+-keep class agrochamba.com.data.PaginatedResponse { *; }
+
+# Preservar metadatos de Kotlin necesarios para reflexión
+-keepclassmembers class kotlin.reflect.** { *; }
+-keep class kotlin.reflect.** { *; }
 
 # Coroutines
 -dontwarn kotlinx.coroutines.**

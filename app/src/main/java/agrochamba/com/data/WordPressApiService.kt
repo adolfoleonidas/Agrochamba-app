@@ -194,7 +194,8 @@ interface WordPressApiService {
     @POST("agrochamba/v1/admin/jobs/{id}/approve")
     suspend fun approveJob(
         @Header("Authorization") token: String,
-        @Path("id") id: Int
+        @Path("id") id: Int,
+        @Body data: Map<String, String>? = null
     ): Response<Unit>
     
     @POST("agrochamba/v1/admin/jobs/{id}/reject")

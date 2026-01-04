@@ -2615,11 +2615,14 @@ function closeFullscreenSlider() {
     }
     
     function shouldShowPopup() {
+        // Popup desactivado - siempre retornar false
+        return false;
+        
         // Verificar si el usuario ya cerró el popup en esta sesión
-        if (sessionStorage.getItem(POLL_POPUP_KEY)) {
-            return false;
-        }
-        return true;
+        // if (sessionStorage.getItem(POLL_POPUP_KEY)) {
+        //     return false;
+        // }
+        // return true;
     }
     
     function showPollPopup() {

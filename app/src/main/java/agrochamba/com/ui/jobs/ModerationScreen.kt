@@ -8,6 +8,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -16,6 +18,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import agrochamba.com.data.ModerationNotificationManager
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -40,10 +43,18 @@ fun ModerationScreen(navController: NavController) {
     val viewModel: ModerationViewModel = viewModel()
     val uiState by viewModel.uiState.collectAsState()
     var showRejectDialog by remember { mutableStateOf<PendingJobPost?>(null) }
+    var showApproveDialog by remember { mutableStateOf<PendingJobPost?>(null) }
     var rejectReason by remember { mutableStateOf("") }
+    var selectedChannels by remember { mutableStateOf(setOf<String>()) }
 
     LaunchedEffect(Unit) {
         viewModel.loadPendingJobs()
+    }
+    
+    // Observar cambios en los trabajos pendientes para actualizar el contador global
+    val pendingJobsCount = uiState.pendingJobs.size
+    LaunchedEffect(pendingJobsCount) {
+        ModerationNotificationManager.updatePendingJobsCount(pendingJobsCount)
     }
 
     // Mostrar mensajes de éxito/error
@@ -139,7 +150,16 @@ fun ModerationScreen(navController: NavController) {
                     items(uiState.pendingJobs) { job ->
                         PendingJobCard(
                             job = job,
-                            onApprove = { viewModel.approveJob(job.id) },
+                            onApprove = { 
+                                // Si el trabajo solicitó Facebook, mostrar diálogo de canales
+                                if (job.facebookPublishRequested == true) {
+                                    showApproveDialog = job
+                                    selectedChannels = setOf("web") // Por defecto solo web
+                                } else {
+                                    // Si no solicitó Facebook, aprobar solo para web
+                                    viewModel.approveJob(job.id, "web")
+                                }
+                            },
                             onReject = { showRejectDialog = job }
                         )
                     }
@@ -148,6 +168,103 @@ fun ModerationScreen(navController: NavController) {
         }
     }
 
+    // Diálogo para aprobar trabajo con selección de canales
+    showApproveDialog?.let { job ->
+        AlertDialog(
+            onDismissRequest = { 
+                showApproveDialog = null
+                selectedChannels = setOf("web")
+            },
+            title = { Text("Aprobar Trabajo") },
+            text = {
+                Column {
+                    Text(
+                        text = "Este trabajo solicitó publicación en Facebook. Selecciona dónde publicarlo:",
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+                    
+                    // Checkbox para AgroChamba web
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = selectedChannels.contains("web"),
+                            onCheckedChange = { checked ->
+                                selectedChannels = if (checked) {
+                                    selectedChannels + "web"
+                                } else {
+                                    selectedChannels - "web"
+                                }
+                            }
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("AgroChamba (web)")
+                    }
+                    
+                    // Checkbox para Facebook (solo si fue solicitado)
+                    if (job.facebookPublishRequested == true) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Checkbox(
+                                checked = selectedChannels.contains("facebook"),
+                                onCheckedChange = { checked ->
+                                    selectedChannels = if (checked) {
+                                        selectedChannels + "facebook"
+                                    } else {
+                                        selectedChannels - "facebook"
+                                    }
+                                }
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Facebook")
+                        }
+                    }
+                    
+                    if (selectedChannels.isEmpty()) {
+                        Text(
+                            text = "Debes seleccionar al menos un canal",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val channels = when {
+                            selectedChannels.contains("web") && selectedChannels.contains("facebook") -> "both"
+                            selectedChannels.contains("facebook") -> "facebook"
+                            else -> "web"
+                        }
+                        viewModel.approveJob(job.id, channels)
+                        showApproveDialog = null
+                        selectedChannels = setOf("web")
+                    },
+                    enabled = selectedChannels.isNotEmpty()
+                ) {
+                    Text("Aprobar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { 
+                    showApproveDialog = null
+                    selectedChannels = setOf("web")
+                }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+    
     // Diálogo para rechazar trabajo
     showRejectDialog?.let { job ->
         AlertDialog(
@@ -271,6 +388,24 @@ fun PendingJobCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(vertical = 8.dp)
                 )
+                }
+            }
+            
+            // Indicador de solicitud de publicación en Facebook
+            if (job.facebookPublishRequested == true) {
+                Surface(
+                    modifier = Modifier
+                        .padding(vertical = 8.dp)
+                        .fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    shape = MaterialTheme.shapes.small
+                ) {
+                    Text(
+                        text = "📘 Solicita publicación en Facebook",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                    )
                 }
             }
 
