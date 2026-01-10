@@ -569,6 +569,138 @@ if (!function_exists('agrochamba_post_to_facebook_via_n8n')) {
 // ==========================================
 // 2. CONSTRUIR MENSAJE PARA FACEBOOK
 // ==========================================
+
+/**
+ * Convierte HTML a texto formateado para Facebook.
+ * Facebook no soporta HTML, pero podemos usar emojis y estructura para simular formato.
+ * 
+ * Conversiones:
+ * - <strong>/<b> → Texto en MAYÚSCULAS o con emoji 📌
+ * - <ul><li> → ✅ item (viñetas con emoji)
+ * - <ol><li> → 1️⃣ item (números con emoji)
+ * - <p> → Doble salto de línea
+ * - <br> → Salto de línea simple
+ */
+if (!function_exists('agrochamba_html_to_facebook_text')) {
+    function agrochamba_html_to_facebook_text($html) {
+        if (empty($html)) {
+            return '';
+        }
+        
+        $text = $html;
+        
+        // Paso 1: Convertir palabras clave en negrita a formato destacado
+        // Detectar patrones como <strong>Requisitos:</strong> y convertir a 📋 REQUISITOS:
+        $keyword_patterns = array(
+            'requisitos' => '📋',
+            'beneficios' => '🎁',
+            'funciones' => '📝',
+            'responsabilidades' => '📝',
+            'contacto' => '📞',
+            'informes' => 'ℹ️',
+            'consultas' => '❓',
+            'importante' => '⚠️',
+            'nota' => '📌',
+            'ubicación' => '📍',
+            'ubicacion' => '📍',
+            'horario' => '🕐',
+            'salario' => '💰',
+            'experiencia' => '💼',
+            'detalles' => '📄',
+        );
+        
+        // Convertir <strong>Palabra:</strong> a EMOJI PALABRA:
+        $text = preg_replace_callback(
+            '/<(strong|b)>([^<]+)<\/(strong|b)>/i',
+            function($matches) use ($keyword_patterns) {
+                $content = trim($matches[2]);
+                $content_lower = mb_strtolower($content, 'UTF-8');
+                
+                // Buscar si es una palabra clave
+                foreach ($keyword_patterns as $keyword => $emoji) {
+                    if (strpos($content_lower, $keyword) !== false) {
+                        // Es una palabra clave, agregar emoji y poner en mayúsculas
+                        $clean_content = preg_replace('/[:\s]+$/', '', $content); // Quitar : final
+                        return "\n" . $emoji . ' ' . mb_strtoupper($clean_content, 'UTF-8') . ':';
+                    }
+                }
+                
+                // No es palabra clave, solo poner en mayúsculas
+                return mb_strtoupper($content, 'UTF-8');
+            },
+            $text
+        );
+        
+        // Paso 2: Convertir listas numeradas <ol> a números con emoji
+        $text = preg_replace_callback(
+            '/<ol[^>]*>(.*?)<\/ol>/is',
+            function($matches) {
+                $list_content = $matches[1];
+                $counter = 1;
+                $number_emojis = array('1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟');
+                
+                $result = preg_replace_callback(
+                    '/<li[^>]*>(.*?)<\/li>/is',
+                    function($li_matches) use (&$counter, $number_emojis) {
+                        $item_content = trim(strip_tags($li_matches[1]));
+                        $emoji = isset($number_emojis[$counter - 1]) ? $number_emojis[$counter - 1] : $counter . '.';
+                        $counter++;
+                        return $emoji . ' ' . $item_content . "\n";
+                    },
+                    $list_content
+                );
+                
+                return "\n" . $result;
+            },
+            $text
+        );
+        
+        // Paso 3: Convertir listas con viñetas <ul> a emojis
+        $text = preg_replace_callback(
+            '/<ul[^>]*>(.*?)<\/ul>/is',
+            function($matches) {
+                $list_content = $matches[1];
+                
+                $result = preg_replace_callback(
+                    '/<li[^>]*>(.*?)<\/li>/is',
+                    function($li_matches) {
+                        $item_content = trim(strip_tags($li_matches[1]));
+                        return '✅ ' . $item_content . "\n";
+                    },
+                    $list_content
+                );
+                
+                return "\n" . $result;
+            },
+            $text
+        );
+        
+        // Paso 4: Convertir elementos de bloque a saltos de línea
+        $text = preg_replace('/<br\s*\/?>/i', "\n", $text);
+        $text = preg_replace('/<\/p>/i', "\n\n", $text);
+        $text = preg_replace('/<p[^>]*>/i', "", $text);
+        $text = preg_replace('/<\/div>/i', "\n", $text);
+        $text = preg_replace('/<div[^>]*>/i', "", $text);
+        
+        // Paso 5: Convertir <em>/<i> a _texto_ (simular cursiva)
+        $text = preg_replace('/<(em|i)>([^<]+)<\/(em|i)>/i', '_$2_', $text);
+        
+        // Paso 6: Remover cualquier HTML restante
+        $text = wp_strip_all_tags($text);
+        
+        // Paso 7: Decodificar entidades HTML
+        $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        
+        // Paso 8: Limpiar espacios y saltos de línea excesivos
+        $text = preg_replace('/[ \t]+/', ' ', $text); // Múltiples espacios a uno
+        $text = preg_replace('/\n{3,}/', "\n\n", $text); // Máximo 2 saltos de línea
+        $text = preg_replace('/^\s+|\s+$/m', '', $text); // Trim cada línea
+        $text = trim($text);
+        
+        return $text;
+    }
+}
+
 if (!function_exists('agrochamba_get_emoji_for_crop')) {
     /**
      * Obtener emoji basado en el cultivo
@@ -632,23 +764,8 @@ if (!function_exists('agrochamba_build_facebook_message')) {
             $header = $emoji . ' ' . $empresa;
         }
         
-        // Preservar formato: convertir HTML a texto plano manteniendo saltos de línea
-        // Primero convertir <br>, <p>, <div> a saltos de línea
-        $content = preg_replace('/<br\s*\/?>/i', "\n", $content);
-        $content = preg_replace('/<\/p>/i', "\n\n", $content);
-        $content = preg_replace('/<\/div>/i', "\n", $content);
-        $content = preg_replace('/<li>/i', "• ", $content);
-        $content = preg_replace('/<\/li>/i', "\n", $content);
-        
-        // Remover otros tags HTML pero mantener el texto
-        $content = wp_strip_all_tags($content);
-        
-        // Decodificar entidades HTML del contenido (ej: &#8211; -> –)
-        $content = html_entity_decode($content, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        
-        // Limpiar espacios múltiples y saltos de línea excesivos (máximo 2 saltos seguidos)
-        $content = preg_replace('/\n{3,}/', "\n\n", $content);
-        $content = trim($content);
+        // Convertir HTML a texto formateado para Facebook (no soporta HTML nativo)
+        $content = agrochamba_html_to_facebook_text($content);
         
         // Verificar si se debe acortar el contenido
         // Prioridad: 1) Preferencia del usuario desde la app, 2) Configuración global del admin
