@@ -304,32 +304,39 @@ private fun String.htmlToMarkdownForDisplay(): String {
     markdown = Regex("<ol[^>]*>(.*?)</ol>", setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)).replace(markdown) { listMatch ->
         var counter = 1
         val listContent = listMatch.groupValues[1]
-        val items = Regex("<li[^>]*>(.*?)</li>", setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)).replace(listContent) { liMatch ->
+        val itemsList = mutableListOf<String>()
+        Regex("<li[^>]*>(.*?)</li>", setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)).findAll(listContent).forEach { liMatch ->
             val itemContent = liMatch.groupValues[1].trim()
                 .replace(Regex("<[^>]+>"), "") // Limpiar HTML interno
                 .replace(Regex("\\s+"), " ") // Normalizar espacios
-            "${counter++}. $itemContent\n"
+                .trim()
+            if (itemContent.isNotEmpty()) {
+                itemsList.add("${counter++}. $itemContent")
+            }
         }
-        "\n$items"
+        itemsList.joinToString("\n")
     }
     
     // Convertir listas con viñetas (manejar tanto con saltos de línea como sin ellos)
     markdown = Regex("<ul[^>]*>(.*?)</ul>", setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)).replace(markdown) { listMatch ->
         val listContent = listMatch.groupValues[1]
-        val items = Regex("<li[^>]*>(.*?)</li>", setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)).replace(listContent) { liMatch ->
+        val itemsList = mutableListOf<String>()
+        Regex("<li[^>]*>(.*?)</li>", setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)).findAll(listContent).forEach { liMatch ->
             val itemContent = liMatch.groupValues[1].trim()
                 .replace(Regex("<[^>]+>"), "") // Limpiar HTML interno
                 .replace(Regex("\\s+"), " ") // Normalizar espacios
-            "- $itemContent\n"
+                .trim()
+            if (itemContent.isNotEmpty()) {
+                itemsList.add("- $itemContent")
+            }
         }
-        "\n$items"
+        itemsList.joinToString("\n")
     }
     
-    // Convertir <p> preservando saltos de línea exactos
+    // Convertir <p> - usar un solo salto de línea para evitar espacios excesivos
     markdown = Regex("<p[^>]*>(.*?)</p>", RegexOption.DOT_MATCHES_ALL).replace(markdown) { 
-        val content = it.groupValues[1]
-        // Preservar el contenido tal cual, incluyendo saltos de línea internos
-        "$content\n\n"
+        val content = it.groupValues[1].trim()
+        if (content.isNotEmpty()) "$content\n" else ""
     }
     
     // Convertir <br> a saltos de línea simples
@@ -338,8 +345,13 @@ private fun String.htmlToMarkdownForDisplay(): String {
     // Limpiar HTML restante pero preservar saltos de línea
     markdown = Regex("<[^>]+>").replace(markdown, "")
     
-    // Limpiar saltos de línea excesivos (más de 2 consecutivos)
-    markdown = Regex("\\n{3,}").replace(markdown, "\n\n")
+    // Normalizar espacios en blanco
+    markdown = markdown.lines()
+        .map { it.trim() } // Trim cada línea
+        .joinToString("\n")
+    
+    // Limpiar saltos de línea excesivos (más de 2 consecutivos a solo 1 línea vacía)
+    markdown = Regex("\\n{2,}").replace(markdown, "\n\n")
     
     return markdown.trim()
 }
@@ -437,7 +449,7 @@ private fun decodeHtmlEntitiesOnly(text: String): String {
 
 /**
  * Parsea Markdown y aplica estilos visuales usando AnnotatedString
- * Respeta EXACTAMENTE los saltos de línea del editor
+ * Respeta los saltos de línea del editor
  * También detecta teléfonos, emails y URLs para hacerlos clickeables
  */
 private fun AnnotatedString.Builder.parseMarkdown(
@@ -446,24 +458,32 @@ private fun AnnotatedString.Builder.parseMarkdown(
     defaultColor: androidx.compose.ui.graphics.Color,
     linkColor: androidx.compose.ui.graphics.Color
 ) {
-    // Dividir el texto en líneas preservando TODOS los saltos de línea
-    val lines = text.split("\n")
-    var inList = false
-    var listType: String? = null
+    // Filtrar líneas vacías consecutivas (máximo 1 línea vacía entre contenido)
+    val rawLines = text.split("\n")
+    val lines = mutableListOf<String>()
+    var lastWasEmpty = false
     
+    for (line in rawLines) {
+        val trimmed = line.trim()
+        if (trimmed.isEmpty()) {
+            if (!lastWasEmpty) {
+                lines.add("")
+                lastWasEmpty = true
+            }
+            // Ignorar líneas vacías consecutivas
+        } else {
+            lines.add(trimmed)
+            lastWasEmpty = false
+        }
+    }
+    
+    // Procesar cada línea
     lines.forEachIndexed { index, line ->
-        val trimmedLine = line.trim()
+        val isLastLine = index == lines.size - 1
         
         // Detectar listas numeradas
-        val numberedMatch = Regex("^(\\d+)\\.\\s+(.+)$").find(trimmedLine)
+        val numberedMatch = Regex("^(\\d+)\\.\\s+(.+)$").find(line)
         if (numberedMatch != null) {
-            if (!inList || listType != "numbered") {
-                if (inList && index > 0) append("\n")
-                inList = true
-                listType = "numbered"
-            } else if (index > 0) {
-                append("\n")
-            }
             val number = numberedMatch.groupValues[1]
             val content = numberedMatch.groupValues[2]
             withStyle(
@@ -475,23 +495,13 @@ private fun AnnotatedString.Builder.parseMarkdown(
                 append("$number. ")
             }
             parseInlineFormatting(content, baseStyle, defaultColor, linkColor)
-            // SIEMPRE agregar salto al final de la línea (excepto última)
-            if (index < lines.size - 1) {
-                append("\n")
-            }
+            if (!isLastLine) append("\n")
             return@forEachIndexed
         }
         
         // Detectar listas con viñetas
-        val bulletMatch = Regex("^[-*]\\s+(.+)$").find(trimmedLine)
+        val bulletMatch = Regex("^[-*]\\s+(.+)$").find(line)
         if (bulletMatch != null) {
-            if (!inList || listType != "bullet") {
-                if (inList && index > 0) append("\n")
-                inList = true
-                listType = "bullet"
-            } else if (index > 0) {
-                append("\n")
-            }
             val content = bulletMatch.groupValues[1]
             withStyle(
                 style = SpanStyle(
@@ -502,35 +512,19 @@ private fun AnnotatedString.Builder.parseMarkdown(
                 append("• ")
             }
             parseInlineFormatting(content, baseStyle, defaultColor, linkColor)
-            // SIEMPRE agregar salto al final de la línea (excepto última)
-            if (index < lines.size - 1) {
-                append("\n")
-            }
+            if (!isLastLine) append("\n")
             return@forEachIndexed
         }
         
-        // Si estaba en lista y ahora no, cerrar lista
-        if (inList && trimmedLine.isNotEmpty()) {
-            inList = false
-            listType = null
-            if (index > 0) append("\n")
+        // Línea vacía = un solo salto de línea (separador de párrafos)
+        if (line.isEmpty()) {
+            if (!isLastLine) append("\n")
+            return@forEachIndexed
         }
         
-        // Procesar línea normal - RESPETAR EXACTAMENTE los saltos de línea
-        if (trimmedLine.isEmpty()) {
-            // Línea vacía = salto de línea (párrafo)
-            // SIEMPRE agregar salto si no es la última línea
-            if (index < lines.size - 1) {
-                append("\n")
-            }
-        } else {
-            // Línea con contenido
-            parseInlineFormatting(trimmedLine, baseStyle, defaultColor, linkColor)
-            // SIEMPRE agregar salto al final (excepto última línea)
-            if (index < lines.size - 1) {
-                append("\n")
-            }
-        }
+        // Línea de texto normal
+        parseInlineFormatting(line, baseStyle, defaultColor, linkColor)
+        if (!isLastLine) append("\n")
     }
 }
 
