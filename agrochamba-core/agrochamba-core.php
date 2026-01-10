@@ -67,6 +67,8 @@ if (!AGROCHAMBA_USE_MODULE_LOADER) {
             '21-personalized-recommendations.php', // Sistema de recomendaciones personalizadas
             '22-company-analytics-dashboard.php',   // Dashboard de analytics para empresas
             '23-supabase-sync.php',            // Sincronización Supabase ↔ WordPress
+            '24-ai-text-enhancer.php',         // Mejora de texto con IA y OCR
+            '25-facebook-pages.php',           // Gestión de múltiples páginas de Facebook
         );
 
         // Cargar cada módulo

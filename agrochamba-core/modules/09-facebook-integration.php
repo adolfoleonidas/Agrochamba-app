@@ -30,11 +30,27 @@ if (!function_exists('agrochamba_post_to_facebook')) {
         $n8n_webhook_url = get_option('agrochamba_n8n_webhook_url', '');
 
         if ($use_n8n && !empty($n8n_webhook_url)) {
-            // Usar n8n para publicar
+            // Usar n8n para publicar (soporta múltiples páginas internamente)
             return agrochamba_post_to_facebook_via_n8n($post_id, $job_data, $n8n_webhook_url);
         }
 
-        // Método directo (legacy)
+        // ==========================================
+        // PUBLICACIÓN EN MÚLTIPLES PÁGINAS
+        // ==========================================
+        
+        // Obtener páginas habilitadas del nuevo sistema
+        $pages = array();
+        if (function_exists('agrochamba_get_enabled_facebook_pages')) {
+            $pages = agrochamba_get_enabled_facebook_pages();
+        }
+        
+        // Si hay páginas configuradas en el nuevo sistema, usarlas
+        if (!empty($pages)) {
+            error_log('AgroChamba Facebook: Publicando en ' . count($pages) . ' página(s) configurada(s)');
+            return agrochamba_post_to_multiple_facebook_pages($post_id, $job_data, $pages);
+        }
+        
+        // Fallback: Método directo legacy (una sola página)
         $page_access_token = get_option('agrochamba_facebook_page_token', '');
         $page_id = get_option('agrochamba_facebook_page_id', '');
 
@@ -239,7 +255,190 @@ if (!function_exists('agrochamba_post_to_facebook')) {
 }
 
 // ==========================================
-// 1.1. PUBLICAR TRABAJO EN FACEBOOK VÍA N8N
+// 1.1. PUBLICAR EN MÚLTIPLES PÁGINAS DE FACEBOOK
+// ==========================================
+if (!function_exists('agrochamba_post_to_multiple_facebook_pages')) {
+    function agrochamba_post_to_multiple_facebook_pages($post_id, $job_data, $pages) {
+        $message = agrochamba_build_facebook_message($post_id, $job_data);
+        $image_urls = agrochamba_get_facebook_images($post_id, $job_data);
+        $job_url = get_permalink($post_id);
+        $use_link_preview = isset($job_data['facebook_use_link_preview']) && filter_var($job_data['facebook_use_link_preview'], FILTER_VALIDATE_BOOLEAN);
+        
+        $results = array();
+        $success_count = 0;
+        $error_count = 0;
+        $all_post_ids = array();
+        
+        foreach ($pages as $page) {
+            $page_id = $page['page_id'];
+            $page_token = $page['page_token'];
+            $page_name = $page['page_name'] ?? 'Página';
+            
+            error_log("AgroChamba Facebook: Publicando en página '{$page_name}' (ID: {$page_id})");
+            
+            // Subir imágenes a esta página si es necesario
+            $photo_ids = array();
+            if (!empty($image_urls) && !$use_link_preview) {
+                foreach ($image_urls as $index => $image_url) {
+                    $photo_url = "https://graph.facebook.com/v18.0/{$page_id}/photos";
+                    
+                    $photo_response = wp_remote_post($photo_url, array(
+                        'method' => 'POST',
+                        'timeout' => 30,
+                        'headers' => array('Content-Type' => 'application/x-www-form-urlencoded'),
+                        'body' => array(
+                            'access_token' => $page_token,
+                            'url' => $image_url,
+                            'published' => false,
+                        ),
+                    ));
+                    
+                    if (!is_wp_error($photo_response)) {
+                        $photo_response_code = wp_remote_retrieve_response_code($photo_response);
+                        $photo_response_body = json_decode(wp_remote_retrieve_body($photo_response), true);
+                        
+                        if ($photo_response_code === 200 && isset($photo_response_body['id'])) {
+                            $photo_ids[] = $photo_response_body['id'];
+                        }
+                    }
+                    
+                    // Pausa entre subidas
+                    if ($index < count($image_urls) - 1) {
+                        usleep(300000);
+                    }
+                }
+            }
+            
+            // Preparar datos del post
+            $post_data = array('message' => $message);
+            
+            if (!empty($photo_ids) && !$use_link_preview) {
+                $attached_media = array();
+                foreach ($photo_ids as $photo_id) {
+                    $attached_media[] = array('media_fbid' => $photo_id);
+                }
+                $post_data['attached_media'] = json_encode($attached_media);
+            } else {
+                $post_data['link'] = $job_url;
+            }
+            
+            // Publicar en el feed de la página
+            $graph_url = "https://graph.facebook.com/v18.0/{$page_id}/feed";
+            
+            $response = wp_remote_post($graph_url, array(
+                'method' => 'POST',
+                'timeout' => 30,
+                'headers' => array('Content-Type' => 'application/x-www-form-urlencoded'),
+                'body' => array_merge($post_data, array('access_token' => $page_token)),
+            ));
+            
+            if (is_wp_error($response)) {
+                $error_count++;
+                $results[] = array(
+                    'page_name' => $page_name,
+                    'page_id' => $page_id,
+                    'success' => false,
+                    'error' => $response->get_error_message()
+                );
+                error_log("AgroChamba Facebook Error en página '{$page_name}': " . $response->get_error_message());
+                continue;
+            }
+            
+            $response_code = wp_remote_retrieve_response_code($response);
+            $response_body = json_decode(wp_remote_retrieve_body($response), true);
+            
+            if ($response_code === 200 && isset($response_body['id'])) {
+                $success_count++;
+                $all_post_ids[] = $response_body['id'];
+                $results[] = array(
+                    'page_name' => $page_name,
+                    'page_id' => $page_id,
+                    'success' => true,
+                    'facebook_post_id' => $response_body['id']
+                );
+                error_log("AgroChamba Facebook: Publicado en '{$page_name}' con ID: " . $response_body['id']);
+            } else {
+                $error_count++;
+                $error_message = isset($response_body['error']['message']) 
+                    ? $response_body['error']['message'] 
+                    : 'Error desconocido';
+                $results[] = array(
+                    'page_name' => $page_name,
+                    'page_id' => $page_id,
+                    'success' => false,
+                    'error' => $error_message
+                );
+                error_log("AgroChamba Facebook Error en página '{$page_name}': {$error_message}");
+            }
+            
+            // Pausa entre publicaciones en diferentes páginas
+            usleep(500000);
+        }
+        
+        // Guardar todos los IDs de posts de Facebook
+        if (!empty($all_post_ids)) {
+            update_post_meta($post_id, 'facebook_post_id', $all_post_ids[0]); // Principal
+            update_post_meta($post_id, 'facebook_post_ids', $all_post_ids); // Todos
+        }
+        
+        // Retornar resultado consolidado
+        return array(
+            'success' => $success_count > 0,
+            'message' => "Publicado en {$success_count} de " . count($pages) . " páginas",
+            'facebook_post_id' => !empty($all_post_ids) ? $all_post_ids[0] : null,
+            'facebook_post_ids' => $all_post_ids,
+            'pages_results' => $results,
+            'success_count' => $success_count,
+            'error_count' => $error_count
+        );
+    }
+}
+
+// ==========================================
+// 1.2. OBTENER IMÁGENES PARA FACEBOOK
+// ==========================================
+if (!function_exists('agrochamba_get_facebook_images')) {
+    function agrochamba_get_facebook_images($post_id, $job_data) {
+        $image_urls = array();
+        
+        // Imagen destacada
+        if (isset($job_data['featured_media']) && !empty($job_data['featured_media'])) {
+            $featured_url = wp_get_attachment_image_url($job_data['featured_media'], 'large');
+            if ($featured_url) {
+                $featured_url = (strpos($featured_url, 'http') === 0) ? $featured_url : site_url($featured_url);
+                $image_urls[] = $featured_url;
+            }
+        } elseif (has_post_thumbnail($post_id)) {
+            $featured_url = get_the_post_thumbnail_url($post_id, 'large');
+            if ($featured_url) {
+                $featured_url = (strpos($featured_url, 'http') === 0) ? $featured_url : site_url($featured_url);
+                $image_urls[] = $featured_url;
+            }
+        }
+        
+        // Galería
+        $gallery_ids = isset($job_data['gallery_ids']) && is_array($job_data['gallery_ids']) 
+            ? $job_data['gallery_ids'] 
+            : get_post_meta($post_id, 'gallery_ids', true);
+            
+        if (is_array($gallery_ids) && !empty($gallery_ids)) {
+            foreach ($gallery_ids as $gallery_id) {
+                $gallery_url = wp_get_attachment_image_url(intval($gallery_id), 'large');
+                if ($gallery_url) {
+                    $gallery_url = (strpos($gallery_url, 'http') === 0) ? $gallery_url : site_url($gallery_url);
+                    if (!in_array($gallery_url, $image_urls)) {
+                        $image_urls[] = $gallery_url;
+                    }
+                }
+            }
+        }
+        
+        return $image_urls;
+    }
+}
+
+// ==========================================
+// 1.3. PUBLICAR TRABAJO EN FACEBOOK VÍA N8N
 // ==========================================
 if (!function_exists('agrochamba_post_to_facebook_via_n8n')) {
     function agrochamba_post_to_facebook_via_n8n($post_id, $job_data, $webhook_url) {
@@ -705,6 +904,30 @@ if (!function_exists('agrochamba_facebook_settings_page')) {
                         </td>
                     </tr>
                     <tr>
+                        <th scope="row">Páginas Configuradas</th>
+                        <td>
+                            <?php
+                            $pages = function_exists('agrochamba_get_facebook_pages') ? agrochamba_get_facebook_pages() : array();
+                            if (!empty($pages)) {
+                                echo '<div style="background: #f0f0f1; padding: 10px; border-radius: 4px; margin-bottom: 10px;">';
+                                echo '<strong>' . count($pages) . ' página(s) configurada(s):</strong><ul style="margin: 10px 0 0 20px;">';
+                                foreach ($pages as $page) {
+                                    $status = $page['enabled'] ? '✅' : '⏸️';
+                                    $primary = ($page['is_primary'] ?? false) ? ' (Principal)' : '';
+                                    echo '<li>' . $status . ' ' . esc_html($page['page_name']) . $primary . '</li>';
+                                }
+                                echo '</ul></div>';
+                            } else {
+                                echo '<p style="color: #d63638;">⚠️ No hay páginas configuradas.</p>';
+                            }
+                            ?>
+                            <p class="description">
+                                Las páginas de Facebook se gestionan desde la app Android en <strong>Configuración → Gestionar Páginas de Facebook</strong>.<br>
+                                También puedes usar la <a href="<?php echo rest_url('agrochamba/v1/facebook/pages'); ?>" target="_blank">API REST</a> para gestionarlas.
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
                         <th scope="row">Método de publicación</th>
                         <td>
                             <label>
@@ -728,22 +951,22 @@ if (!function_exists('agrochamba_facebook_settings_page')) {
                         </td>
                     </tr>
                     <tr>
-                        <th scope="row">Page Access Token</th>
+                        <th scope="row">Page Access Token (Legacy)</th>
                         <td>
                             <input type="text" name="facebook_page_token" value="<?php echo esc_attr($page_token); ?>" class="regular-text" />
                             <p class="description">
-                                Token de acceso de larga duración de tu página de Facebook.<br>
-                                Solo necesario si NO usas n8n. Puedes obtenerlo desde: <a href="https://developers.facebook.com/tools/explorer/" target="_blank">Graph API Explorer</a>
+                                <em>Configuración legacy para una sola página.</em> Usa la app Android para configurar múltiples páginas.<br>
+                                Token de acceso de larga duración de tu página de Facebook.
                             </p>
                         </td>
                     </tr>
                     <tr>
-                        <th scope="row">Page ID</th>
+                        <th scope="row">Page ID (Legacy)</th>
                         <td>
                             <input type="text" name="facebook_page_id" value="<?php echo esc_attr($page_id); ?>" class="regular-text" />
                             <p class="description">
-                                ID de tu página de Facebook (puedes encontrarlo en la configuración de tu página).<br>
-                                Solo necesario si NO usas n8n.
+                                <em>Configuración legacy para una sola página.</em> Usa la app Android para configurar múltiples páginas.<br>
+                                ID de tu página de Facebook.
                             </p>
                         </td>
                     </tr>

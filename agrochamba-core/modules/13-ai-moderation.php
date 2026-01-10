@@ -803,7 +803,7 @@ if (!function_exists('agrochamba_moderate_image_with_openai')) {
         $api_url = 'https://api.openai.com/v1/chat/completions';
         
         $request_body = array(
-            'model' => 'gpt-4-vision-preview', // Modelo con visión
+            'model' => 'gpt-4o-mini', // Modelo eficiente con visión
             'messages' => array(
                 array(
                     'role' => 'user',
@@ -1021,7 +1021,7 @@ Si apruebas (approved: true), el trabajo se publicará automáticamente. Si rech
         $user_prompt = "Revisa este anuncio de trabajo:\n\n" . $content;
 
         $request_body = array(
-            'model' => 'gpt-3.5-turbo', // Puedes cambiar a 'gpt-4' si tienes acceso
+            'model' => 'gpt-4o-mini', // Modelo eficiente y económico
             'messages' => array(
                 array('role' => 'system', 'content' => $system_prompt),
                 array('role' => 'user', 'content' => $user_prompt)

@@ -8,7 +8,18 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
@@ -47,6 +58,7 @@ import agrochamba.com.utils.htmlToString
 import agrochamba.com.utils.htmlToMarkdown
 import agrochamba.com.utils.textToHtml
 import agrochamba.com.ui.common.RichTextEditor
+import agrochamba.com.ui.common.SearchableDropdown
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 
@@ -151,6 +163,7 @@ fun EditJobScreen(
     var comentariosHabilitados by remember { mutableStateOf(true) }
     
     var showMoreOptions by remember { mutableStateOf(false) }
+    var showOCRDialog by remember { mutableStateOf(false) }
     
     // IMPORTANTE: Recargar imágenes cuando cambia el trabajo
     // Esto asegura que cada trabajo tenga sus propias imágenes cargadas
@@ -405,23 +418,71 @@ fun EditJobScreen(
                 
                 // Descripción
                 Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                    Text(
-                        if (tipoPublicacion == "trabajo") "Descripción del Trabajo" else "Descripción del Blog",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            if (tipoPublicacion == "trabajo") "Descripción del Trabajo" else "Descripción del Blog",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        // Mensaje de estado de IA
+                        uiState.aiSuccess?.let { success ->
+                            Text(
+                                text = success,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color(0xFF4CAF50),
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                        }
+                        uiState.aiError?.let { error ->
+                            Text(
+                                text = error,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                        }
+                    }
                     RichTextEditor(
                         value = description,
-                        onValueChange = { description = it },
+                        onValueChange = { 
+                            description = it
+                            viewModel.clearAIMessages()
+                        },
                         placeholder = if (tipoPublicacion == "trabajo") {
-                            "Una descripción detallada permite obtener más visitas. Incluye información sobre el trabajo, requisitos y beneficios.\n\nUsa los botones de formato para resaltar texto importante."
+                            "Una descripción detallada permite obtener más visitas. Incluye información sobre el trabajo, requisitos y beneficios.\n\nUsa los botones de formato para resaltar texto importante.\n\n✨ Usa el botón IA para mejorar tu texto automáticamente."
                         } else {
-                            "Escribe el contenido de tu artículo de blog aquí.\n\nUsa los botones de formato para resaltar texto importante."
+                            "Escribe el contenido de tu artículo de blog aquí.\n\nUsa los botones de formato para resaltar texto importante.\n\n✨ Usa el botón IA para mejorar tu texto automáticamente."
                         },
                         maxLines = 15,
-                        enabled = !uiState.isLoading
+                        enabled = !uiState.isLoading && !uiState.isAIEnhancing && !uiState.isOCRProcessing,
+                        // Funciones de IA
+                        onAIEnhanceClick = {
+                            viewModel.enhanceTextWithAI(
+                                currentText = description,
+                                type = if (tipoPublicacion == "trabajo") "job" else "blog"
+                            ) { enhancedText ->
+                                description = enhancedText
+                            }
+                        },
+                        onOCRClick = if (uiState.existingImageUrls.isNotEmpty() || uiState.selectedImages.isNotEmpty()) {
+                            {
+                                showOCRDialog = true
+                            }
+                        } else null,
+                        isAILoading = uiState.isAIEnhancing,
+                        isOCRLoading = uiState.isOCRProcessing,
+                        // Límites de uso de IA
+                        aiUsesRemaining = uiState.aiUsesRemaining,
+                        aiIsPremium = uiState.aiIsPremium,
+                        onUpgradeToPremiumClick = {
+                            // TODO: Navegar a pantalla de suscripción premium
+                        }
                     )
                 }
                 
@@ -477,27 +538,33 @@ fun EditJobScreen(
                 // Ubicación y Empresa - uno debajo del otro (solo para trabajos)
                 if (tipoPublicacion == "trabajo") {
                     Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                        // Selector de Ubicación (arriba)
-                        CategoryDropdown(
+                        // Selector de Ubicación (arriba) - con búsqueda
+                        SearchableDropdown(
                             label = "Ubicación *",
                             items = uiState.ubicaciones,
                             selectedItem = selectedUbicacion,
+                            onItemSelected = { cat -> selectedUbicacion = cat },
                             modifier = Modifier.fillMaxWidth(),
-                            leadingIcon = Icons.Default.LocationOn
-                        ) { cat -> selectedUbicacion = cat }
+                            leadingIcon = Icons.Default.LocationOn,
+                            placeholder = "Buscar ubicación...",
+                            emptyMessage = "No se encontraron ubicaciones"
+                        )
                         
                         Spacer(Modifier.height(12.dp))
                         
-                        // Selector de Empresa (abajo) - SIEMPRE VISIBLE
+                        // Selector de Empresa (abajo) - SIEMPRE VISIBLE - con búsqueda
                         if (isAdmin) {
                             // Admin: puede seleccionar cualquier empresa
-                            CategoryDropdown(
+                            SearchableDropdown(
                                 label = "Empresa",
                                 items = uiState.empresas,
                                 selectedItem = selectedEmpresa,
+                                onItemSelected = { cat -> selectedEmpresa = cat },
                                 modifier = Modifier.fillMaxWidth(),
-                                leadingIcon = Icons.Default.Business
-                            ) { cat -> selectedEmpresa = cat }
+                                leadingIcon = Icons.Default.Business,
+                                placeholder = "Buscar empresa...",
+                                emptyMessage = "No se encontraron empresas"
+                            )
                         } else {
                             // Empresa normal: mostrar su empresa (solo lectura)
                             OutlinedTextField(
@@ -617,11 +684,14 @@ fun EditJobScreen(
                             )
                         } else if (isAdmin) {
                             // Admin: puede seleccionar cualquier empresa
-                            CategoryDropdown(
+                            SearchableDropdown(
                                 label = "Empresa",
                                 items = uiState.empresas,
-                                selectedItem = selectedEmpresa
-                            ) { cat -> selectedEmpresa = cat }
+                                selectedItem = selectedEmpresa,
+                                onItemSelected = { cat -> selectedEmpresa = cat },
+                                placeholder = "Buscar empresa...",
+                                emptyMessage = "No se encontraron empresas"
+                            )
                         }
                         
                         CategoryDropdown(
@@ -707,6 +777,207 @@ fun EditJobScreen(
                             modifier = Modifier.padding(16.dp)
                         )
                     }
+                }
+            }
+        }
+    }
+
+    // Diálogo para seleccionar imagen para OCR
+    if (showOCRDialog && (uiState.existingImageUrls.isNotEmpty() || uiState.selectedImages.isNotEmpty())) {
+        EditOCRImageSelectorDialog(
+            existingImageUrls = uiState.existingImageUrls,
+            newImages = uiState.selectedImages,
+            isProcessing = uiState.isOCRProcessing,
+            onExistingImageSelected = { imageUrl ->
+                showOCRDialog = false
+                // Extraer texto de la imagen existente
+                viewModel.extractTextFromImage(
+                    imageUrl = imageUrl,
+                    enhance = true
+                ) { extractedText, enhancedText ->
+                    val textToUse = enhancedText ?: extractedText
+                    if (textToUse.isNotBlank()) {
+                        description = if (description.isBlank()) {
+                            textToUse
+                        } else {
+                            "$description\n\n$textToUse"
+                        }
+                    }
+                }
+            },
+            onNewImageSelected = { uri ->
+                showOCRDialog = false
+                // Extraer texto de la nueva imagen
+                viewModel.extractTextFromImage(
+                    imageUrl = uri.toString(),
+                    enhance = true
+                ) { extractedText, enhancedText ->
+                    val textToUse = enhancedText ?: extractedText
+                    if (textToUse.isNotBlank()) {
+                        description = if (description.isBlank()) {
+                            textToUse
+                        } else {
+                            "$description\n\n$textToUse"
+                        }
+                    }
+                }
+            },
+            onDismiss = { showOCRDialog = false }
+        )
+    }
+}
+
+/**
+ * Diálogo para seleccionar imagen para OCR en EditJobScreen
+ */
+@Composable
+private fun EditOCRImageSelectorDialog(
+    existingImageUrls: List<String>,
+    newImages: List<Uri>,
+    isProcessing: Boolean,
+    onExistingImageSelected: (String) -> Unit,
+    onNewImageSelected: (Uri) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    
+    androidx.compose.ui.window.Dialog(onDismissRequest = { if (!isProcessing) onDismiss() }) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Icono y título
+                Icon(
+                    Icons.Default.Folder,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(40.dp)
+                )
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = "Selecciona una imagen",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "La IA extraerá el texto de la imagen y lo convertirá en una descripción profesional",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+                
+                Spacer(Modifier.height(20.dp))
+                
+                if (isProcessing) {
+                    // Mostrar indicador de carga
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(48.dp)
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = "Procesando imagen...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                } else {
+                    // Grid de imágenes
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        // Imágenes existentes
+                        itemsIndexed(existingImageUrls) { index, imageUrl ->
+                            Box(
+                                modifier = Modifier
+                                    .size(80.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .border(
+                                        2.dp,
+                                        MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                                        RoundedCornerShape(8.dp)
+                                    )
+                                    .clickable { onExistingImageSelected(imageUrl) }
+                            ) {
+                                AsyncImage(
+                                    model = ImageRequest.Builder(context)
+                                        .data(imageUrl)
+                                        .crossfade(true)
+                                        .build(),
+                                    contentDescription = "Imagen ${index + 1}",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                                // Overlay para indicar que es clickeable
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(Color.Black.copy(alpha = 0.3f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.Folder,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                            }
+                        }
+                        
+                        // Nuevas imágenes
+                        itemsIndexed(newImages) { index, uri ->
+                            Box(
+                                modifier = Modifier
+                                    .size(80.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .border(
+                                        2.dp,
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                                        RoundedCornerShape(8.dp)
+                                    )
+                                    .clickable { onNewImageSelected(uri) }
+                            ) {
+                                AsyncImage(
+                                    model = uri,
+                                    contentDescription = "Nueva imagen ${index + 1}",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                                // Overlay para indicar que es clickeable
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(Color.Black.copy(alpha = 0.3f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.Folder,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                Spacer(Modifier.height(20.dp))
+                
+                // Botón cancelar
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isProcessing
+                ) {
+                    Text("Cancelar")
                 }
             }
         }

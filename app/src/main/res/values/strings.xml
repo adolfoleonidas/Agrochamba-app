@@ -1,3 +1,34 @@
 <resources>
     <string name="app_name">Agrochamba</string>
+    
+    <!-- AI Features -->
+    <string name="ai_enhance_text">Mejorar texto con IA</string>
+    <string name="ai_ocr">Extraer texto de imagen</string>
+    <string name="ai_processing">Procesando…</string>
+    <string name="ai_success_enhanced">Texto mejorado con IA</string>
+    <string name="ai_success_ocr">Texto extraído de la imagen</string>
+    <string name="ai_error_no_text">Escribe algo primero para que la IA pueda mejorarlo</string>
+    <string name="ai_error_no_image">Selecciona una imagen primero</string>
+    <string name="ai_select_image_title">Selecciona una imagen</string>
+    <string name="ai_select_image_description">La IA extraerá el texto de la imagen y lo convertirá en una descripción profesional</string>
+    
+    <!-- AI Limits -->
+    <string name="ai_limit_reached">Has alcanzado el límite de 3 usos gratuitos de IA</string>
+    <string name="ai_upgrade_to_premium">Actualizar a Premium para uso ilimitado</string>
+    <string name="ai_uses_remaining">%d usos de IA restantes</string>
+    <string name="ai_unlimited">IA ilimitada</string>
+    
+    <!-- Searchable Dropdown -->
+    <string name="search_location">Buscar ubicación…</string>
+    <string name="search_company">Buscar empresa…</string>
+    <string name="no_results_found">No se encontraron resultados</string>
+    
+    <!-- Facebook Pages -->
+    <string name="facebook_pages_title">Páginas de Facebook</string>
+    <string name="facebook_add_page">Agregar Página</string>
+    <string name="facebook_page_id">Page ID</string>
+    <string name="facebook_page_token">Page Access Token</string>
+    <string name="facebook_page_name">Nombre de la Página</string>
+    <string name="facebook_test_connection">Probar Conexión</string>
+    <string name="facebook_delete_page">Eliminar Página</string>
 </resources>

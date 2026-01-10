@@ -3,7 +3,16 @@ package agrochamba.com.ui.common
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -11,6 +20,8 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.DocumentScanner
 import androidx.compose.material.icons.filled.FormatBold
 import androidx.compose.material.icons.filled.FormatItalic
 import androidx.compose.material.icons.filled.FormatListBulleted
@@ -33,6 +44,7 @@ import androidx.compose.ui.unit.sp
 
 /**
  * Editor de texto rico nativo con formato básico (negrita, cursiva, listas)
+ * y herramientas de IA para mejorar texto y OCR
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,7 +54,16 @@ fun RichTextEditor(
     modifier: Modifier = Modifier,
     placeholder: String = "",
     maxLines: Int = 15,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    // Callbacks para funciones de IA
+    onAIEnhanceClick: (() -> Unit)? = null,
+    onOCRClick: (() -> Unit)? = null,
+    isAILoading: Boolean = false,
+    isOCRLoading: Boolean = false,
+    // Límites de uso de IA
+    aiUsesRemaining: Int = -1, // -1 = ilimitado
+    aiIsPremium: Boolean = false,
+    onUpgradeToPremiumClick: (() -> Unit)? = null
 ) {
     val keyboardController = LocalSoftwareKeyboardController.current
     // Usar una clave estable para remember, no el valor que cambia constantemente
@@ -127,7 +148,7 @@ fun RichTextEditor(
         }
         
         // Barra de herramientas siempre debajo, pero con estado según selección
-        Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
         FormatToolbar(
             isBold = if (hasSelection) isBold else false,
             isItalic = if (hasSelection) isItalic else false,
@@ -148,7 +169,17 @@ fun RichTextEditor(
             onNumberedListClick = {
                 textFieldValue = toggleNumberedList(textFieldValue)
                 keyboardController?.show()
-            }
+            },
+            // Funciones de IA
+            onAIEnhanceClick = onAIEnhanceClick,
+            onOCRClick = onOCRClick,
+            isAILoading = isAILoading,
+            isOCRLoading = isOCRLoading,
+            hasText = textFieldValue.text.isNotEmpty(),
+            // Límites de IA
+            aiUsesRemaining = aiUsesRemaining,
+            aiIsPremium = aiIsPremium,
+            onUpgradeToPremiumClick = onUpgradeToPremiumClick
         )
     }
 }
@@ -162,43 +193,238 @@ private fun FormatToolbar(
     onBoldClick: () -> Unit,
     onItalicClick: () -> Unit,
     onBulletListClick: () -> Unit,
-    onNumberedListClick: () -> Unit
+    onNumberedListClick: () -> Unit,
+    // Funciones de IA
+    onAIEnhanceClick: (() -> Unit)? = null,
+    onOCRClick: (() -> Unit)? = null,
+    isAILoading: Boolean = false,
+    isOCRLoading: Boolean = false,
+    hasText: Boolean = false,
+    // Límites de IA
+    aiUsesRemaining: Int = -1,
+    aiIsPremium: Boolean = false,
+    onUpgradeToPremiumClick: (() -> Unit)? = null
 ) {
-    Row(
+    val hasAIUsesLeft = aiIsPremium || aiUsesRemaining == -1 || aiUsesRemaining > 0
+    
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
+            .padding(horizontal = 8.dp, vertical = 4.dp)
     ) {
-        FormatButton(
-            icon = Icons.Default.FormatBold,
-            isSelected = isBold,
-            onClick = onBoldClick,
-            contentDescription = "Negrita"
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Botones de formato
+            FormatButton(
+                icon = Icons.Default.FormatBold,
+                isSelected = isBold,
+                onClick = onBoldClick,
+                contentDescription = "Negrita"
+            )
+            
+            FormatButton(
+                icon = Icons.Default.FormatItalic,
+                isSelected = isItalic,
+                onClick = onItalicClick,
+                contentDescription = "Cursiva"
+            )
+            
+            Spacer(modifier = Modifier.width(4.dp))
+            
+            FormatButton(
+                icon = Icons.Default.FormatListBulleted,
+                isSelected = isBulletList,
+                onClick = onBulletListClick,
+                contentDescription = "Lista con viñetas"
+            )
+            
+            FormatButton(
+                icon = Icons.Default.FormatListNumbered,
+                isSelected = isNumberedList,
+                onClick = onNumberedListClick,
+                contentDescription = "Lista numerada"
+            )
+            
+            // Separador y botones de IA (si están disponibles)
+            if (onAIEnhanceClick != null || onOCRClick != null) {
+                Spacer(modifier = Modifier.weight(1f))
+                
+                // Badge de usos restantes (solo si no es premium y tiene límite)
+                if (!aiIsPremium && aiUsesRemaining >= 0) {
+                    AIUsageBadge(
+                        remaining = aiUsesRemaining,
+                        onUpgradeClick = onUpgradeToPremiumClick
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                }
+                
+                // Botón de IA para mejorar texto
+                if (onAIEnhanceClick != null) {
+                    AIButton(
+                        icon = Icons.Default.AutoAwesome,
+                        onClick = onAIEnhanceClick,
+                        contentDescription = "Mejorar texto con IA",
+                        isLoading = isAILoading,
+                        enabled = hasText && hasAIUsesLeft && !isAILoading && !isOCRLoading,
+                        tooltip = "IA",
+                        isLocked = !hasAIUsesLeft
+                    )
+                }
+                
+                // Botón de OCR
+                if (onOCRClick != null) {
+                    AIButton(
+                        icon = Icons.Default.DocumentScanner,
+                        onClick = onOCRClick,
+                        contentDescription = "Extraer texto de imagen (OCR)",
+                        isLoading = isOCRLoading,
+                        enabled = hasAIUsesLeft && !isAILoading && !isOCRLoading,
+                        tooltip = "OCR",
+                        isLocked = !hasAIUsesLeft
+                    )
+                }
+            }
+        }
         
-        FormatButton(
-            icon = Icons.Default.FormatItalic,
-            isSelected = isItalic,
-            onClick = onItalicClick,
-            contentDescription = "Cursiva"
+        // Mensaje de límite alcanzado
+        if (!hasAIUsesLeft && (onAIEnhanceClick != null || onOCRClick != null)) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
+                        RoundedCornerShape(4.dp)
+                    )
+                    .clickable(enabled = onUpgradeToPremiumClick != null) {
+                        onUpgradeToPremiumClick?.invoke()
+                    }
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "⚠️ Límite de IA alcanzado. ",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+                Text(
+                    text = "Actualizar a Premium",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold,
+                    textDecoration = TextDecoration.Underline
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Badge que muestra los usos de IA restantes
+ */
+@Composable
+private fun AIUsageBadge(
+    remaining: Int,
+    onUpgradeClick: (() -> Unit)? = null
+) {
+    val backgroundColor = when {
+        remaining <= 0 -> MaterialTheme.colorScheme.errorContainer
+        remaining == 1 -> MaterialTheme.colorScheme.tertiaryContainer
+        else -> MaterialTheme.colorScheme.primaryContainer
+    }
+    val textColor = when {
+        remaining <= 0 -> MaterialTheme.colorScheme.error
+        remaining == 1 -> MaterialTheme.colorScheme.tertiary
+        else -> MaterialTheme.colorScheme.primary
+    }
+    
+    Box(
+        modifier = Modifier
+            .background(backgroundColor.copy(alpha = 0.7f), RoundedCornerShape(12.dp))
+            .clickable(enabled = onUpgradeClick != null) { onUpgradeClick?.invoke() }
+            .padding(horizontal = 8.dp, vertical = 4.dp)
+    ) {
+        Text(
+            text = if (remaining > 0) "$remaining IA" else "0 IA",
+            style = MaterialTheme.typography.labelSmall,
+            color = textColor,
+            fontWeight = FontWeight.Bold,
+            fontSize = 10.sp
         )
-        
-        Spacer(modifier = Modifier.width(8.dp))
-        
-        FormatButton(
-            icon = Icons.Default.FormatListBulleted,
-            isSelected = isBulletList,
-            onClick = onBulletListClick,
-            contentDescription = "Lista con viñetas"
-        )
-        
-        FormatButton(
-            icon = Icons.Default.FormatListNumbered,
-            isSelected = isNumberedList,
-            onClick = onNumberedListClick,
-            contentDescription = "Lista numerada"
-        )
+    }
+}
+
+/**
+ * Botón especial para funciones de IA con indicador de carga y estado de bloqueo
+ */
+@Composable
+private fun AIButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit,
+    contentDescription: String,
+    isLoading: Boolean = false,
+    enabled: Boolean = true,
+    tooltip: String,
+    isLocked: Boolean = false
+) {
+    val backgroundColor = when {
+        isLocked -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+        enabled -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+        else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+    }
+    val iconTint = when {
+        isLocked -> MaterialTheme.colorScheme.error.copy(alpha = 0.6f)
+        enabled -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+    }
+    
+    Box(
+        modifier = Modifier
+            .size(40.dp)
+            .background(backgroundColor, RoundedCornerShape(8.dp))
+            .clickable(enabled = enabled && !isLoading && !isLocked) { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        if (isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(18.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.primary
+            )
+        } else {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = contentDescription,
+                        tint = iconTint,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    // Mostrar candado si está bloqueado
+                    if (isLocked) {
+                        Text(
+                            text = "🔒",
+                            fontSize = 8.sp,
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(0.dp)
+                        )
+                    }
+                }
+                Text(
+                    text = tooltip,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontSize = 8.sp,
+                    color = iconTint
+                )
+            }
+        }
     }
 }
 

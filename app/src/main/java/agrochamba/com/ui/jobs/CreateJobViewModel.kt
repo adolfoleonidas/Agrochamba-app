@@ -8,6 +8,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import agrochamba.com.data.AIService
 import agrochamba.com.data.AuthManager
 import agrochamba.com.data.Category
 import agrochamba.com.data.SettingsManager
@@ -32,7 +33,15 @@ data class CreateJobScreenState(
     val tiposPuesto: List<Category> = emptyList(),
     val categorias: List<Category> = emptyList(),
     val selectedImages: List<Uri> = emptyList(),
-    val userCompanyId: Int? = null
+    val userCompanyId: Int? = null,
+    // Estados de IA
+    val isAIEnhancing: Boolean = false,
+    val isOCRProcessing: Boolean = false,
+    val aiError: String? = null,
+    val aiSuccess: String? = null,
+    // Límites de uso de IA
+    val aiUsesRemaining: Int = -1, // -1 = ilimitado o desconocido
+    val aiIsPremium: Boolean = false
 )
 
 @HiltViewModel
@@ -43,6 +52,7 @@ class CreateJobViewModel @Inject constructor() : androidx.lifecycle.ViewModel() 
 
     init {
         loadFormData()
+        loadAIUsageStatus()
     }
 
     private fun loadFormData() {
@@ -72,6 +82,44 @@ class CreateJobViewModel @Inject constructor() : androidx.lifecycle.ViewModel() 
             }
         }
     }
+    
+    /**
+     * Cargar el estado de uso de IA del usuario
+     */
+    private fun loadAIUsageStatus() {
+        viewModelScope.launch {
+            when (val result = AIService.getUsageStatus()) {
+                is AIService.AIResult.Success -> {
+                    val status = result.data
+                    uiState = uiState.copy(
+                        aiUsesRemaining = status.remaining,
+                        aiIsPremium = status.isPremium
+                    )
+                    Log.d("CreateJobViewModel", "AI usage loaded: remaining=${status.remaining}, isPremium=${status.isPremium}")
+                }
+                is AIService.AIResult.Error -> {
+                    // Si falla, asumir admin (sin límites) para no bloquear la funcionalidad
+                    if (AuthManager.isUserAdmin()) {
+                        uiState = uiState.copy(aiUsesRemaining = -1, aiIsPremium = true)
+                    }
+                    Log.w("CreateJobViewModel", "Could not load AI usage: ${result.message}")
+                }
+                is AIService.AIResult.Loading -> {}
+            }
+        }
+    }
+    
+    /**
+     * Actualizar el estado de uso de IA desde la respuesta
+     */
+    private fun updateAIUsageFromService() {
+        AIService.usageStatus?.let { status ->
+            uiState = uiState.copy(
+                aiUsesRemaining = status.remaining,
+                aiIsPremium = status.isPremium
+            )
+        }
+    }
 
     fun onImagesSelected(uris: List<Uri>) {
         val currentImages = uiState.selectedImages.toMutableList()
@@ -90,6 +138,157 @@ class CreateJobViewModel @Inject constructor() : androidx.lifecycle.ViewModel() 
             Collections.swap(mutableList, from, to)
             uiState = uiState.copy(selectedImages = mutableList)
         }
+    }
+
+    // ==========================================
+    // FUNCIONES DE IA
+    // ==========================================
+
+    /**
+     * Mejorar texto de la descripción usando IA
+     */
+    fun enhanceTextWithAI(
+        currentText: String,
+        type: String = "job",
+        onResult: (String) -> Unit
+    ) {
+        if (currentText.isBlank()) {
+            uiState = uiState.copy(aiError = "Escribe algo primero para que la IA pueda mejorarlo")
+            return
+        }
+
+        viewModelScope.launch {
+            uiState = uiState.copy(isAIEnhancing = true, aiError = null, aiSuccess = null)
+
+            when (val result = AIService.enhanceText(currentText, type)) {
+                is AIService.AIResult.Success -> {
+                    updateAIUsageFromService()
+                    uiState = uiState.copy(
+                        isAIEnhancing = false,
+                        aiSuccess = "✨ Texto mejorado con IA"
+                    )
+                    onResult(result.data)
+                }
+                is AIService.AIResult.Error -> {
+                    if (result.isLimitReached) {
+                        uiState = uiState.copy(
+                            isAIEnhancing = false,
+                            aiError = result.message,
+                            aiUsesRemaining = 0,
+                            aiIsPremium = false
+                        )
+                    } else {
+                        uiState = uiState.copy(
+                            isAIEnhancing = false,
+                            aiError = result.message
+                        )
+                    }
+                }
+                is AIService.AIResult.Loading -> {
+                    // Already handling in isAIEnhancing
+                }
+            }
+        }
+    }
+
+    /**
+     * Generar título optimizado para SEO
+     */
+    fun generateTitleWithAI(
+        description: String,
+        location: String? = null,
+        onResult: (String) -> Unit
+    ) {
+        if (description.isBlank()) {
+            uiState = uiState.copy(aiError = "Primero escribe una descripción para generar el título")
+            return
+        }
+
+        viewModelScope.launch {
+            uiState = uiState.copy(isAIEnhancing = true, aiError = null, aiSuccess = null)
+
+            when (val result = AIService.generateTitle(description, location)) {
+                is AIService.AIResult.Success -> {
+                    updateAIUsageFromService()
+                    uiState = uiState.copy(
+                        isAIEnhancing = false,
+                        aiSuccess = if (result.data.isSeoOptimal) 
+                            "✨ Título SEO óptimo generado" 
+                            else "✨ Título generado"
+                    )
+                    onResult(result.data.title)
+                }
+                is AIService.AIResult.Error -> {
+                    if (result.isLimitReached) {
+                        uiState = uiState.copy(
+                            isAIEnhancing = false,
+                            aiError = result.message,
+                            aiUsesRemaining = 0,
+                            aiIsPremium = false
+                        )
+                    } else {
+                        uiState = uiState.copy(
+                            isAIEnhancing = false,
+                            aiError = result.message
+                        )
+                    }
+                }
+                is AIService.AIResult.Loading -> {
+                    // Already handling in isAIEnhancing
+                }
+            }
+        }
+    }
+
+    /**
+     * Extraer texto de imagen (OCR) y opcionalmente mejorarlo
+     */
+    fun extractTextFromImage(
+        imageUrl: String,
+        enhance: Boolean = true,
+        onResult: (extractedText: String, enhancedText: String?) -> Unit
+    ) {
+        viewModelScope.launch {
+            uiState = uiState.copy(isOCRProcessing = true, aiError = null, aiSuccess = null)
+
+            when (val result = AIService.extractTextFromImage(imageUrl = imageUrl, enhance = enhance)) {
+                is AIService.AIResult.Success -> {
+                    updateAIUsageFromService()
+                    uiState = uiState.copy(
+                        isOCRProcessing = false,
+                        aiSuccess = if (result.data.enhancedText != null) 
+                            "📄 Texto extraído y mejorado" 
+                            else "📄 Texto extraído de la imagen"
+                    )
+                    onResult(result.data.extractedText, result.data.enhancedText)
+                }
+                is AIService.AIResult.Error -> {
+                    if (result.isLimitReached) {
+                        uiState = uiState.copy(
+                            isOCRProcessing = false,
+                            aiError = result.message,
+                            aiUsesRemaining = 0,
+                            aiIsPremium = false
+                        )
+                    } else {
+                        uiState = uiState.copy(
+                            isOCRProcessing = false,
+                            aiError = result.message
+                        )
+                    }
+                }
+                is AIService.AIResult.Loading -> {
+                    // Already handling in isOCRProcessing
+                }
+            }
+        }
+    }
+
+    /**
+     * Limpiar mensajes de IA
+     */
+    fun clearAIMessages() {
+        uiState = uiState.copy(aiError = null, aiSuccess = null)
     }
 
     fun createJob(jobData: Map<String, Any?>, context: Context) {

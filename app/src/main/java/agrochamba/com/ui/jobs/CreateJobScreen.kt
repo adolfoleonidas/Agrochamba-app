@@ -9,7 +9,17 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
@@ -53,6 +63,7 @@ import androidx.navigation.NavController
 import agrochamba.com.data.AuthManager
 import agrochamba.com.data.Category
 import agrochamba.com.ui.common.RichTextEditor
+import agrochamba.com.ui.common.SearchableDropdown
 import agrochamba.com.utils.textToHtml
 import coil.compose.AsyncImage
 
@@ -91,6 +102,7 @@ fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel 
     var tipoPublicacion by remember { mutableStateOf("trabajo") } // "trabajo" o "post" (blog)
     
     var showMoreOptions by remember { mutableStateOf(false) }
+    var showOCRDialog by remember { mutableStateOf(false) }
 
     // Reiniciar el estado cuando se navega a esta pantalla
     LaunchedEffect(Unit) {
@@ -322,23 +334,80 @@ fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel 
                 
                 // Descripción (texto dinámico según el tipo)
                 Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                    Text(
-                        if (tipoPublicacion == "trabajo") "Descripción del Trabajo" else "Descripción del Blog",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            if (tipoPublicacion == "trabajo") "Descripción del Trabajo" else "Descripción del Blog",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        // Mensaje de estado de IA
+                        uiState.aiSuccess?.let { success ->
+                            Text(
+                                text = success,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color(0xFF4CAF50),
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                        }
+                        uiState.aiError?.let { error ->
+                            Text(
+                                text = error,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                        }
+                    }
                     RichTextEditor(
                         value = description,
-                        onValueChange = { description = it },
+                        onValueChange = { 
+                            description = it
+                            viewModel.clearAIMessages()
+                        },
                         placeholder = if (tipoPublicacion == "trabajo") {
-                            "Una descripción detallada permite obtener más visitas. Incluye información sobre el trabajo, requisitos y beneficios.\n\nUsa los botones de formato para resaltar texto importante."
+                            "Una descripción detallada permite obtener más visitas. Incluye información sobre el trabajo, requisitos y beneficios.\n\nUsa los botones de formato para resaltar texto importante.\n\n✨ Usa el botón IA para mejorar tu texto automáticamente."
                         } else {
-                            "Escribe el contenido de tu artículo de blog. Usa los botones de formato para resaltar texto importante y hacer tu contenido más atractivo."
+                            "Escribe el contenido de tu artículo de blog. Usa los botones de formato para resaltar texto importante y hacer tu contenido más atractivo.\n\n✨ Usa el botón IA para mejorar tu texto automáticamente."
                         },
                         maxLines = 15,
-                        enabled = !uiState.isLoading
+                        enabled = !uiState.isLoading && !uiState.isAIEnhancing && !uiState.isOCRProcessing,
+                        // Funciones de IA
+                        onAIEnhanceClick = {
+                            viewModel.enhanceTextWithAI(
+                                currentText = description,
+                                type = if (tipoPublicacion == "trabajo") "job" else "blog"
+                            ) { enhancedText ->
+                                description = enhancedText
+                                // También generar título si está vacío
+                                if (title.isBlank()) {
+                                    viewModel.generateTitleWithAI(
+                                        description = enhancedText,
+                                        location = selectedUbicacion?.name
+                                    ) { generatedTitle ->
+                                        title = generatedTitle
+                                    }
+                                }
+                            }
+                        },
+                        onOCRClick = if (uiState.selectedImages.isNotEmpty()) {
+                            {
+                                showOCRDialog = true
+                            }
+                        } else null,
+                        isAILoading = uiState.isAIEnhancing,
+                        isOCRLoading = uiState.isOCRProcessing,
+                        // Límites de uso de IA
+                        aiUsesRemaining = uiState.aiUsesRemaining,
+                        aiIsPremium = uiState.aiIsPremium,
+                        onUpgradeToPremiumClick = {
+                            // TODO: Navegar a pantalla de suscripción premium
+                        }
                     )
                 }
                 
@@ -394,28 +463,34 @@ fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel 
                 // Ubicación y Empresa - uno debajo del otro (solo para trabajos)
                 if (tipoPublicacion == "trabajo") {
                     Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                        // Selector de Ubicación (arriba)
-                    CategoryDropdown(
-                        label = "Ubicación *",
-                        items = uiState.ubicaciones,
+                        // Selector de Ubicación (arriba) - con búsqueda
+                        SearchableDropdown(
+                            label = "Ubicación *",
+                            items = uiState.ubicaciones,
                             selectedItem = selectedUbicacion,
+                            onItemSelected = { cat -> selectedUbicacion = cat },
                             modifier = Modifier.fillMaxWidth(),
-                            leadingIcon = Icons.Default.LocationOn
-                    ) { cat -> selectedUbicacion = cat }
+                            leadingIcon = Icons.Default.LocationOn,
+                            placeholder = "Buscar ubicación...",
+                            emptyMessage = "No se encontraron ubicaciones"
+                        )
                         
                         Spacer(Modifier.height(12.dp))
                         
-                        // Selector de Empresa (abajo) - SIEMPRE VISIBLE
-                        CategoryDropdown(
+                        // Selector de Empresa (abajo) - SIEMPRE VISIBLE - con búsqueda
+                        SearchableDropdown(
                             label = "Empresa",
                             items = uiState.empresas,
                             selectedItem = selectedEmpresa,
+                            onItemSelected = { cat -> 
+                                android.util.Log.d("CreateJobScreen", "Empresa seleccionada: ${cat.name}")
+                                selectedEmpresa = cat 
+                            },
                             modifier = Modifier.fillMaxWidth(),
-                            leadingIcon = Icons.Default.Business
-                        ) { cat -> 
-                            android.util.Log.d("CreateJobScreen", "Empresa seleccionada: ${cat.name}")
-                            selectedEmpresa = cat 
-                        }
+                            leadingIcon = Icons.Default.Business,
+                            placeholder = "Buscar empresa...",
+                            emptyMessage = "No se encontraron empresas"
+                        )
                 }
                 
                 Spacer(Modifier.height(16.dp))
@@ -584,6 +659,156 @@ fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel 
                             modifier = Modifier.padding(16.dp)
                         )
                     }
+                }
+            }
+        }
+    }
+
+    // Diálogo para seleccionar imagen para OCR
+    if (showOCRDialog && uiState.selectedImages.isNotEmpty()) {
+        OCRImageSelectorDialog(
+            images = uiState.selectedImages,
+            isProcessing = uiState.isOCRProcessing,
+            onImageSelected = { uri ->
+                showOCRDialog = false
+                // Extraer texto de la imagen seleccionada
+                viewModel.extractTextFromImage(
+                    imageUrl = uri.toString(),
+                    enhance = true
+                ) { extractedText, enhancedText ->
+                    // Usar el texto mejorado si está disponible, sino el extraído
+                    val textToUse = enhancedText ?: extractedText
+                    if (textToUse.isNotBlank()) {
+                        // Agregar o reemplazar descripción
+                        description = if (description.isBlank()) {
+                            textToUse
+                        } else {
+                            "$description\n\n$textToUse"
+                        }
+                        // Generar título si está vacío
+                        if (title.isBlank()) {
+                            viewModel.generateTitleWithAI(
+                                description = textToUse,
+                                location = selectedUbicacion?.name
+                            ) { generatedTitle ->
+                                title = generatedTitle
+                            }
+                        }
+                    }
+                }
+            },
+            onDismiss = { showOCRDialog = false }
+        )
+    }
+}
+
+/**
+ * Diálogo para seleccionar imagen para OCR
+ */
+@Composable
+private fun OCRImageSelectorDialog(
+    images: List<Uri>,
+    isProcessing: Boolean,
+    onImageSelected: (Uri) -> Unit,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = { if (!isProcessing) onDismiss() }) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Icono y título
+                Icon(
+                    Icons.Default.Link,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(40.dp)
+                )
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = "Selecciona una imagen",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "La IA extraerá el texto de la imagen y lo convertirá en una descripción profesional",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+                
+                Spacer(Modifier.height(20.dp))
+                
+                if (isProcessing) {
+                    // Mostrar indicador de carga
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(48.dp)
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = "Procesando imagen...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                } else {
+                    // Grid de imágenes
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        itemsIndexed(images) { index, uri ->
+                            Box(
+                                modifier = Modifier
+                                    .size(80.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .border(
+                                        2.dp,
+                                        MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                                        RoundedCornerShape(8.dp)
+                                    )
+                                    .clickable { onImageSelected(uri) }
+                            ) {
+                                AsyncImage(
+                                    model = uri,
+                                    contentDescription = "Imagen ${index + 1}",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                                // Overlay para indicar que es clickeable
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(Color.Black.copy(alpha = 0.3f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.Link,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                Spacer(Modifier.height(20.dp))
+                
+                // Botón cancelar
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isProcessing
+                ) {
+                    Text("Cancelar")
                 }
             }
         }

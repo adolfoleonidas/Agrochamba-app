@@ -44,6 +44,7 @@ import agrochamba.com.ui.auth.ProfileScreen
 import agrochamba.com.ui.auth.RegisterChoiceScreen
 import agrochamba.com.ui.auth.RegisterScreen
 import agrochamba.com.ui.auth.SettingsScreen
+import agrochamba.com.ui.auth.FacebookPagesScreen
 import agrochamba.com.ui.jobs.CompanyProfileScreen
 import agrochamba.com.ui.jobs.CreateJobScreen
 import agrochamba.com.ui.jobs.EditJobScreen
@@ -79,6 +80,7 @@ sealed class Screen(val route: String, val label: String? = null, val icon: Imag
     object Favorites : Screen("favorites")
     object Saved : Screen("saved")
     object Settings : Screen("settings")
+    object FacebookPages : Screen("facebook_pages")
 }
 
 val bottomBarItems = listOf(Screen.Jobs, Screen.Routes, Screen.Dates, Screen.Rooms, Screen.Profile)
@@ -243,6 +245,9 @@ fun MainAppScreen() {
             }
             composable(Screen.Settings.route) {
                 SettingsScreen(navController = navController)
+            }
+            composable(Screen.FacebookPages.route) {
+                FacebookPagesScreen(navController = navController)
             }
         }
     }

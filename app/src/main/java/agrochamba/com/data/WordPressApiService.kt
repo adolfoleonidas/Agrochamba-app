@@ -204,6 +204,67 @@ interface WordPressApiService {
         @Path("id") id: Int,
         @Body reason: Map<String, String>? = null
     ): Response<Unit>
+
+    // ==========================================
+    // ENDPOINTS DE IA (Mejora de texto y OCR)
+    // ==========================================
+    
+    @GET("agrochamba/v1/ai/usage")
+    suspend fun getAIUsageStatus(
+        @Header("Authorization") token: String
+    ): AIUsageStatusResponse
+    
+    @POST("agrochamba/v1/ai/enhance-text")
+    suspend fun enhanceText(
+        @Header("Authorization") token: String,
+        @Body data: Map<String, String>
+    ): AIEnhanceTextResponse
+    
+    @POST("agrochamba/v1/ai/generate-title")
+    suspend fun generateTitle(
+        @Header("Authorization") token: String,
+        @Body data: Map<String, String>
+    ): AIGenerateTitleResponse
+    
+    @POST("agrochamba/v1/ai/ocr")
+    suspend fun extractTextFromImage(
+        @Header("Authorization") token: String,
+        @Body data: Map<String, @JvmSuppressWildcards Any>
+    ): AIOCRResponse
+    
+    // ==========================================
+    // ENDPOINTS DE GESTIÓN DE PÁGINAS DE FACEBOOK
+    // ==========================================
+    
+    @GET("agrochamba/v1/facebook/pages")
+    suspend fun getFacebookPages(
+        @Header("Authorization") token: String
+    ): FacebookPagesResponse
+    
+    @POST("agrochamba/v1/facebook/pages")
+    suspend fun addFacebookPage(
+        @Header("Authorization") token: String,
+        @Body data: FacebookPageRequest
+    ): FacebookPageResponse
+    
+    @PUT("agrochamba/v1/facebook/pages/{id}")
+    suspend fun updateFacebookPage(
+        @Header("Authorization") token: String,
+        @Path("id") pageId: String,
+        @Body data: Map<String, @JvmSuppressWildcards Any>
+    ): FacebookPageResponse
+    
+    @DELETE("agrochamba/v1/facebook/pages/{id}")
+    suspend fun deleteFacebookPage(
+        @Header("Authorization") token: String,
+        @Path("id") pageId: String
+    ): FacebookPageDeleteResponse
+    
+    @POST("agrochamba/v1/facebook/pages/{id}/test")
+    suspend fun testFacebookPage(
+        @Header("Authorization") token: String,
+        @Path("id") pageId: String
+    ): FacebookPageTestResponse
 }
 
 object WordPressApi {
