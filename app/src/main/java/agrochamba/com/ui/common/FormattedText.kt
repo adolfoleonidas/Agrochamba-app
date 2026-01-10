@@ -281,9 +281,8 @@ private fun String.htmlToMarkdownForDisplay(): String {
         ""
     )
     
-    // SEGUNDO: Decodificar entidades HTML como &#8212; (em dash), &nbsp;, etc.
-    // Esto debe hacerse ANTES de procesar las etiquetas HTML
-    markdown = decodeHtmlEntities(markdown)
+    // SEGUNDO: Decodificar SOLO entidades HTML numéricas y nombradas (NO usar Html.fromHtml que elimina tags)
+    markdown = decodeHtmlEntitiesOnly(markdown)
     
     // Convertir <strong> y <b> a **
     markdown = Regex("<strong>(.*?)</strong>", RegexOption.DOT_MATCHES_ALL).replace(markdown) { 
@@ -301,26 +300,36 @@ private fun String.htmlToMarkdownForDisplay(): String {
         "*${it.groupValues[1]}*"
     }
     
-    // Convertir listas numeradas
-    markdown = Regex("<ol>.*?</ol>", RegexOption.DOT_MATCHES_ALL).replace(markdown) { listMatch ->
+    // Convertir listas numeradas (manejar tanto con saltos de línea como sin ellos)
+    markdown = Regex("<ol[^>]*>(.*?)</ol>", setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)).replace(markdown) { listMatch ->
         var counter = 1
-        Regex("<li>(.*?)</li>", RegexOption.DOT_MATCHES_ALL).replace(listMatch.value) { liMatch ->
-            "${counter++}. ${liMatch.groupValues[1].trim()}\n"
+        val listContent = listMatch.groupValues[1]
+        val items = Regex("<li[^>]*>(.*?)</li>", setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)).replace(listContent) { liMatch ->
+            val itemContent = liMatch.groupValues[1].trim()
+                .replace(Regex("<[^>]+>"), "") // Limpiar HTML interno
+                .replace(Regex("\\s+"), " ") // Normalizar espacios
+            "${counter++}. $itemContent\n"
         }
+        "\n$items"
     }
     
-    // Convertir listas con viñetas
-    markdown = Regex("<ul>.*?</ul>", RegexOption.DOT_MATCHES_ALL).replace(markdown) { listMatch ->
-        Regex("<li>(.*?)</li>", RegexOption.DOT_MATCHES_ALL).replace(listMatch.value) { liMatch ->
-            "- ${liMatch.groupValues[1].trim()}\n"
+    // Convertir listas con viñetas (manejar tanto con saltos de línea como sin ellos)
+    markdown = Regex("<ul[^>]*>(.*?)</ul>", setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)).replace(markdown) { listMatch ->
+        val listContent = listMatch.groupValues[1]
+        val items = Regex("<li[^>]*>(.*?)</li>", setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)).replace(listContent) { liMatch ->
+            val itemContent = liMatch.groupValues[1].trim()
+                .replace(Regex("<[^>]+>"), "") // Limpiar HTML interno
+                .replace(Regex("\\s+"), " ") // Normalizar espacios
+            "- $itemContent\n"
         }
+        "\n$items"
     }
     
     // Convertir <p> preservando saltos de línea exactos
     markdown = Regex("<p[^>]*>(.*?)</p>", RegexOption.DOT_MATCHES_ALL).replace(markdown) { 
         val content = it.groupValues[1]
         // Preservar el contenido tal cual, incluyendo saltos de línea internos
-        "$content\n"
+        "$content\n\n"
     }
     
     // Convertir <br> a saltos de línea simples
@@ -329,31 +338,101 @@ private fun String.htmlToMarkdownForDisplay(): String {
     // Limpiar HTML restante pero preservar saltos de línea
     markdown = Regex("<[^>]+>").replace(markdown, "")
     
-    // NO limpiar saltos de línea múltiples - respetar exactamente lo que el usuario escribió
-    return markdown
+    // Limpiar saltos de línea excesivos (más de 2 consecutivos)
+    markdown = Regex("\\n{3,}").replace(markdown, "\n\n")
+    
+    return markdown.trim()
 }
 
 /**
- * Decodifica entidades HTML como &nbsp;, &amp;, etc.
- * PRESERVA los guiones tal como están escritos (---, --, etc.)
- * Solo decodifica entidades HTML estándar, sin convertir guiones
+ * Decodifica SOLO entidades HTML sin eliminar etiquetas HTML.
+ * Convierte &nbsp;, &amp;, &#8212;, etc. a sus caracteres correspondientes.
+ * NO usa Html.fromHtml porque eso eliminaría las etiquetas HTML.
  */
-private fun decodeHtmlEntities(text: String): String {
-    // Usar Html.fromHtml para decodificar entidades HTML estándar
-    // Esto convierte &nbsp; a espacio, &amp; a &, &lt; a <, &gt; a >, etc.
-    // PERO preserva los guiones tal como están
-    val decoded = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-        Html.fromHtml(text, Html.FROM_HTML_MODE_LEGACY).toString()
-    } else {
-        @Suppress("DEPRECATION")
-        Html.fromHtml(text).toString()
+private fun decodeHtmlEntitiesOnly(text: String): String {
+    var result = text
+    
+    // Decodificar entidades numéricas decimales (&#123;)
+    result = Regex("&#(\\d+);").replace(result) { match ->
+        val code = match.groupValues[1].toIntOrNull()
+        if (code != null && code in 0..0x10FFFF) {
+            try {
+                String(Character.toChars(code))
+            } catch (e: Exception) {
+                match.value
+            }
+        } else {
+            match.value
+        }
     }
     
-    // Si el usuario escribió --- en el editor, debe mostrarse como ---
-    // Si hay &#8212; en el HTML, se decodificará a — (em dash)
-    // Pero si el usuario escribió --- originalmente, debe preservarse
-    // No hacer conversiones automáticas de guiones
-    return decoded
+    // Decodificar entidades numéricas hexadecimales (&#x1A;)
+    result = Regex("&#x([0-9A-Fa-f]+);").replace(result) { match ->
+        val code = match.groupValues[1].toIntOrNull(16)
+        if (code != null && code in 0..0x10FFFF) {
+            try {
+                String(Character.toChars(code))
+            } catch (e: Exception) {
+                match.value
+            }
+        } else {
+            match.value
+        }
+    }
+    
+    // Decodificar entidades nombradas comunes
+    val namedEntities = mapOf(
+        "&nbsp;" to " ",
+        "&amp;" to "&",
+        "&lt;" to "<",
+        "&gt;" to ">",
+        "&quot;" to "\"",
+        "&apos;" to "'",
+        "&ndash;" to "–",
+        "&mdash;" to "—",
+        "&lsquo;" to "'",
+        "&rsquo;" to "'",
+        "&ldquo;" to """,
+        "&rdquo;" to """,
+        "&bull;" to "•",
+        "&hellip;" to "…",
+        "&copy;" to "©",
+        "&reg;" to "®",
+        "&trade;" to "™",
+        "&euro;" to "€",
+        "&pound;" to "£",
+        "&yen;" to "¥",
+        "&cent;" to "¢",
+        "&deg;" to "°",
+        "&plusmn;" to "±",
+        "&times;" to "×",
+        "&divide;" to "÷",
+        "&frac12;" to "½",
+        "&frac14;" to "¼",
+        "&frac34;" to "¾",
+        "&iexcl;" to "¡",
+        "&iquest;" to "¿",
+        "&ntilde;" to "ñ",
+        "&Ntilde;" to "Ñ",
+        "&aacute;" to "á",
+        "&eacute;" to "é",
+        "&iacute;" to "í",
+        "&oacute;" to "ó",
+        "&uacute;" to "ú",
+        "&Aacute;" to "Á",
+        "&Eacute;" to "É",
+        "&Iacute;" to "Í",
+        "&Oacute;" to "Ó",
+        "&Uacute;" to "Ú",
+        "&uuml;" to "ü",
+        "&Uuml;" to "Ü"
+    )
+    
+    namedEntities.forEach { (entity, char) ->
+        result = result.replace(entity, char, ignoreCase = true)
+    }
+    
+    return result
 }
 
 /**
