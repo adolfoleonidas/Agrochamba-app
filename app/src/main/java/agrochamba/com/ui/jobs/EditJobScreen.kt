@@ -790,10 +790,11 @@ fun EditJobScreen(
             isProcessing = uiState.isOCRProcessing,
             onExistingImageSelected = { imageUrl ->
                 showOCRDialog = false
-                // Extraer texto de la imagen existente
+                // Extraer texto de la imagen existente (ya es URL HTTP)
                 viewModel.extractTextFromImage(
                     imageUrl = imageUrl,
-                    enhance = true
+                    enhance = true,
+                    context = null // No necesita context porque ya es URL HTTP
                 ) { extractedText, enhancedText ->
                     val textToUse = enhancedText ?: extractedText
                     if (textToUse.isNotBlank()) {
@@ -807,10 +808,11 @@ fun EditJobScreen(
             },
             onNewImageSelected = { uri ->
                 showOCRDialog = false
-                // Extraer texto de la nueva imagen
+                // Extraer texto de la nueva imagen (necesita subirse primero)
                 viewModel.extractTextFromImage(
                     imageUrl = uri.toString(),
-                    enhance = true
+                    enhance = true,
+                    context = context
                 ) { extractedText, enhancedText ->
                     val textToUse = enhancedText ?: extractedText
                     if (textToUse.isNotBlank()) {

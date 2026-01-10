@@ -242,16 +242,47 @@ class CreateJobViewModel @Inject constructor() : androidx.lifecycle.ViewModel() 
 
     /**
      * Extraer texto de imagen (OCR) y opcionalmente mejorarlo
+     * Soporta tanto URLs HTTP como URIs locales (content://)
      */
     fun extractTextFromImage(
         imageUrl: String,
         enhance: Boolean = true,
+        context: android.content.Context? = null,
         onResult: (extractedText: String, enhancedText: String?) -> Unit
     ) {
         viewModelScope.launch {
             uiState = uiState.copy(isOCRProcessing = true, aiError = null, aiSuccess = null)
+            
+            // Determinar si es un URI local que necesita subirse primero
+            val finalImageUrl: String
+            if (imageUrl.startsWith("content://") || imageUrl.startsWith("file://")) {
+                // Es un URI local, necesitamos subir la imagen primero
+                if (context == null) {
+                    uiState = uiState.copy(
+                        isOCRProcessing = false,
+                        aiError = "Error: No se puede procesar imagen local sin contexto"
+                    )
+                    return@launch
+                }
+                
+                uiState = uiState.copy(loadingMessage = "Subiendo imagen...")
+                
+                val uploadResult = uploadImageForOCR(context, android.net.Uri.parse(imageUrl))
+                if (uploadResult == null) {
+                    uiState = uiState.copy(
+                        isOCRProcessing = false,
+                        aiError = "Error al subir la imagen para OCR"
+                    )
+                    return@launch
+                }
+                finalImageUrl = uploadResult
+                uiState = uiState.copy(loadingMessage = "Extrayendo texto...")
+            } else {
+                // Ya es una URL HTTP, usarla directamente
+                finalImageUrl = imageUrl
+            }
 
-            when (val result = AIService.extractTextFromImage(imageUrl = imageUrl, enhance = enhance)) {
+            when (val result = AIService.extractTextFromImage(imageUrl = finalImageUrl, enhance = enhance)) {
                 is AIService.AIResult.Success -> {
                     updateAIUsageFromService()
                     uiState = uiState.copy(
@@ -281,6 +312,40 @@ class CreateJobViewModel @Inject constructor() : androidx.lifecycle.ViewModel() 
                     // Already handling in isOCRProcessing
                 }
             }
+        }
+    }
+    
+    /**
+     * Subir imagen temporalmente para OCR
+     */
+    private suspend fun uploadImageForOCR(context: android.content.Context, uri: android.net.Uri): String? {
+        return try {
+            val token = AuthManager.token ?: return null
+            
+            val inputStream = context.contentResolver.openInputStream(uri)
+            val bytes = inputStream?.readBytes()
+            inputStream?.close()
+            
+            if (bytes == null || bytes.isEmpty()) return null
+            
+            val mimeType = context.contentResolver.getType(uri) ?: "image/jpeg"
+            val mediaType = mimeType.toMediaTypeOrNull() ?: "image/jpeg".toMediaTypeOrNull()
+            val fileName = "ocr_temp_${System.currentTimeMillis()}.jpg"
+            
+            val requestFile = okhttp3.RequestBody.create(mediaType, bytes)
+            val body = MultipartBody.Part.createFormData("file", fileName, requestFile)
+            
+            val mediaItem = WordPressApi.retrofitService.uploadImage(
+                "Bearer $token",
+                body,
+                emptyMap()
+            )
+            
+            // Retornar la URL de la imagen subida
+            mediaItem.source_url
+        } catch (e: Exception) {
+            Log.e("CreateJobViewModel", "Error uploading image for OCR", e)
+            null
         }
     }
 

@@ -674,7 +674,8 @@ fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel 
                 // Extraer texto de la imagen seleccionada
                 viewModel.extractTextFromImage(
                     imageUrl = uri.toString(),
-                    enhance = true
+                    enhance = true,
+                    context = context
                 ) { extractedText, enhancedText ->
                     // Usar el texto mejorado si está disponible, sino el extraído
                     val textToUse = enhancedText ?: extractedText
