@@ -981,6 +981,61 @@ function agrochamba_make_content_clickable($content) {
 .trabajo-descripcion-text {
     line-height: 1.8;
     color: #333;
+    font-size: 16px;
+}
+
+/* Estilos para listas en la descripción */
+.trabajo-descripcion-text ul,
+.trabajo-descripcion-text ol {
+    margin: 16px 0;
+    padding-left: 24px;
+}
+
+.trabajo-descripcion-text ul {
+    list-style-type: disc;
+}
+
+.trabajo-descripcion-text ol {
+    list-style-type: decimal;
+}
+
+.trabajo-descripcion-text li {
+    margin-bottom: 8px;
+    padding-left: 8px;
+    line-height: 1.6;
+}
+
+.trabajo-descripcion-text li::marker {
+    color: #0066cc;
+    font-weight: 600;
+}
+
+/* Estilos para texto formateado */
+.trabajo-descripcion-text strong,
+.trabajo-descripcion-text b {
+    font-weight: 700;
+    color: #1a1a1a;
+}
+
+.trabajo-descripcion-text em,
+.trabajo-descripcion-text i {
+    font-style: italic;
+}
+
+/* Párrafos con mejor espaciado */
+.trabajo-descripcion-text p {
+    margin-bottom: 16px;
+}
+
+.trabajo-descripcion-text p:last-child {
+    margin-bottom: 0;
+}
+
+/* Palabras clave destacadas - detectadas automáticamente */
+.trabajo-descripcion-text strong:first-of-type,
+.trabajo-descripcion-text b:first-of-type {
+    display: inline-block;
+    margin-top: 8px;
 }
 
 .responsabilidades-list {
