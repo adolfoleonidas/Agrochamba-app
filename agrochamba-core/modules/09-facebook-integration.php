@@ -589,8 +589,57 @@ if (!function_exists('agrochamba_html_to_facebook_text')) {
         
         $text = $html;
         
-        // Paso 1: Convertir palabras clave en negrita a formato destacado
-        // Detectar patrones como <strong>Requisitos:</strong> y convertir a 📋 REQUISITOS:
+        // Paso 0: Normalizar saltos de línea y espacios en el HTML
+        $text = str_replace(array("\r\n", "\r"), "\n", $text);
+        
+        // Paso 1: Convertir listas PRIMERO (antes de procesar negrita)
+        // Esto asegura que las listas se conviertan correctamente
+        
+        // Convertir listas numeradas <ol> a números con emoji
+        $text = preg_replace_callback(
+            '/<ol[^>]*>(.*?)<\/ol>/is',
+            function($matches) {
+                $list_content = $matches[1];
+                $counter = 1;
+                $number_emojis = array('1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟');
+                $items = array();
+                
+                preg_match_all('/<li[^>]*>(.*?)<\/li>/is', $list_content, $li_matches);
+                foreach ($li_matches[1] as $li_content) {
+                    $item_content = trim(strip_tags($li_content));
+                    if (!empty($item_content)) {
+                        $emoji = isset($number_emojis[$counter - 1]) ? $number_emojis[$counter - 1] : $counter . '.';
+                        $items[] = $emoji . ' ' . $item_content;
+                        $counter++;
+                    }
+                }
+                
+                return "\n" . implode("\n", $items) . "\n";
+            },
+            $text
+        );
+        
+        // Convertir listas con viñetas <ul> a emojis
+        $text = preg_replace_callback(
+            '/<ul[^>]*>(.*?)<\/ul>/is',
+            function($matches) {
+                $list_content = $matches[1];
+                $items = array();
+                
+                preg_match_all('/<li[^>]*>(.*?)<\/li>/is', $list_content, $li_matches);
+                foreach ($li_matches[1] as $li_content) {
+                    $item_content = trim(strip_tags($li_content));
+                    if (!empty($item_content)) {
+                        $items[] = '✅ ' . $item_content;
+                    }
+                }
+                
+                return "\n" . implode("\n", $items) . "\n";
+            },
+            $text
+        );
+        
+        // Paso 2: Convertir palabras clave en negrita a formato destacado
         $keyword_patterns = array(
             'requisitos' => '📋',
             'beneficios' => '🎁',
@@ -607,9 +656,11 @@ if (!function_exists('agrochamba_html_to_facebook_text')) {
             'salario' => '💰',
             'experiencia' => '💼',
             'detalles' => '📄',
+            'oportunidades' => '💼',
+            'fechas' => '📅',
         );
         
-        // Convertir <strong>Palabra:</strong> a EMOJI PALABRA:
+        // Convertir <strong>Palabra:</strong> a EMOJI PALABRA: (con salto de línea después)
         $text = preg_replace_callback(
             '/<(strong|b)>([^<]+)<\/(strong|b)>/i',
             function($matches) use ($keyword_patterns) {
@@ -620,8 +671,9 @@ if (!function_exists('agrochamba_html_to_facebook_text')) {
                 foreach ($keyword_patterns as $keyword => $emoji) {
                     if (strpos($content_lower, $keyword) !== false) {
                         // Es una palabra clave, agregar emoji y poner en mayúsculas
-                        $clean_content = preg_replace('/[:\s]+$/', '', $content); // Quitar : final
-                        return "\n" . $emoji . ' ' . mb_strtoupper($clean_content, 'UTF-8') . ':';
+                        $clean_content = preg_replace('/[:\s]+$/', '', $content);
+                        // Agregar salto de línea antes Y después para que se vea separado
+                        return "\n\n" . $emoji . ' ' . mb_strtoupper($clean_content, 'UTF-8') . ":\n";
                     }
                 }
                 
@@ -631,70 +683,46 @@ if (!function_exists('agrochamba_html_to_facebook_text')) {
             $text
         );
         
-        // Paso 2: Convertir listas numeradas <ol> a números con emoji
-        $text = preg_replace_callback(
-            '/<ol[^>]*>(.*?)<\/ol>/is',
-            function($matches) {
-                $list_content = $matches[1];
-                $counter = 1;
-                $number_emojis = array('1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟');
-                
-                $result = preg_replace_callback(
-                    '/<li[^>]*>(.*?)<\/li>/is',
-                    function($li_matches) use (&$counter, $number_emojis) {
-                        $item_content = trim(strip_tags($li_matches[1]));
-                        $emoji = isset($number_emojis[$counter - 1]) ? $number_emojis[$counter - 1] : $counter . '.';
-                        $counter++;
-                        return $emoji . ' ' . $item_content . "\n";
-                    },
-                    $list_content
-                );
-                
-                return "\n" . $result;
-            },
-            $text
-        );
-        
-        // Paso 3: Convertir listas con viñetas <ul> a emojis
-        $text = preg_replace_callback(
-            '/<ul[^>]*>(.*?)<\/ul>/is',
-            function($matches) {
-                $list_content = $matches[1];
-                
-                $result = preg_replace_callback(
-                    '/<li[^>]*>(.*?)<\/li>/is',
-                    function($li_matches) {
-                        $item_content = trim(strip_tags($li_matches[1]));
-                        return '✅ ' . $item_content . "\n";
-                    },
-                    $list_content
-                );
-                
-                return "\n" . $result;
-            },
-            $text
-        );
-        
-        // Paso 4: Convertir elementos de bloque a saltos de línea
+        // Paso 3: Convertir elementos de bloque a saltos de línea
         $text = preg_replace('/<br\s*\/?>/i', "\n", $text);
-        $text = preg_replace('/<\/p>/i', "\n\n", $text);
+        $text = preg_replace('/<\/p>/i', "\n", $text);
         $text = preg_replace('/<p[^>]*>/i', "", $text);
         $text = preg_replace('/<\/div>/i', "\n", $text);
         $text = preg_replace('/<div[^>]*>/i', "", $text);
         
-        // Paso 5: Convertir <em>/<i> a _texto_ (simular cursiva)
+        // Paso 4: Convertir <em>/<i> a _texto_ (simular cursiva)
         $text = preg_replace('/<(em|i)>([^<]+)<\/(em|i)>/i', '_$2_', $text);
         
-        // Paso 6: Remover cualquier HTML restante
+        // Paso 5: Remover cualquier HTML restante
         $text = wp_strip_all_tags($text);
         
-        // Paso 7: Decodificar entidades HTML
+        // Paso 6: Decodificar entidades HTML
         $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         
-        // Paso 8: Limpiar espacios y saltos de línea excesivos
-        $text = preg_replace('/[ \t]+/', ' ', $text); // Múltiples espacios a uno
-        $text = preg_replace('/\n{3,}/', "\n\n", $text); // Máximo 2 saltos de línea
-        $text = preg_replace('/^\s+|\s+$/m', '', $text); // Trim cada línea
+        // Paso 7: Limpiar espacios horizontales (NO tocar saltos de línea aún)
+        $text = preg_replace('/[ \t]+/', ' ', $text); // Múltiples espacios a uno solo
+        
+        // Paso 8: Procesar línea por línea para limpiar sin perder estructura
+        $lines = explode("\n", $text);
+        $cleaned_lines = array();
+        $prev_was_empty = false;
+        
+        foreach ($lines as $line) {
+            $trimmed = trim($line);
+            
+            if (empty($trimmed)) {
+                // Línea vacía - solo agregar si la anterior no era vacía (evitar múltiples líneas vacías)
+                if (!$prev_was_empty && count($cleaned_lines) > 0) {
+                    $cleaned_lines[] = '';
+                    $prev_was_empty = true;
+                }
+            } else {
+                $cleaned_lines[] = $trimmed;
+                $prev_was_empty = false;
+            }
+        }
+        
+        $text = implode("\n", $cleaned_lines);
         $text = trim($text);
         
         return $text;
