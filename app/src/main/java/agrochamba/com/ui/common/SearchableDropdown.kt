@@ -71,29 +71,47 @@ fun SearchableDropdown(
 ) {
     var showDialog by remember { mutableStateOf(false) }
 
-    // Campo que muestra la selección actual
-    OutlinedTextField(
-        value = selectedItem?.name ?: "",
-        onValueChange = {},
-        readOnly = true,
-        enabled = enabled,
-        label = { Text(label) },
-        leadingIcon = leadingIcon?.let { { Icon(it, contentDescription = null) } },
-        trailingIcon = {
-            Icon(
-                Icons.Default.ExpandMore,
-                contentDescription = "Expandir",
-                tint = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant 
-                       else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-            )
-        },
+    // Envolver en Box clickable para asegurar que el clic funcione
+    Box(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(enabled = enabled) { showDialog = true },
-        colors = TextFieldDefaults.colors(
-            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            .clickable(enabled = enabled) { 
+                showDialog = true 
+            }
+    ) {
+        // Campo que muestra la selección actual
+        OutlinedTextField(
+            value = selectedItem?.name ?: "",
+            onValueChange = {},
+            readOnly = true,
+            enabled = false, // Deshabilitado para que no consuma toques
+            label = { Text(label) },
+            leadingIcon = leadingIcon?.let { { Icon(it, contentDescription = null) } },
+            trailingIcon = {
+                Icon(
+                    Icons.Default.ExpandMore,
+                    contentDescription = "Expandir",
+                    tint = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant 
+                           else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                )
+            },
+            modifier = Modifier.fillMaxWidth(),
+            colors = TextFieldDefaults.colors(
+                disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                disabledContainerColor = if (enabled) 
+                    MaterialTheme.colorScheme.surface 
+                else 
+                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                disabledIndicatorColor = if (enabled)
+                    MaterialTheme.colorScheme.outline
+                else
+                    MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+            )
         )
-    )
+    }
 
     // Diálogo de selección con búsqueda
     if (showDialog) {
