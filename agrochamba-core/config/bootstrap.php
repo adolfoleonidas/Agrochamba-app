@@ -33,3 +33,4 @@ $autoloader->register();
 require_once AGROCHAMBA_INCLUDES_DIR . '/functions.php';
 require_once AGROCHAMBA_INCLUDES_DIR . '/hooks.php';
 require_once AGROCHAMBA_INCLUDES_DIR . '/empresa-functions.php';
+require_once AGROCHAMBA_INCLUDES_DIR . '/peru-locations.php';

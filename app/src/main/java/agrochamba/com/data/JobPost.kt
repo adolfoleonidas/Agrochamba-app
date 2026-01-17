@@ -5,13 +5,16 @@ import com.squareup.moshi.Json
 // El molde principal, ahora con todos los metadatos
 data class JobPost(
     val id: Int,
-    val link: String?,
-    val date: String?,
-    val title: Title?,
-    val content: Content?,
-    val excerpt: Content?,
-    val meta: JobMeta?, // Objeto que contiene todos los campos personalizados
-    @Json(name = "_embedded") val embedded: Embedded?
+    val link: String? = null,
+    val date: String? = null,
+    val status: String? = null, // publish, pending, draft, trash
+    val title: Title? = null,
+    val content: Content? = null,
+    val excerpt: Content? = null,
+    @Json(name = "featured_media") val featuredMedia: Int? = null,
+    @Json(name = "featured_image_url") val featuredImageUrl: String? = null,
+    val meta: JobMeta? = null, // Objeto que contiene todos los campos personalizados
+    @Json(name = "_embedded") val embedded: Embedded? = null
 )
 
 data class Title(
@@ -35,7 +38,8 @@ data class JobMeta(
     val requisitos: String?,
     val beneficios: String?,
     @Json(name = "gallery_ids") val galleryIds: List<Int>?, // IDs de las imágenes de la galería
-    @Json(name = "facebook_post_id") val facebookPostId: String? // ID del post en Facebook si fue publicado
+    @Json(name = "facebook_post_id") val facebookPostId: String?, // ID del post en Facebook si fue publicado
+    @Json(name = "_ubicacion_completa") val ubicacionCompleta: UbicacionCompleta? = null
 )
 
 

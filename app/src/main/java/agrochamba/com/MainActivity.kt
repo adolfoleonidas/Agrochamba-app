@@ -48,10 +48,11 @@ import agrochamba.com.ui.auth.FacebookPagesScreen
 import agrochamba.com.ui.jobs.CompanyProfileScreen
 import agrochamba.com.ui.jobs.CreateJobScreen
 import agrochamba.com.ui.jobs.EditJobScreen
+import agrochamba.com.ui.jobs.EditJobByIdScreen
 import agrochamba.com.ui.jobs.FavoritesScreen
 import agrochamba.com.ui.jobs.JobDetailScreen
 import agrochamba.com.ui.jobs.JobsScreen
-import agrochamba.com.ui.jobs.ModerationScreen
+import agrochamba.com.ui.moderation.ModerationScreen
 import agrochamba.com.ui.jobs.MyJobsScreen
 import agrochamba.com.ui.jobs.SavedScreen
 import agrochamba.com.ui.theme.AgrochambaTheme
@@ -81,6 +82,7 @@ sealed class Screen(val route: String, val label: String? = null, val icon: Imag
     object Saved : Screen("saved")
     object Settings : Screen("settings")
     object FacebookPages : Screen("facebook_pages")
+    object SedesManagement : Screen("sedes_management")
 }
 
 val bottomBarItems = listOf(Screen.Jobs, Screen.Routes, Screen.Dates, Screen.Rooms, Screen.Profile)
@@ -89,9 +91,31 @@ val bottomBarItems = listOf(Screen.Jobs, Screen.Routes, Screen.Dates, Screen.Roo
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Handler global de excepciones para debugging
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            android.util.Log.e("CRASH_HANDLER", "💥💥💥 APP CRASH 💥💥💥")
+            android.util.Log.e("CRASH_HANDLER", "Thread: ${thread.name}")
+            android.util.Log.e("CRASH_HANDLER", "Exception: ${throwable.javaClass.simpleName}")
+            android.util.Log.e("CRASH_HANDLER", "Message: ${throwable.message}")
+            android.util.Log.e("CRASH_HANDLER", "StackTrace:", throwable)
+            throwable.cause?.let { cause ->
+                android.util.Log.e("CRASH_HANDLER", "Caused by: ${cause.javaClass.simpleName}")
+                android.util.Log.e("CRASH_HANDLER", "Cause message: ${cause.message}")
+                android.util.Log.e("CRASH_HANDLER", "Cause StackTrace:", cause)
+            }
+            // Re-throw para que el sistema maneje el crash normalmente
+            throw throwable
+        }
+        
+        android.util.Log.d("MainActivity", "🚀 onCreate iniciado")
         AuthManager.init(this)
+        android.util.Log.d("MainActivity", "✅ AuthManager inicializado")
         SettingsManager.init(this)
+        android.util.Log.d("MainActivity", "✅ SettingsManager inicializado")
+        
         setContent {
+            android.util.Log.d("MainActivity", "🎨 setContent ejecutando")
             AgrochambaTheme {
                 AppEntry()
             }
@@ -108,12 +132,13 @@ fun AppEntry() {
     LaunchedEffect(isInitializing, isLoggedIn) {
         android.util.Log.d(
             "AppEntry",
-            "state => isInitializing=${isInitializing}, isLoggedIn=${isLoggedIn}, token=${AuthManager.token}, displayName=${AuthManager.userDisplayName}"
+            "🔄 state => isInitializing=${isInitializing}, isLoggedIn=${isLoggedIn}, token=${AuthManager.token?.take(20)}..., displayName=${AuthManager.userDisplayName}"
         )
     }
 
     // UI de diagnóstico (visible para el usuario) mientras inicializa
     if (isInitializing) {
+        android.util.Log.d("AppEntry", "⏳ Mostrando pantalla de inicialización...")
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 CircularProgressIndicator()
@@ -131,8 +156,10 @@ fun AppEntry() {
             }
         }
     } else if (isLoggedIn) {
+        android.util.Log.d("AppEntry", "✅ Usuario logueado, mostrando MainAppScreen...")
         MainAppScreen()
     } else {
+        android.util.Log.d("AppEntry", "🔐 Usuario no logueado, mostrando AuthNavigator...")
         AuthNavigator()
     }
 }
@@ -152,18 +179,24 @@ fun AuthNavigator() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainAppScreen() {
+    android.util.Log.d("MainAppScreen", "🏠 MainAppScreen() INICIADO")
+    
     val navController = rememberNavController()
+    android.util.Log.d("MainAppScreen", "✅ NavController creado")
+    
     // Observar directamente el estado de roles para que Compose detecte cambios
     // Leer userRoles directamente - Compose detectará cambios porque es un mutableStateOf
     val userRoles = AuthManager.userRoles
+    android.util.Log.d("MainAppScreen", "📋 UserRoles: $userRoles")
+    
     val isUserEnterprise = remember(userRoles) { 
         userRoles.contains("employer") || userRoles.contains("administrator")
     }
+    android.util.Log.d("MainAppScreen", "🏢 isUserEnterprise: $isUserEnterprise")
     
     // Log para debugging
     LaunchedEffect(isUserEnterprise, userRoles) {
-        android.util.Log.d("MainAppScreen", "isUserEnterprise: $isUserEnterprise")
-        android.util.Log.d("MainAppScreen", "Roles del usuario: $userRoles")
+        android.util.Log.d("MainAppScreen", "🔄 LaunchedEffect - isUserEnterprise: $isUserEnterprise, Roles: $userRoles")
     }
 
     Scaffold(
@@ -227,6 +260,19 @@ fun MainAppScreen() {
                     )
                 } ?: navController.popBackStack()
             }
+            // Ruta para editar trabajo por ID (usado por moderación)
+            composable("${Screen.EditJob.route}/{jobId}") { backStackEntry ->
+                val jobId = backStackEntry.arguments?.getString("jobId")?.toIntOrNull()
+                if (jobId != null) {
+                    // Cargar el trabajo por ID y mostrar la pantalla de edición
+                    EditJobByIdScreen(
+                        jobId = jobId,
+                        navController = navController
+                    )
+                } else {
+                    navController.popBackStack()
+                }
+            }
             composable("${Screen.CompanyProfile.route}/{companyName}") { backStackEntry ->
                 val companyName = backStackEntry.arguments?.getString("companyName") ?: ""
                 CompanyProfileScreen(
@@ -235,7 +281,12 @@ fun MainAppScreen() {
                 )
             }
             composable(Screen.Moderation.route) {
-                ModerationScreen(navController = navController)
+                agrochamba.com.ui.moderation.ModerationScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToEditJob = { jobId -> 
+                        navController.navigate("${Screen.EditJob.route}/$jobId")
+                    }
+                )
             }
             composable(Screen.Favorites.route) {
                 FavoritesScreen(navController = navController)
@@ -248,6 +299,9 @@ fun MainAppScreen() {
             }
             composable(Screen.FacebookPages.route) {
                 FacebookPagesScreen(navController = navController)
+            }
+            composable(Screen.SedesManagement.route) {
+                agrochamba.com.ui.company.SedesManagementScreen(navController = navController)
             }
         }
     }

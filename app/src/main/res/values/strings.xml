@@ -23,6 +23,9 @@
     <string name="search_company">Buscar empresa…</string>
     <string name="no_results_found">No se encontraron resultados</string>
     
+    <!-- Mapbox -->
+    <string name="mapbox_access_token">pk.eyJ1IjoiYWRvbGZvbGVvbmlkYXMiLCJhIjoiY21jb2M2dWV5MWI0dTJqcTB5NGM3MGUxbyJ9.zx7Kv5EyUwJ7lB2-7F3GLg</string>
+    
     <!-- Facebook Pages -->
     <string name="facebook_pages_title">Páginas de Facebook</string>
     <string name="facebook_add_page">Agregar Página</string>

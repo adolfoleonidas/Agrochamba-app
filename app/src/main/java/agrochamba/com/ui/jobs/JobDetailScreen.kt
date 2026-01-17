@@ -51,6 +51,8 @@ import androidx.compose.runtime.remember
 import androidx.lifecycle.viewmodel.compose.viewModel
 import agrochamba.com.data.CompanyProfileResponse
 import agrochamba.com.data.WordPressApi
+import agrochamba.com.data.UbicacionCompleta
+import agrochamba.com.ui.common.LocationDetailView
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -219,6 +221,39 @@ private fun JobDetailContent(
     val companyName = terms.find { it.taxonomy == "empresa" }?.name
     val locationName = terms.find { it.taxonomy == "ubicacion" }?.name
     
+    // Usar ubicación completa del meta field si existe, sino parsear del nombre de taxonomía
+    val ubicacionCompleta = remember(job.meta?.ubicacionCompleta, locationName) {
+        // Prioridad 1: usar _ubicacion_completa del meta field
+        job.meta?.ubicacionCompleta?.let { return@remember it }
+        
+        // Prioridad 2: parsear del nombre de la taxonomía
+        if (locationName == null) return@remember null
+        
+        val parts = locationName.split(",").map { it.trim() }
+        when (parts.size) {
+            1 -> UbicacionCompleta(
+                departamento = parts[0],
+                provincia = parts[0],
+                distrito = parts[0]
+            )
+            2 -> UbicacionCompleta(
+                departamento = parts[1],
+                provincia = parts[0],
+                distrito = parts[0]
+            )
+            3 -> UbicacionCompleta(
+                departamento = parts[2],
+                provincia = parts[1],
+                distrito = parts[0]
+            )
+            else -> UbicacionCompleta(
+                departamento = parts.lastOrNull() ?: "",
+                provincia = parts.getOrNull(parts.size - 2) ?: "",
+                distrito = parts.firstOrNull() ?: ""
+            )
+        }
+    }
+    
     // Estado para información de la empresa
     var companyProfile by remember { mutableStateOf<CompanyProfileResponse?>(null) }
     var isLoadingCompany by remember { mutableStateOf(false) }
@@ -314,24 +349,26 @@ private fun JobDetailContent(
 
             Spacer(Modifier.height(20.dp))
 
-            // --- INFORMACIÓN PRINCIPAL EN FILA ---
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (locationName != null) {
-                    SimpleInfoRow(icon = Icons.Default.LocationOn, text = locationName.htmlToString())
+            // --- SALARIO (en fila simple) ---
+            job.meta?.let {
+                val salario = when {
+                    !it.salarioMin.isNullOrBlank() && !it.salarioMax.isNullOrBlank() -> "S/ ${it.salarioMin} - S/ ${it.salarioMax}"
+                    !it.salarioMin.isNullOrBlank() -> "S/ ${it.salarioMin}+"
+                    else -> null
                 }
-                job.meta?.let {
-                    val salario = when {
-                        !it.salarioMin.isNullOrBlank() && !it.salarioMax.isNullOrBlank() -> "S/ ${it.salarioMin} - S/ ${it.salarioMax}"
-                        !it.salarioMin.isNullOrBlank() -> "S/ ${it.salarioMin}+"
-                        else -> null
-                    }
-                    if (salario != null) {
-                        SimpleInfoRow(icon = Icons.Default.AttachMoney, text = salario)
-                    }
+                if (salario != null) {
+                    SimpleInfoRow(icon = Icons.Default.AttachMoney, text = salario)
+                    Spacer(Modifier.height(16.dp))
+                }
+            }
+            
+            // --- UBICACIÓN COMPLETA (Departamento, Provincia, Distrito) ---
+            ubicacionCompleta?.let { ubicacion ->
+                if (ubicacion.departamento.isNotBlank()) {
+                    LocationDetailView(
+                        ubicacion = ubicacion,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
 

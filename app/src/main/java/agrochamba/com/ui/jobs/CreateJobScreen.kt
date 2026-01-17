@@ -62,8 +62,13 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import agrochamba.com.data.AuthManager
 import agrochamba.com.data.Category
+import agrochamba.com.data.UbicacionCompleta
+import agrochamba.com.data.SedeEmpresa
+import agrochamba.com.data.repository.LocationRepository
 import agrochamba.com.ui.common.RichTextEditor
 import agrochamba.com.ui.common.SearchableDropdown
+import agrochamba.com.ui.common.SmartLocationSelector
+import agrochamba.com.ui.common.LocationSearchField
 import agrochamba.com.utils.textToHtml
 import coil.compose.AsyncImage
 
@@ -85,7 +90,13 @@ fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel 
     var salarioMax by remember { mutableStateOf("") }
     var vacantes by remember { mutableStateOf("") }
     var selectedUbicacion by remember { mutableStateOf<Category?>(null) }
+    // Nueva ubicación estructurada (departamento, provincia, distrito)
+    var selectedUbicacionCompleta by remember { mutableStateOf<UbicacionCompleta?>(null) }
     var selectedEmpresa by remember { mutableStateOf<Category?>(null) }
+    
+    // Sedes de empresa cargadas desde el repositorio
+    val locationRepository = remember { LocationRepository.getInstance(context) }
+    val companySedes by locationRepository.companySedes.collectAsState(initial = emptyList())
     var selectedCultivo by remember { mutableStateOf<Category?>(null) }
     var selectedTipoPuesto by remember { mutableStateOf<Category?>(null) }
     var selectedCategoria by remember { mutableStateOf<Category?>(null) }
@@ -165,39 +176,72 @@ fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel 
                     // IMPORTANTE: Solo validar ubicación y empresa si es TRABAJO
                     if (tipoPublicacion == "trabajo") {
                         android.util.Log.d("CreateJobScreen", "Validando campos de TRABAJO")
-                        // Validaciones para trabajos
-                    if (selectedUbicacion == null) {
-                        Toast.makeText(context, "La ubicación es obligatoria", Toast.LENGTH_SHORT).show()
-                        return@BottomActionBar
-                    }
+                        android.util.Log.d("CreateJobScreen", "selectedUbicacionCompleta: $selectedUbicacionCompleta")
+                        android.util.Log.d("CreateJobScreen", "selectedUbicacion (Category): $selectedUbicacion")
+                        
+                        // Validación de ubicación: usar el nuevo sistema (UbicacionCompleta) como fuente principal
+                        // Una ubicación válida debe tener al menos el departamento seleccionado
+                        val ubicacionValida = selectedUbicacionCompleta != null && 
+                            selectedUbicacionCompleta!!.departamento.isNotBlank()
+                        
+                        if (!ubicacionValida) {
+                            Toast.makeText(context, "La ubicación es obligatoria", Toast.LENGTH_SHORT).show()
+                            return@BottomActionBar
+                        }
+                        
+                        // Sincronizar automáticamente el Category (para compatibilidad con backend)
+                        if (selectedUbicacion == null && selectedUbicacionCompleta != null) {
+                            val deptoName = selectedUbicacionCompleta!!.departamento
+                            selectedUbicacion = uiState.ubicaciones.find { cat ->
+                                cat.name.equals(deptoName, ignoreCase = true)
+                            }
+                            android.util.Log.d("CreateJobScreen", "Sincronizado Category: ${selectedUbicacion?.name} para departamento: $deptoName")
+                        }
                     
                         // Empresa es OPCIONAL - usar la seleccionada o la del usuario automáticamente
                         val empresaId = if (isAdmin) {
                             // Admin: puede seleccionar empresa o dejarla vacía
-                        selectedEmpresa?.id
-                    } else {
+                            selectedEmpresa?.id
+                        } else {
                             // Empresa normal: usar su empresa automáticamente si existe
-                        uiState.userCompanyId
-                    }
+                            uiState.userCompanyId
+                        }
                     
-                        val ubicacionIdValue = selectedUbicacion!!.id
+                        // ubicacion_id puede ser null si no existe un Category correspondiente al departamento
+                        // El backend puede trabajar con ubicacion_completa directamente
+                        val ubicacionIdValue = selectedUbicacion?.id
                         
                         val jobData = mutableMapOf<String, Any?>(
                             "post_type" to "trabajo",
-                        "title" to title.trim(),
-                        "content" to description.textToHtml(),
-                        "salario_min" to (salarioMin.toIntOrNull() ?: 0),
-                        "salario_max" to (salarioMax.toIntOrNull() ?: 0),
-                        "vacantes" to (vacantes.toIntOrNull() ?: 1),
-                            "ubicacion_id" to ubicacionIdValue,
-                        "cultivo_id" to selectedCultivo?.id,
-                        "tipo_puesto_id" to selectedTipoPuesto?.id,
-                        "alojamiento" to alojamiento,
-                        "transporte" to transporte,
-                        "alimentacion" to alimentacion,
+                            "title" to title.trim(),
+                            "content" to description.textToHtml(),
+                            "salario_min" to (salarioMin.toIntOrNull() ?: 0),
+                            "salario_max" to (salarioMax.toIntOrNull() ?: 0),
+                            "vacantes" to (vacantes.toIntOrNull() ?: 1),
+                            "cultivo_id" to selectedCultivo?.id,
+                            "tipo_puesto_id" to selectedTipoPuesto?.id,
+                            "alojamiento" to alojamiento,
+                            "transporte" to transporte,
+                            "alimentacion" to alimentacion,
                             "comentarios_habilitados" to comentariosHabilitados,
-                        "publish_to_facebook" to publishToFacebook
-                    )
+                            "publish_to_facebook" to publishToFacebook
+                        )
+                        
+                        // Agregar ubicacion_id solo si existe el Category correspondiente
+                        ubicacionIdValue?.let { jobData["ubicacion_id"] = it }
+                        
+                        // Agregar ubicación completa - SIEMPRE (es la fuente principal de datos de ubicación)
+                        // NOTA: El backend espera _ubicacion_completa (con underscore)
+                        selectedUbicacionCompleta?.let { ubicacion ->
+                            jobData["_ubicacion_completa"] = mapOf(
+                                "departamento" to ubicacion.departamento,
+                                "provincia" to ubicacion.provincia,
+                                "distrito" to ubicacion.distrito,
+                                "direccion" to (ubicacion.direccion ?: ""),
+                                "lat" to (ubicacion.obtenerCoordenadas()?.lat ?: 0.0),
+                                "lng" to (ubicacion.obtenerCoordenadas()?.lng ?: 0.0)
+                            )
+                        }
                         
                         // Agregar empresa_id solo si está presente (opcional)
                         empresaId?.let { jobData["empresa_id"] = it }
@@ -463,27 +507,63 @@ fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel 
                 // Ubicación y Empresa - uno debajo del otro (solo para trabajos)
                 if (tipoPublicacion == "trabajo") {
                     Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                        // Selector de Ubicación (arriba) - con búsqueda
-                        SearchableDropdown(
+                        // Selector de Ubicación Inteligente con Sedes
+                        // - Prioriza sedes existentes (flujo principal)
+                        // - Permite crear nueva ubicación (flujo secundario)
+                        // - Opción de guardar nueva ubicación como sede
+                        SmartLocationSelector(
+                            selectedLocation = selectedUbicacionCompleta,
+                            onLocationSelected = { ubicacion ->
+                                android.util.Log.d("CreateJobScreen", "Ubicación seleccionada: depto=${ubicacion.departamento}, prov=${ubicacion.provincia}, dist=${ubicacion.distrito}")
+                                selectedUbicacionCompleta = ubicacion
+                                
+                                // Buscar Category correspondiente al departamento para compatibilidad con el sistema anterior
+                                if (ubicacion.departamento.isNotBlank()) {
+                                    val deptoNormalizado = ubicacion.departamento.trim().lowercase()
+                                    
+                                    // Buscar coincidencia exacta primero
+                                    var matchingCategory = uiState.ubicaciones.find { cat ->
+                                        cat.name.trim().lowercase() == deptoNormalizado
+                                    }
+                                    
+                                    // Si no hay coincidencia exacta, buscar si contiene el nombre
+                                    if (matchingCategory == null) {
+                                        matchingCategory = uiState.ubicaciones.find { cat ->
+                                            cat.name.lowercase().contains(deptoNormalizado) ||
+                                            deptoNormalizado.contains(cat.name.lowercase())
+                                        }
+                                    }
+                                    
+                                    selectedUbicacion = matchingCategory
+                                    android.util.Log.d("CreateJobScreen", "Category sincronizado: ${matchingCategory?.name ?: "NO ENCONTRADO"}")
+                                }
+                            },
+                            sedes = companySedes,
+                            showSedesFirst = companySedes.isNotEmpty(),
+                            canManageSedes = true, // Empresas pueden crear sedes
+                            onSedeCreated = { nuevaSede ->
+                                // La sede ya se guarda en LocationRepository
+                                // Actualizar la lista local si es necesario
+                                android.util.Log.d("CreateJobScreen", "Nueva sede creada: ${nuevaSede.nombre}")
+                            },
                             label = "Ubicación *",
-                            items = uiState.ubicaciones,
-                            selectedItem = selectedUbicacion,
-                            onItemSelected = { cat -> selectedUbicacion = cat },
-                            modifier = Modifier.fillMaxWidth(),
-                            leadingIcon = Icons.Default.LocationOn,
-                            placeholder = "Buscar ubicación...",
-                            emptyMessage = "No se encontraron ubicaciones"
+                            placeholder = "Buscar distrito, provincia o departamento...",
+                            modifier = Modifier.fillMaxWidth()
                         )
                         
                         Spacer(Modifier.height(12.dp))
                         
-                        // Selector de Empresa (abajo) - SIEMPRE VISIBLE - con búsqueda
+                        // Selector de Empresa
+                        // - Admins: pueden seleccionar cualquier empresa
+                        // - Empresas: su empresa se asigna automáticamente (solo lectura)
+                        if (isAdmin) {
+                            // Admin: selector completo con búsqueda
                         SearchableDropdown(
                             label = "Empresa",
                             items = uiState.empresas,
                             selectedItem = selectedEmpresa,
                             onItemSelected = { cat -> 
-                                android.util.Log.d("CreateJobScreen", "Empresa seleccionada: ${cat.name}")
+                                    android.util.Log.d("CreateJobScreen", "Empresa seleccionada (admin): ${cat.name}")
                                 selectedEmpresa = cat 
                             },
                             modifier = Modifier.fillMaxWidth(),
@@ -491,6 +571,31 @@ fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel 
                             placeholder = "Buscar empresa...",
                             emptyMessage = "No se encontraron empresas"
                         )
+                        } else if (selectedEmpresa != null) {
+                            // Empresa normal: mostrar su empresa asignada (solo lectura)
+                            OutlinedTextField(
+                                value = selectedEmpresa?.name ?: "",
+                                onValueChange = {},
+                                readOnly = true,
+                                enabled = false,
+                                label = { Text("Empresa") },
+                                leadingIcon = { Icon(Icons.Default.Business, contentDescription = null) },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                                    disabledBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                                    disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                ),
+                                supportingText = {
+                                    Text(
+                                        "Tu empresa se asigna automáticamente",
+                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+                                    )
+                                }
+                            )
+                        }
+                        // Si no es admin y no tiene empresa, no mostrar nada (el trabajo se crea sin empresa)
                 }
                 
                 Spacer(Modifier.height(16.dp))

@@ -20,6 +20,7 @@ private val moshi = Moshi.Builder()
     .add(ContentAdapterFactory())
     .add(BooleanAdapterFactory())
     .add(EmpresaDataAdapterFactory())
+    .add(UbicacionCompletaAdapterFactory()) // Maneja _ubicacion_completa que puede ser objeto o array vacío
     .addLast(KotlinJsonAdapterFactory())
     .build()
 
@@ -49,6 +50,12 @@ interface WordPressApiService {
         @Query("page") page: Int,
         @Query("per_page") perPage: Int = 10
     ): List<JobPost>
+    
+    @GET("wp/v2/trabajos/{id}?_embed")
+    suspend fun getJobById(
+        @Header("Authorization") token: String,
+        @Path("id") id: Int
+    ): retrofit2.Response<JobPost>
 
     @GET("wp/v2/ubicacion?per_page=100")
     suspend fun getUbicaciones(): List<Category>
@@ -204,6 +211,54 @@ interface WordPressApiService {
         @Path("id") id: Int,
         @Body reason: Map<String, String>? = null
     ): Response<Unit>
+    
+    // Listar todos los trabajos (con paginación y filtros)
+    @GET("agrochamba/v1/admin/jobs")
+    suspend fun getAdminJobs(
+        @Header("Authorization") token: String,
+        @Query("page") page: Int = 1,
+        @Query("per_page") perPage: Int = 20,
+        @Query("status") status: String = "all",
+        @Query("search") search: String = "",
+        @Query("orderby") orderby: String = "date",
+        @Query("order") order: String = "DESC"
+    ): AdminJobsListResponse
+    
+    // Obtener un trabajo específico para preview
+    @GET("agrochamba/v1/admin/jobs/{id}")
+    suspend fun getAdminJobDetail(
+        @Header("Authorization") token: String,
+        @Path("id") id: Int
+    ): AdminJobDetailResponse
+    
+    // Actualizar un trabajo (CRUD Update)
+    @PUT("agrochamba/v1/admin/jobs/{id}")
+    suspend fun updateAdminJob(
+        @Header("Authorization") token: String,
+        @Path("id") id: Int,
+        @Body data: Map<String, @JvmSuppressWildcards Any?>
+    ): AdminJobDetailResponse
+    
+    // Eliminar un trabajo (CRUD Delete)
+    @DELETE("agrochamba/v1/admin/jobs/{id}")
+    suspend fun deleteAdminJob(
+        @Header("Authorization") token: String,
+        @Path("id") id: Int,
+        @Query("force") force: Boolean = false
+    ): AdminJobDeleteResponse
+    
+    // Estadísticas de moderación
+    @GET("agrochamba/v1/admin/moderation/stats")
+    suspend fun getModerationStats(
+        @Header("Authorization") token: String
+    ): ModerationStatsResponse
+    
+    // Acción masiva
+    @POST("agrochamba/v1/admin/jobs/bulk-action")
+    suspend fun bulkAction(
+        @Header("Authorization") token: String,
+        @Body data: Map<String, @JvmSuppressWildcards Any>
+    ): BulkActionResponse
 
     // ==========================================
     // ENDPOINTS DE IA (Mejora de texto y OCR)
@@ -265,6 +320,38 @@ interface WordPressApiService {
         @Header("Authorization") token: String,
         @Path("id") pageId: String
     ): FacebookPageTestResponse
+    
+    // ==========================================
+    // ENDPOINTS DE SEDES DE EMPRESA
+    // ==========================================
+    
+    @GET("agrochamba/v1/companies/{id}/sedes")
+    suspend fun getCompanySedes(
+        @Header("Authorization") token: String,
+        @Path("id") companyId: Int
+    ): SedesResponse
+    
+    @POST("agrochamba/v1/companies/{id}/sedes")
+    suspend fun createSede(
+        @Header("Authorization") token: String,
+        @Path("id") companyId: Int,
+        @Body sedeData: Map<String, @JvmSuppressWildcards Any?>
+    ): CreateSedeResponse
+    
+    @PUT("agrochamba/v1/companies/{company_id}/sedes/{sede_id}")
+    suspend fun updateSede(
+        @Header("Authorization") token: String,
+        @Path("company_id") companyId: Int,
+        @Path("sede_id") sedeId: String,
+        @Body sedeData: Map<String, @JvmSuppressWildcards Any?>
+    ): UpdateSedeResponse
+    
+    @DELETE("agrochamba/v1/companies/{company_id}/sedes/{sede_id}")
+    suspend fun deleteSede(
+        @Header("Authorization") token: String,
+        @Path("company_id") companyId: Int,
+        @Path("sede_id") sedeId: String
+    ): Response<DeleteSedeResponse>
 }
 
 object WordPressApi {

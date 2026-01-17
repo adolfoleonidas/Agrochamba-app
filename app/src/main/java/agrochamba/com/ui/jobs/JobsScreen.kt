@@ -41,6 +41,7 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Work
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -64,8 +65,18 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.material3.Divider
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.ui.graphics.Brush
@@ -84,6 +95,11 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import agrochamba.com.data.Category
 import agrochamba.com.data.JobPost
+import agrochamba.com.ui.common.ActiveFilter
+import agrochamba.com.ui.common.CreateAlertBanner
+import agrochamba.com.ui.common.FilterChipsBar
+import agrochamba.com.ui.common.FilterType
+import agrochamba.com.ui.common.NoResultsMessage
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import kotlinx.coroutines.delay
@@ -92,6 +108,11 @@ import java.util.Locale
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
 import agrochamba.com.R
+import agrochamba.com.data.LocationSearchResult
+import agrochamba.com.data.LocationType
+import agrochamba.com.data.PeruLocations
+import agrochamba.com.data.UbicacionCompleta
+import agrochamba.com.data.repository.LocationRepository
 import java.util.Date
 
 fun getEmojiForCrop(cropName: String): String {
@@ -159,11 +180,16 @@ fun formatDate(dateString: String?): String {
 
 @Composable
 fun JobsScreen(jobsViewModel: JobsViewModel = viewModel()) {
+    android.util.Log.d("JobsScreen", "📱 JobsScreen() INICIADO")
+    
     val uiState = jobsViewModel.uiState
+    android.util.Log.d("JobsScreen", "📊 Estado: isLoading=${uiState.isLoading}, jobs=${uiState.allJobs.size}, filtered=${uiState.filteredJobs.size}")
 
         if (uiState.selectedJob == null) {
+        android.util.Log.d("JobsScreen", "📋 Mostrando JobsListWithSearchScreen...")
             JobsListWithSearchScreen(jobsViewModel)
         } else {
+        android.util.Log.d("JobsScreen", "📄 Mostrando JobDetailScreen para: ${uiState.selectedJob.id}")
             JobDetailScreen(
                 job = uiState.selectedJob,
             mediaItems = uiState.selectedJobMedia,
@@ -175,9 +201,128 @@ fun JobsScreen(jobsViewModel: JobsViewModel = viewModel()) {
 
 @Composable
 fun JobsListWithSearchScreen(jobsViewModel: JobsViewModel) {
+    android.util.Log.d("JobsListWithSearchScreen", "🔍 JobsListWithSearchScreen() INICIADO")
+    
     val uiState = jobsViewModel.uiState
+    android.util.Log.d("JobsListWithSearchScreen", "📊 uiState obtenido: isLoading=${uiState.isLoading}")
+    
+    // Vista siempre en lista (mapa movido a futuras implementaciones en Perfil)
+    
+    // Construir lista de filtros activos
+    android.util.Log.d("JobsListWithSearchScreen", "🏗️ Construyendo filtros activos...")
+    val activeFilters = remember(
+        uiState.selectedLocationFilter,
+        uiState.selectedLocation,
+        uiState.selectedCrop,
+        uiState.selectedJobType,
+        uiState.selectedCompany
+    ) {
+        android.util.Log.d("JobsListWithSearchScreen", "🔧 Dentro de remember para activeFilters")
+        mutableListOf<ActiveFilter>().apply {
+            // Priorizar selectedLocationFilter sobre selectedLocation
+            val locationLabel = uiState.selectedLocationFilter?.displayLabel 
+                ?: uiState.selectedLocation?.name
+            val locationIcon = when (uiState.selectedLocationFilter?.tipo) {
+                LocationType.DEPARTAMENTO -> "📍"
+                LocationType.PROVINCIA -> "🏘️"
+                LocationType.DISTRITO -> "📌"
+                null -> "📍"
+            }
+            
+            if (locationLabel != null) {
+                add(ActiveFilter(
+                    id = "location",
+                    label = locationLabel,
+                    icon = locationIcon,
+                    type = FilterType.LOCATION
+                ))
+            }
+            uiState.selectedCrop?.let {
+                add(ActiveFilter(
+                    id = "crop",
+                    label = it.name,
+                    icon = getEmojiForCrop(it.name),
+                    type = FilterType.CROP
+                ))
+            }
+            uiState.selectedJobType?.let {
+                add(ActiveFilter(
+                    id = "jobType",
+                    label = it.name,
+                    icon = "💼",
+                    type = FilterType.JOB_TYPE
+                ))
+            }
+            uiState.selectedCompany?.let {
+                add(ActiveFilter(
+                    id = "company",
+                    label = it.name,
+                    icon = "🏢",
+                    type = FilterType.OTHER
+                ))
+            }
+        }
+    }
+    
     Column(modifier = Modifier.fillMaxSize()) {
-        SearchAndFilterPanel(uiState = uiState, onFilterChange = jobsViewModel::onFilterChange)
+        SearchAndFilterPanel(
+            uiState = uiState, 
+            onFilterChange = jobsViewModel::onFilterChange,
+            onLocationFilterChange = jobsViewModel::onLocationFilterChange
+        )
+        
+        Spacer(modifier = Modifier.height(4.dp))
+
+        // Contador de resultados y chips de filtros
+        if (!uiState.isLoading && !uiState.isError) {
+            FilterChipsBar(
+                resultCount = uiState.filteredJobs.size,
+                filters = activeFilters,
+                onRemoveFilter = { filter ->
+                    when (filter.id) {
+                        "location" -> {
+                            // Limpiar filtro de ubicación inteligente
+                            jobsViewModel.onLocationFilterChange(null)
+                        }
+                        "crop" -> jobsViewModel.onFilterChange(
+                            uiState.searchQuery, uiState.selectedLocation, uiState.selectedCompany,
+                            uiState.selectedJobType, null
+                        )
+                        "jobType" -> jobsViewModel.onFilterChange(
+                            uiState.searchQuery, uiState.selectedLocation, uiState.selectedCompany,
+                            null, uiState.selectedCrop
+                        )
+                        "company" -> jobsViewModel.onFilterChange(
+                            uiState.searchQuery, uiState.selectedLocation, null,
+                            uiState.selectedJobType, uiState.selectedCrop
+                        )
+                    }
+                },
+                onClearAll = {
+                    jobsViewModel.clearAllFilters()
+                },
+                searchQuery = uiState.searchQuery,
+                locationName = uiState.selectedLocationFilter?.displayLabel ?: uiState.selectedLocation?.name,
+                isLoading = uiState.isLoading,
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
+            
+            // Banner para crear alerta (solo si hay búsqueda activa y resultados)
+            val hasActiveLocationFilter = uiState.selectedLocationFilter != null || uiState.selectedLocation != null
+            if (uiState.filteredJobs.isNotEmpty() && 
+                (uiState.searchQuery.isNotBlank() || hasActiveLocationFilter)) {
+                CreateAlertBanner(
+                    searchQuery = uiState.searchQuery,
+                    locationId = uiState.selectedLocation?.id,
+                    locationName = uiState.selectedLocationFilter?.displayLabel ?: uiState.selectedLocation?.name,
+                    cropId = uiState.selectedCrop?.id,
+                    cropName = uiState.selectedCrop?.name,
+                    jobTypeId = uiState.selectedJobType?.id,
+                    jobTypeName = uiState.selectedJobType?.name,
+                    onDismiss = { /* Usuario rechazó la alerta */ }
+                )
+            }
+        }
 
         when {
             uiState.isLoading -> LoadingScreen()
@@ -185,6 +330,36 @@ fun JobsListWithSearchScreen(jobsViewModel: JobsViewModel) {
                 onRetry = { jobsViewModel.retry() },
                 errorMessage = uiState.errorMessage
             )
+            uiState.filteredJobs.isEmpty() && (uiState.searchQuery.isNotBlank() || activeFilters.isNotEmpty()) -> {
+                // Mostrar mensaje especial cuando no hay resultados con filtros activos
+                val locationDisplayName = uiState.selectedLocationFilter?.displayLabel 
+                    ?: uiState.selectedLocation?.name
+                NoResultsMessage(
+                    searchQuery = uiState.searchQuery,
+                    locationName = locationDisplayName,
+                    suggestions = listOf(
+                        "Ver trabajos de cosecha",
+                        "Ver todos los trabajos en ${locationDisplayName ?: "Perú"}",
+                        "Buscar en otra ubicación"
+                    ),
+                    onSuggestionClick = { suggestion ->
+                        when {
+                            suggestion.contains("cosecha") -> {
+                                jobsViewModel.clearAllFilters()
+                                jobsViewModel.onFilterChange("cosecha", null, null, null, null)
+                            }
+                            suggestion.contains("todos") -> {
+                                // Mantener ubicación pero limpiar otros filtros
+                                jobsViewModel.onFilterChange("", uiState.selectedLocation, null, null, null)
+                            }
+                            else -> jobsViewModel.clearAllFilters()
+                        }
+                    },
+                    onClearFilters = {
+                        jobsViewModel.onFilterChange("", null, null, null, null)
+                    }
+                )
+            }
             else -> JobsListScreen(
                 jobs = uiState.filteredJobs,
                 onJobClicked = { job -> jobsViewModel.selectJob(job) },
@@ -199,11 +374,21 @@ fun JobsListWithSearchScreen(jobsViewModel: JobsViewModel) {
 }
 
 
+/**
+ * Panel de búsqueda y filtros con experiencia tipo Google
+ * 
+ * Arquitectura UX:
+ * 1. Campo de búsqueda de texto (para buscar por título, descripción, etc.)
+ * 2. Buscador inteligente de ubicación (departamento/provincia/distrito)
+ * 3. Chips de cultivo para filtro rápido
+ * 4. Filtros avanzados en modal (empresa, tipo de puesto)
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchAndFilterPanel(
     uiState: JobsScreenState,
-    onFilterChange: (String?, Category?, Category?, Category?, Category?) -> Unit
+    onFilterChange: (String?, Category?, Category?, Category?, Category?) -> Unit,
+    onLocationFilterChange: ((SelectedLocationFilter?) -> Unit)? = null
 ) {
     // Estado para controlar la visibilidad del modal de filtros avanzados
     var showAdvancedFiltersModal by remember { mutableStateOf(false) }
@@ -212,6 +397,7 @@ fun SearchAndFilterPanel(
     // Sincronizar estado local con el estado del ViewModel
     var searchQuery by remember { mutableStateOf(uiState.searchQuery) }
     var selectedLocation by remember { mutableStateOf<Category?>(uiState.selectedLocation) }
+    var selectedLocationFilter by remember { mutableStateOf<SelectedLocationFilter?>(uiState.selectedLocationFilter) }
     var selectedCompany by remember { mutableStateOf<Category?>(uiState.selectedCompany) }
     var selectedJobType by remember { mutableStateOf<Category?>(uiState.selectedJobType) }
     var selectedCrop by remember { mutableStateOf<Category?>(uiState.selectedCrop) }
@@ -220,20 +406,21 @@ fun SearchAndFilterPanel(
     LaunchedEffect(
         uiState.searchQuery, 
         uiState.selectedLocation, 
+        uiState.selectedLocationFilter,
         uiState.selectedCompany,
         uiState.selectedJobType,
         uiState.selectedCrop
     ) {
         searchQuery = uiState.searchQuery
         selectedLocation = uiState.selectedLocation
+        selectedLocationFilter = uiState.selectedLocationFilter
         selectedCompany = uiState.selectedCompany
         selectedJobType = uiState.selectedJobType
         selectedCrop = uiState.selectedCrop
     }
 
-    // Aplicar filtros con debounce para búsqueda
-    LaunchedEffect(searchQuery, selectedLocation, selectedCompany, selectedJobType, selectedCrop) {
-        // Debounce solo para cambios en la búsqueda (para evitar demasiadas llamadas mientras el usuario escribe)
+    // Aplicar filtros con debounce para búsqueda de texto
+    LaunchedEffect(searchQuery, selectedCompany, selectedJobType, selectedCrop) {
         if (searchQuery != uiState.searchQuery) {
         delay(300)
         }
@@ -241,54 +428,64 @@ fun SearchAndFilterPanel(
     }
 
     Column(modifier = Modifier.padding(16.dp)) {
+        // =================================================================
+        // BUSCADOR DE TEXTO (para trabajos, empresas, etc.)
+        // =================================================================
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
-            label = { Text("Buscar trabajo") },
+            placeholder = { Text("Buscar trabajo, empresa...") },
             modifier = Modifier.fillMaxWidth(),
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Buscar") },
             trailingIcon = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(Icons.Default.Close, contentDescription = "Limpiar")
+                        }
+                    }
                 IconButton(
                     onClick = { showAdvancedFiltersModal = true }
                 ) {
                     Icon(
                         Icons.Default.Tune,
                         contentDescription = "Filtros avanzados",
-                        tint = if (selectedCompany != null || selectedJobType != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            tint = if (selectedCompany != null || selectedJobType != null) 
+                                MaterialTheme.colorScheme.primary 
+                            else 
+                                MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
+            },
+            singleLine = true,
+            shape = RoundedCornerShape(12.dp)
         )
 
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(12.dp))
 
-        var isLocationExpanded by remember { mutableStateOf(false) }
-        ExposedDropdownMenuBox(
-            expanded = isLocationExpanded,
-            onExpandedChange = { isLocationExpanded = !isLocationExpanded }
-        ) {
-            OutlinedTextField(
-                value = selectedLocation?.name ?: "Todas las ubicaciones",
-                onValueChange = {},
-                readOnly = true,
-                label = { Text("Ubicación") },
-                leadingIcon = { Icon(Icons.Default.LocationOn, contentDescription = "Ubicación") },
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isLocationExpanded) },
-                modifier = Modifier.fillMaxWidth().menuAnchor()
-            )
-            ExposedDropdownMenu(expanded = isLocationExpanded, onDismissRequest = { isLocationExpanded = false }) {
-                DropdownMenuItem(
-                    text = { Text("Todas") },
-                    onClick = { selectedLocation = null; isLocationExpanded = false; }
-                )
-                uiState.locationCategories.forEach { item ->
-                    DropdownMenuItem(
-                        text = { Text(item.name) },
-                        onClick = { selectedLocation = item; isLocationExpanded = false; }
-                    )
-                }
-            }
-        }
+        // =================================================================
+        // BUSCADOR INTELIGENTE DE UBICACIÓN (tipo Google)
+        // Con botón GPS integrado para encontrar trabajos cercanos
+        // =================================================================
+        agrochamba.com.ui.common.LocationSearchBar(
+            selectedLocation = selectedLocationFilter,
+            onLocationSelected = { filter ->
+                selectedLocationFilter = filter
+                // También actualizar la categoría para compatibilidad
+                selectedLocation = if (filter != null) {
+                    uiState.locationCategories.find { 
+                        it.name.equals(filter.departamento, ignoreCase = true) 
+                    }
+                } else null
+                
+                // Notificar al ViewModel
+                onLocationFilterChange?.invoke(filter)
+            },
+            placeholder = "¿Dónde buscas trabajo?",
+            showGpsButton = true
+            // El GPS se maneja internamente en LocationSearchBar
+        )
 
         Spacer(Modifier.height(16.dp))
 
@@ -492,11 +689,25 @@ data class BadgeInfo(
     val textColor: Color
 )
 
+/**
+ * Extrae solo el departamento de un nombre de ubicación.
+ * Soporta formatos: "Departamento", "Provincia, Departamento", "Distrito, Provincia, Departamento"
+ */
+fun extractDepartamento(locationName: String?): String? {
+    if (locationName.isNullOrBlank()) return null
+    
+    val parts = locationName.split(",").map { it.trim() }
+    // El departamento siempre es el último elemento
+    return parts.lastOrNull()?.takeIf { it.isNotBlank() }
+}
+
 @Composable
 fun JobCard(job: JobPost, onClick: () -> Unit, viewModel: JobsViewModel) {
     val terms = job.embedded?.terms?.flatten() ?: emptyList()
     val companyName = terms.find { it.taxonomy == "empresa" }?.name
-    val locationName = terms.find { it.taxonomy == "ubicacion" }?.name
+    val fullLocationName = terms.find { it.taxonomy == "ubicacion" }?.name
+    // UX: En cards mostramos SOLO el departamento
+    val locationName = extractDepartamento(fullLocationName)
     val cropName = terms.find { it.taxonomy == "cultivo" }?.name
     
     // Obtener imagen desde featuredMedia embebido o desde el mapa de imágenes cargadas

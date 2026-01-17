@@ -67,7 +67,7 @@ import agrochamba.com.Screen
 import agrochamba.com.data.AuthManager
 import agrochamba.com.data.ModerationNotificationManager
 import agrochamba.com.data.WordPressApi
-import agrochamba.com.ui.jobs.ModerationViewModel
+import agrochamba.com.ui.moderation.ModerationViewModel
 import agrochamba.com.utils.htmlToString
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -94,7 +94,7 @@ fun ProfileScreen(navController: NavController, viewModel: ProfileViewModel = vi
                 try {
                     val authHeader = "Bearer $token"
                     val response = WordPressApi.retrofitService.getPendingJobs(authHeader, page = 1, perPage = 100)
-                    ModerationNotificationManager.updatePendingJobsCount(response.jobs.size)
+                    ModerationNotificationManager.updatePendingJobsCount(response.data.size)
                 } catch (e: Exception) {
                     android.util.Log.e("ProfileScreen", "Error al cargar trabajos pendientes: ${e.message}")
                     // En caso de error, mantener el contador en 0

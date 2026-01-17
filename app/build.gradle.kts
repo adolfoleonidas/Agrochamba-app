@@ -118,6 +118,13 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+
+    // Location + Maps (GPS + Map view)
+    implementation("com.google.android.gms:play-services-location:21.2.0")
+    // TODO: Configurar MAPBOX_DOWNLOADS_TOKEN en gradle.properties con un secret token
+    // Obtenerlo desde: https://account.mapbox.com/access-tokens/ (crear un secret token)
+    // implementation("com.mapbox.maps:android:11.5.0")
+    // implementation("com.mapbox.maps:plugin-annotation:11.5.0")
     implementation("com.google.accompanist:accompanist-webview:0.36.0")
     implementation("com.google.accompanist:accompanist-swiperefresh:0.36.0")
     implementation("androidx.navigation:navigation-compose:2.9.5")

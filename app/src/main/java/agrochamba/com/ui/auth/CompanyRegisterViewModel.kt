@@ -43,7 +43,8 @@ class CompanyRegisterViewModel @Inject constructor(
                         )
                     }
                     is agrochamba.com.util.Result.Error -> {
-                        throw WordPressErrorMapper.mapAuthError(result.exception)
+                        // Usar mapRegisterError para mensajes seguros (no revelar datos existentes)
+                        throw WordPressErrorMapper.mapRegisterError(result.exception)
                     }
                 }
 
@@ -51,7 +52,7 @@ class CompanyRegisterViewModel @Inject constructor(
                 android.util.Log.e("CompanyRegisterViewModel", "Error general: ${e.message}", e)
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    error = e.message ?: "Ocurrió un error. Inténtalo de nuevo."
+                    error = e.message ?: "No se pudo completar el registro. Inténtalo de nuevo."
                 )
             }
         }

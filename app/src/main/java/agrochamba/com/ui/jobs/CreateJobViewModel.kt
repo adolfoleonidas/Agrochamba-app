@@ -459,6 +459,13 @@ class CreateJobViewModel @Inject constructor() : androidx.lifecycle.ViewModel() 
                         put("ubicacion_id", ubicacionId.toInt())
                     }
 
+                    // Agregar ubicación completa si está presente (para mostrar en detalle)
+                    @Suppress("UNCHECKED_CAST")
+                    val ubicacionCompleta = jobData["ubicacion_completa"] as? Map<String, Any?>
+                    if (ubicacionCompleta != null) {
+                        put("_ubicacion_completa", ubicacionCompleta)
+                    }
+
                     // Convertir valores numéricos
                     val salarioMin = (jobData["salario_min"] as? Number)?.toInt() ?: 0
                     val salarioMax = (jobData["salario_max"] as? Number)?.toInt() ?: 0

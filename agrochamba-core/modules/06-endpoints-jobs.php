@@ -293,6 +293,47 @@ if (!function_exists('agrochamba_create_job')) {
                 }
             }
             
+            // Guardar ubicación completa (departamento, provincia, distrito, dirección, coordenadas)
+            if (isset($params['_ubicacion_completa']) && is_array($params['_ubicacion_completa'])) {
+                $ubicacion = $params['_ubicacion_completa'];
+                $departamento = sanitize_text_field($ubicacion['departamento'] ?? '');
+                $provincia = sanitize_text_field($ubicacion['provincia'] ?? '');
+                $distrito = sanitize_text_field($ubicacion['distrito'] ?? '');
+                $direccion = sanitize_text_field($ubicacion['direccion'] ?? '');
+                
+                $ubicacion_sanitizada = array(
+                    'departamento' => $departamento,
+                    'provincia'    => $provincia,
+                    'distrito'     => $distrito,
+                    'direccion'    => $direccion,
+                    'lat'          => floatval($ubicacion['lat'] ?? 0),
+                    'lng'          => floatval($ubicacion['lng'] ?? 0),
+                );
+                update_post_meta($post_id, '_ubicacion_completa', $ubicacion_sanitizada);
+                
+                // Guardar también en meta fields individuales para búsqueda
+                update_post_meta($post_id, '_ubicacion_provincia', $provincia);
+                update_post_meta($post_id, '_ubicacion_distrito', $distrito);
+                update_post_meta($post_id, '_ubicacion_direccion', $direccion);
+                
+                // SINCRONIZAR CON TAXONOMÍA (para filtrado rápido y SEO)
+                if (!empty($departamento)) {
+                    $term = get_term_by('name', $departamento, 'ubicacion');
+                    
+                    if (!$term) {
+                        // Crear el término si no existe
+                        $result = wp_insert_term($departamento, 'ubicacion', array(
+                            'slug' => sanitize_title($departamento)
+                        ));
+                        if (!is_wp_error($result)) {
+                            wp_set_post_terms($post_id, array($result['term_id']), 'ubicacion');
+                        }
+                    } else {
+                        wp_set_post_terms($post_id, array($term->term_id), 'ubicacion');
+                    }
+                }
+            }
+            
             // Guardar comentarios_habilitados (por defecto true si no se especifica)
             if (isset($params['comentarios_habilitados'])) {
                 $comentarios = filter_var($params['comentarios_habilitados'], FILTER_VALIDATE_BOOLEAN);
@@ -713,8 +754,32 @@ if (!function_exists('agrochamba_get_current_user_jobs')) {
                 $post = get_post(get_the_ID());
                 $post_id = $post->ID;
                 
-                // Obtener taxonomías
+                // Obtener ubicación: priorizar meta fields
+                $ubicacion_dept = get_post_meta($post_id, '_ubicacion_departamento', true);
+                $ubicacion_prov = get_post_meta($post_id, '_ubicacion_provincia', true);
+                $ubicacion_dist = get_post_meta($post_id, '_ubicacion_distrito', true);
+                $ubicacion_completa_meta = get_post_meta($post_id, '_ubicacion_completa', true);
+                
+                // Fallback a taxonomía si no hay meta
                 $ubicaciones = wp_get_post_terms($post_id, 'ubicacion', array('fields' => 'all'));
+                
+                // Formatear ubicación para respuesta
+                if ($ubicacion_dept) {
+                    $ubicacion_data = array(
+                        'id' => 0, // No hay term ID
+                        'name' => $ubicacion_dept,
+                        'slug' => sanitize_title($ubicacion_dept)
+                    );
+                } elseif (!empty($ubicaciones) && !is_wp_error($ubicaciones)) {
+                    $ubicacion_data = array(
+                        'id' => $ubicaciones[0]->term_id,
+                        'name' => $ubicaciones[0]->name,
+                        'slug' => $ubicaciones[0]->slug
+                    );
+                } else {
+                    $ubicacion_data = null;
+                }
+                
                 $cultivos = wp_get_post_terms($post_id, 'cultivo', array('fields' => 'all'));
                 $tipos_puesto = wp_get_post_terms($post_id, 'tipo_puesto', array('fields' => 'all'));
                 $empresas = wp_get_post_terms($post_id, 'empresa', array('fields' => 'all'));
@@ -727,13 +792,6 @@ if (!function_exists('agrochamba_get_current_user_jobs')) {
                 $transporte = get_post_meta($post_id, 'transporte', true);
                 $alimentacion = get_post_meta($post_id, 'alimentacion', true);
                 $gallery_ids = get_post_meta($post_id, 'gallery_ids', true);
-                
-                // Formatear taxonomías
-                $ubicacion_data = !empty($ubicaciones) && !is_wp_error($ubicaciones) ? array(
-                    'id' => $ubicaciones[0]->term_id,
-                    'name' => $ubicaciones[0]->name,
-                    'slug' => $ubicaciones[0]->slug
-                ) : null;
                 
                 $cultivo_data = !empty($cultivos) && !is_wp_error($cultivos) ? array(
                     'id' => $cultivos[0]->term_id,
@@ -771,6 +829,7 @@ if (!function_exists('agrochamba_get_current_user_jobs')) {
                     'featured_media_url' => $featured_media_url,
                     'gallery_ids' => is_array($gallery_ids) ? $gallery_ids : array(),
                     'ubicacion' => $ubicacion_data,
+                    '_ubicacion_completa' => is_array($ubicacion_completa_meta) ? $ubicacion_completa_meta : null,
                     'cultivo' => $cultivo_data,
                     'tipo_puesto' => $tipo_puesto_data,
                     'empresa' => $empresa_data,
@@ -851,6 +910,7 @@ if (!function_exists('agrochamba_get_single_job')) {
         $alimentacion = get_post_meta($post_id, 'alimentacion', true);
         $gallery_ids = get_post_meta($post_id, 'gallery_ids', true);
         $comentarios_habilitados = get_post_meta($post_id, 'comentarios_habilitados', true);
+        $ubicacion_completa = get_post_meta($post_id, '_ubicacion_completa', true);
         
         // Formatear taxonomías
         $ubicacion_data = !empty($ubicaciones) && !is_wp_error($ubicaciones) ? array(
@@ -906,6 +966,7 @@ if (!function_exists('agrochamba_get_single_job')) {
             'transporte' => ($transporte === '1' || $transporte === 1 || $transporte === true),
             'alimentacion' => ($alimentacion === '1' || $alimentacion === 1 || $alimentacion === true),
             'comentarios_habilitados' => ($comentarios_habilitados !== '0' && $comentarios_habilitados !== 0 && $comentarios_habilitados !== false),
+            '_ubicacion_completa' => is_array($ubicacion_completa) ? $ubicacion_completa : null,
         );
         
         return new WP_REST_Response($post_data, 200);
@@ -1093,7 +1154,16 @@ if (!function_exists('agrochamba_get_company_profile_with_jobs')) {
                 $featured_image_id = get_post_thumbnail_id($job->ID);
                 $featured_image_url = $featured_image_id ? wp_get_attachment_image_url($featured_image_id, 'medium') : null;
 
+                // Ubicación: priorizar meta fields, fallback a taxonomía
+                $ubicacion_dept = get_post_meta($job->ID, '_ubicacion_departamento', true);
+                $ubicacion_completa = get_post_meta($job->ID, '_ubicacion_completa', true);
+                
+                if (empty($ubicacion_dept)) {
+                    // Fallback a taxonomía
                 $ubicaciones = wp_get_post_terms($job->ID, 'ubicacion', array('fields' => 'names'));
+                    $ubicacion_dept = !empty($ubicaciones) ? $ubicaciones[0] : null;
+                }
+                
                 $cultivos = wp_get_post_terms($job->ID, 'cultivo', array('fields' => 'names'));
                 $tipos_puesto = wp_get_post_terms($job->ID, 'tipo_puesto', array('fields' => 'names'));
 
@@ -1107,7 +1177,8 @@ if (!function_exists('agrochamba_get_company_profile_with_jobs')) {
                     'date' => $job->post_date,
                     'link' => get_permalink($job->ID),
                     'featured_image_url' => $featured_image_url,
-                    'ubicacion' => !empty($ubicaciones) ? $ubicaciones[0] : null,
+                    'ubicacion' => $ubicacion_dept, // Departamento para cards
+                    '_ubicacion_completa' => is_array($ubicacion_completa) ? $ubicacion_completa : null,
                     'cultivo' => !empty($cultivos) ? $cultivos[0] : null,
                     'tipo_puesto' => !empty($tipos_puesto) ? $tipos_puesto[0] : null,
                     'salario_min' => $salario_min,

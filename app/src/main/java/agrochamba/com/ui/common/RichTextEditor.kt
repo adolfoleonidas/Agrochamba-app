@@ -31,6 +31,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextRange
@@ -66,6 +68,8 @@ fun RichTextEditor(
     onUpgradeToPremiumClick: (() -> Unit)? = null
 ) {
     val keyboardController = LocalSoftwareKeyboardController.current
+    val focusRequester = remember { FocusRequester() }
+    
     // Usar una clave estable para remember, no el valor que cambia constantemente
     var textFieldValue by remember { mutableStateOf(TextFieldValue(value, TextRange(value.length))) }
     var isInternalChange by remember { mutableStateOf(false) }
@@ -104,12 +108,23 @@ fun RichTextEditor(
                 RoundedCornerShape(12.dp)
             )
     ) {
-        // Campo de texto
+        // Campo de texto - El Box es clickeable en toda su área
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height((maxLines * 24).dp)
+                .clickable(
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                    indication = null // Sin efecto visual de ripple
+                ) {
+                    // Al hacer clic en cualquier parte del Box, dar foco al TextField
+                    focusRequester.requestFocus()
+                    keyboardController?.show()
+                }
+                .padding(16.dp)
         ) {
+            val scrollState = rememberScrollState()
+            
             BasicTextField(
                 value = textFieldValue,
                 onValueChange = { newValue ->
@@ -120,8 +135,8 @@ fun RichTextEditor(
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp)
-                    .verticalScroll(rememberScrollState()),
+                    .focusRequester(focusRequester)
+                    .verticalScroll(scrollState),
                 textStyle = TextStyle(
                     fontSize = 16.sp,
                     color = MaterialTheme.colorScheme.onSurface,
@@ -133,18 +148,22 @@ fun RichTextEditor(
                 keyboardActions = KeyboardActions(
                     onDone = { keyboardController?.hide() }
                 ),
-                maxLines = maxLines
+                decorationBox = { innerTextField ->
+                    Box {
+                        if (textFieldValue.text.isEmpty() && placeholder.isNotEmpty()) {
+                            Text(
+                                text = placeholder,
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontSize = 16.sp,
+                                    lineHeight = 24.sp
+                                ),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            )
+                        }
+                        innerTextField()
+                    }
+                }
             )
-            
-            // Placeholder
-            if (textFieldValue.text.isEmpty() && placeholder.isNotEmpty()) {
-                Text(
-                    text = placeholder,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                    modifier = Modifier.padding(16.dp)
-                )
-            }
         }
         
         // Barra de herramientas siempre debajo, pero con estado según selección

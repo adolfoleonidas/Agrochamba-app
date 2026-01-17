@@ -10,6 +10,10 @@ import agrochamba.com.data.AuthManager
 import agrochamba.com.data.Category
 import agrochamba.com.data.JobPost
 import agrochamba.com.data.MediaItem
+import agrochamba.com.data.LocationSearchResult
+import agrochamba.com.data.LocationType
+import agrochamba.com.data.PeruLocations
+import agrochamba.com.data.UbicacionCompleta
 import agrochamba.com.data.WordPressApi
 import agrochamba.com.util.Result
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -20,6 +24,66 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import retrofit2.HttpException
 
+/**
+ * Ubicación seleccionada con información de nivel (departamento/provincia/distrito)
+ * Permite filtrar a diferentes niveles de granularidad
+ */
+data class SelectedLocationFilter(
+    val departamento: String,
+    val provincia: String? = null,
+    val distrito: String? = null,
+    val displayLabel: String, // Lo que se muestra al usuario
+    val tipo: LocationType // Nivel de filtrado
+) {
+    /**
+     * Verifica si un trabajo coincide con este filtro de ubicación
+     */
+    fun matches(jobUbicacion: UbicacionCompleta?): Boolean {
+        if (jobUbicacion == null) return false
+        
+        return when (tipo) {
+            LocationType.DEPARTAMENTO -> 
+                jobUbicacion.departamento.equals(departamento, ignoreCase = true)
+            LocationType.PROVINCIA -> 
+                jobUbicacion.departamento.equals(departamento, ignoreCase = true) &&
+                jobUbicacion.provincia.equals(provincia, ignoreCase = true)
+            LocationType.DISTRITO -> 
+                jobUbicacion.departamento.equals(departamento, ignoreCase = true) &&
+                jobUbicacion.provincia.equals(provincia, ignoreCase = true) &&
+                jobUbicacion.distrito.equals(distrito, ignoreCase = true)
+        }
+    }
+    
+    /**
+     * Verifica si un trabajo coincide usando el nombre de taxonomía (fallback)
+     */
+    fun matchesTaxonomyName(taxonomyName: String): Boolean {
+        val normalizedName = taxonomyName.lowercase().trim()
+        return when (tipo) {
+            LocationType.DEPARTAMENTO -> 
+                normalizedName.contains(departamento.lowercase())
+            LocationType.PROVINCIA -> 
+                normalizedName.contains(provincia?.lowercase() ?: "") ||
+                normalizedName.contains(departamento.lowercase())
+            LocationType.DISTRITO -> 
+                normalizedName.contains(distrito?.lowercase() ?: "") ||
+                normalizedName.contains(provincia?.lowercase() ?: "")
+        }
+    }
+    
+    companion object {
+        fun fromSearchResult(result: LocationSearchResult): SelectedLocationFilter {
+            return SelectedLocationFilter(
+                departamento = result.departamento,
+                provincia = result.provincia,
+                distrito = result.distrito,
+                displayLabel = result.displayLabel,
+                tipo = result.tipo
+            )
+        }
+    }
+}
+
 // El estado ahora incluye la lista de medios para el trabajo seleccionado
 data class JobsScreenState(
     val allJobs: List<JobPost> = emptyList(),
@@ -29,7 +93,8 @@ data class JobsScreenState(
     val jobTypeCategories: List<Category> = emptyList(),
     val cropCategories: List<Category> = emptyList(),
     val searchQuery: String = "",
-    val selectedLocation: Category? = null,
+    val selectedLocation: Category? = null, // Mantener para compatibilidad
+    val selectedLocationFilter: SelectedLocationFilter? = null, // Nuevo: ubicación con nivel
     val selectedCompany: Category? = null,
     val selectedJobType: Category? = null,
     val selectedCrop: Category? = null,
@@ -50,24 +115,37 @@ class JobsViewModel @Inject constructor() : androidx.lifecycle.ViewModel() {
         private set
 
     init {
+        Log.d("JobsViewModel", "🏗️ JobsViewModel INIT - Iniciando carga de datos")
+        try {
             loadInitialData()
+        } catch (e: Exception) {
+            Log.e("JobsViewModel", "💥 Error en init: ${e.message}", e)
+        }
     }
 
     private fun loadInitialData() {
+        Log.d("JobsViewModel", "📥 loadInitialData() iniciado")
         viewModelScope.launch {
             uiState = JobsScreenState()
             try {
+                Log.d("JobsViewModel", "🌐 Cargando datos desde API...")
                 val jobsDeferred = async { WordPressApi.retrofitService.getJobs(page = 1) }
                 val locationsDeferred = async { WordPressApi.retrofitService.getUbicaciones() }
                 val companiesDeferred = async { WordPressApi.retrofitService.getEmpresas() }
                 val jobTypesDeferred = async { WordPressApi.retrofitService.getTiposPuesto() }
                 val cropsDeferred = async { WordPressApi.retrofitService.getCultivos() }
 
+                Log.d("JobsViewModel", "⏳ Esperando respuestas de API...")
                 val jobs = jobsDeferred.await()
+                Log.d("JobsViewModel", "✅ Jobs cargados: ${jobs.size}")
                 val locations = locationsDeferred.await()
+                Log.d("JobsViewModel", "✅ Locations cargados: ${locations.size}")
                 val companies = companiesDeferred.await()
+                Log.d("JobsViewModel", "✅ Companies cargados: ${companies.size}")
                 val jobTypes = jobTypesDeferred.await()
+                Log.d("JobsViewModel", "✅ JobTypes cargados: ${jobTypes.size}")
                 val crops = cropsDeferred.await()
+                Log.d("JobsViewModel", "✅ Crops cargados: ${crops.size}")
 
                 // Cargar imágenes para trabajos que no tienen featuredMedia pero tienen gallery_ids
                 // También verificar si featuredMedia existe pero no tiene URL válida
@@ -171,8 +249,49 @@ class JobsViewModel @Inject constructor() : androidx.lifecycle.ViewModel() {
         )
         applyFilters()
     }
+    
+    /**
+     * Filtrado inteligente de ubicación (departamento/provincia/distrito)
+     * Este es el método principal para el buscador tipo Google
+     */
+    fun onLocationFilterChange(locationFilter: SelectedLocationFilter?) {
+        // Buscar la categoría de departamento para compatibilidad con filtros existentes
+        val matchingCategory = if (locationFilter != null) {
+            uiState.locationCategories.find { 
+                it.name.equals(locationFilter.departamento, ignoreCase = true) 
+            }
+        } else null
+        
+        uiState = uiState.copy(
+            selectedLocationFilter = locationFilter,
+            selectedLocation = matchingCategory
+        )
+        applyFilters()
+    }
+    
+    /**
+     * Limpiar todos los filtros
+     */
+    fun clearAllFilters() {
+        uiState = uiState.copy(
+            searchQuery = "",
+            selectedLocation = null,
+            selectedLocationFilter = null,
+            selectedCompany = null,
+            selectedJobType = null,
+            selectedCrop = null
+        )
+        applyFilters()
+    }
 
     private fun applyFilters() {
+        val normalizedQuery = uiState.searchQuery.trim()
+        val locationResult = if (normalizedQuery.isNotBlank()) {
+            PeruLocations.searchLocation(normalizedQuery, 1).firstOrNull()
+        } else {
+            null
+        }
+
         val filtered = uiState.allJobs.filter { job ->
             // ==========================================
             // 1. FILTRO DE BÚSQUEDA (query)
@@ -191,10 +310,23 @@ class JobsViewModel @Inject constructor() : androidx.lifecycle.ViewModel() {
                     .filter { it.taxonomy == "empresa" }
                     .map { it.name.lowercase() }
                     .joinToString(" ")
-                val ubicacionNames = jobTerms
+                val ubicacionNames = buildString {
+                    jobTerms
                     .filter { it.taxonomy == "ubicacion" }
                     .map { it.name.lowercase() }
                     .joinToString(" ")
+                        .takeIf { it.isNotBlank() }
+                        ?.let { append(it) }
+                    job.meta?.ubicacionCompleta?.let { ubicacion ->
+                        if (isNotEmpty()) append(" ")
+                        append(
+                            listOf(ubicacion.distrito, ubicacion.provincia, ubicacion.departamento)
+                                .filter { it.isNotBlank() }
+                                .joinToString(" ")
+                                .lowercase()
+                        )
+                    }
+                }
                 val cultivoNames = jobTerms
                     .filter { it.taxonomy == "cultivo" }
                     .map { it.name.lowercase() }
@@ -205,35 +337,60 @@ class JobsViewModel @Inject constructor() : androidx.lifecycle.ViewModel() {
                     .joinToString(" ")
                 
                 // Buscar en título, contenido, excerpt y nombres de taxonomías
-                title.contains(query) || 
+                val matchesText = title.contains(query) || 
                 content.contains(query) || 
                 excerpt.contains(query) ||
                 empresaNames.contains(query) ||
                 ubicacionNames.contains(query) ||
                 cultivoNames.contains(query) ||
                 tipoPuestoNames.contains(query)
+
+                // Búsqueda inteligente por ubicación
+                val matchesLocationQuery = locationResult?.let { result ->
+                    matchesLocationResult(job, result)
+                } ?: false
+
+                matchesText || matchesLocationQuery
             }
             
             // ==========================================
-            // 2. FILTROS POR TAXONOMÍAS
+            // 2. FILTRO INTELIGENTE DE UBICACIÓN
             // ==========================================
-            // Obtener todos los términos del trabajo
-            val jobTerms = job.embedded?.terms?.flatten() ?: emptyList()
+            val matchesLocation = if (uiState.selectedLocationFilter != null) {
+                val locationFilter = uiState.selectedLocationFilter!!
+                
+                // Primero intentar con ubicación completa (trabajos nuevos)
+                val jobUbicacion = job.meta?.ubicacionCompleta ?: extractFromUbicacionTerm(job)
+                
+                if (jobUbicacion != null) {
+                    locationFilter.matches(jobUbicacion)
+                } else {
+                    // Fallback: buscar en taxonomía (trabajos antiguos)
+                    val jobTerms = job.embedded?.terms?.flatten() ?: emptyList()
+                    val ubicacionTerms = jobTerms.filter { it.taxonomy == "ubicacion" }
+                    ubicacionTerms.any { term -> locationFilter.matchesTaxonomyName(term.name) }
+                }
+            } else if (uiState.selectedLocation != null) {
+                // Compatibilidad: filtrar por categoría de departamento
+                val jobTerms = job.embedded?.terms?.flatten() ?: emptyList()
+                val ubicacionIds = jobTerms.filter { it.taxonomy == "ubicacion" }.map { it.id }.toSet()
+                ubicacionIds.contains(uiState.selectedLocation!!.id)
+            } else {
+                true // Sin filtro de ubicación
+            }
             
-            // Separar términos por taxonomía para filtrado preciso
-            val ubicacionTerms = jobTerms.filter { it.taxonomy == "ubicacion" }
+            // ==========================================
+            // 3. OTROS FILTROS POR TAXONOMÍAS
+            // ==========================================
+            val jobTerms = job.embedded?.terms?.flatten() ?: emptyList()
             val empresaTerms = jobTerms.filter { it.taxonomy == "empresa" }
             val tipoPuestoTerms = jobTerms.filter { it.taxonomy == "tipo_puesto" }
             val cultivoTerms = jobTerms.filter { it.taxonomy == "cultivo" }
             
-            // Crear sets de IDs por taxonomía
-            val ubicacionIds = ubicacionTerms.map { it.id }.toSet()
             val empresaIds = empresaTerms.map { it.id }.toSet()
             val tipoPuestoIds = tipoPuestoTerms.map { it.id }.toSet()
             val cultivoIds = cultivoTerms.map { it.id }.toSet()
             
-            // Aplicar filtros: si el filtro es null, mostrar todos (true)
-            val matchesLocation = uiState.selectedLocation == null || ubicacionIds.contains(uiState.selectedLocation!!.id)
             val matchesCompany = uiState.selectedCompany == null || empresaIds.contains(uiState.selectedCompany!!.id)
             val matchesJobType = uiState.selectedJobType == null || tipoPuestoIds.contains(uiState.selectedJobType!!.id)
             val matchesCrop = uiState.selectedCrop == null || cultivoIds.contains(uiState.selectedCrop!!.id)
@@ -242,6 +399,51 @@ class JobsViewModel @Inject constructor() : androidx.lifecycle.ViewModel() {
             matchesQuery && matchesLocation && matchesCompany && matchesJobType && matchesCrop
         }
         uiState = uiState.copy(filteredJobs = filtered)
+    }
+
+    private fun matchesLocationResult(job: JobPost, result: LocationSearchResult): Boolean {
+        val ubicacion = job.meta?.ubicacionCompleta ?: extractFromUbicacionTerm(job)
+        if (ubicacion == null) return false
+
+        fun equalsIgnoreCase(a: String, b: String) = a.equals(b, ignoreCase = true)
+
+        return when (result.tipo) {
+            LocationType.DEPARTAMENTO -> equalsIgnoreCase(ubicacion.departamento, result.departamento)
+            LocationType.PROVINCIA -> equalsIgnoreCase(ubicacion.provincia, result.provincia ?: "") &&
+                equalsIgnoreCase(ubicacion.departamento, result.departamento)
+            LocationType.DISTRITO -> equalsIgnoreCase(ubicacion.distrito, result.distrito ?: "") &&
+                equalsIgnoreCase(ubicacion.provincia, result.provincia ?: "") &&
+                equalsIgnoreCase(ubicacion.departamento, result.departamento)
+        }
+    }
+
+    private fun extractFromUbicacionTerm(job: JobPost): UbicacionCompleta? {
+        val terms = job.embedded?.terms?.flatten() ?: emptyList()
+        val locationName = terms.firstOrNull { it.taxonomy == "ubicacion" }?.name ?: return null
+        val parts = locationName.split(",").map { it.trim() }.filter { it.isNotBlank() }
+
+        return when (parts.size) {
+            1 -> UbicacionCompleta(
+                departamento = parts[0],
+                provincia = parts[0],
+                distrito = parts[0]
+            )
+            2 -> UbicacionCompleta(
+                departamento = parts[1],
+                provincia = parts[0],
+                distrito = parts[0]
+            )
+            3 -> UbicacionCompleta(
+                departamento = parts[2],
+                provincia = parts[1],
+                distrito = parts[0]
+            )
+            else -> UbicacionCompleta(
+                departamento = parts.lastOrNull() ?: "",
+                provincia = parts.getOrNull(parts.size - 2) ?: "",
+                distrito = parts.firstOrNull() ?: ""
+            )
+        }
     }
 
     // Al seleccionar un trabajo, también pedimos su galería de imágenes

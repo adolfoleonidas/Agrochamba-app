@@ -69,6 +69,9 @@ if (!AGROCHAMBA_USE_MODULE_LOADER) {
             '23-supabase-sync.php',            // Sincronización Supabase ↔ WordPress
             '24-ai-text-enhancer.php',         // Mejora de texto con IA y OCR
             '25-facebook-pages.php',           // Gestión de múltiples páginas de Facebook
+            '26-company-sedes.php',            // Sedes de empresas
+            '27-location-system.php',          // Sistema de ubicaciones nativo
+            '28-job-moderation-admin.php',     // Sistema de moderación para admins
         );
 
         // Cargar cada módulo
