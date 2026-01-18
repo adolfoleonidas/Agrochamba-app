@@ -433,6 +433,10 @@ class CreateJobViewModel @Inject constructor() : androidx.lifecycle.ViewModel() 
                 val postType = jobData["post_type"] as? String ?: "trabajo" // Por defecto trabajo
                 val ubicacionId = jobData["ubicacion_id"] as? Number
                 
+                // Obtener ubicación completa (nuevo sistema)
+                @Suppress("UNCHECKED_CAST")
+                val ubicacionCompleta = jobData["_ubicacion_completa"] as? Map<String, Any?>
+                
                 if (title.isNullOrBlank()) {
                     throw Exception("El título es obligatorio.")
                 }
@@ -441,8 +445,15 @@ class CreateJobViewModel @Inject constructor() : androidx.lifecycle.ViewModel() 
                 }
                 
                 // Solo validar ubicación si es un trabajo (no para blogs)
-                if (postType == "trabajo" && ubicacionId == null) {
-                    throw Exception("La ubicación es obligatoria.")
+                // IMPORTANTE: Aceptar ubicacion_id O _ubicacion_completa como válidos
+                // El nuevo sistema usa _ubicacion_completa, el legacy usa ubicacion_id
+                if (postType == "trabajo") {
+                    val tieneUbicacionCompleta = ubicacionCompleta != null && 
+                        (ubicacionCompleta["departamento"] as? String)?.isNotBlank() == true
+                    
+                    if (ubicacionId == null && !tieneUbicacionCompleta) {
+                        throw Exception("La ubicación es obligatoria.")
+                    }
                 }
                 
                 val payload: MutableMap<String, Any> = mutableMapOf<String, Any>().apply {
@@ -460,10 +471,11 @@ class CreateJobViewModel @Inject constructor() : androidx.lifecycle.ViewModel() 
                     }
 
                     // Agregar ubicación completa si está presente (para mostrar en detalle)
+                    // NOTA: El frontend envía como "_ubicacion_completa" (con underscore)
                     @Suppress("UNCHECKED_CAST")
-                    val ubicacionCompleta = jobData["ubicacion_completa"] as? Map<String, Any?>
-                    if (ubicacionCompleta != null) {
-                        put("_ubicacion_completa", ubicacionCompleta)
+                    val ubicacionCompletaPayload = jobData["_ubicacion_completa"] as? Map<String, Any?>
+                    if (ubicacionCompletaPayload != null) {
+                        put("_ubicacion_completa", ubicacionCompletaPayload)
                     }
 
                     // Convertir valores numéricos
