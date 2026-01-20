@@ -880,74 +880,78 @@ if (!function_exists('agrochamba_register_location_query_params')) {
 // 10. INCLUIR UBICACIÓN EN RESPUESTA REST
 // ==========================================
 
+if (!function_exists('agrochamba_get_job_location_display_data')) {
+    function agrochamba_get_job_location_display_data($post_id) {
+        $ubicacion = get_post_meta($post_id, '_ubicacion_completa', true);
+        
+        if (!empty($ubicacion) && !empty($ubicacion['departamento'])) {
+            $departamento = $ubicacion['departamento'];
+            $provincia = $ubicacion['provincia'] ?? '';
+            $distrito = $ubicacion['distrito'] ?? '';
+            $direccion = $ubicacion['direccion'] ?? '';
+            
+            // Obtener el nivel de especificidad (DEPARTAMENTO, PROVINCIA, DISTRITO)
+            $nivel = strtoupper($ubicacion['nivel'] ?? '');
+            if (!in_array($nivel, array('DEPARTAMENTO', 'PROVINCIA', 'DISTRITO'))) {
+                // Detectar nivel automáticamente si no está definido
+                if (empty($provincia) || $provincia === $departamento) {
+                    $nivel = 'DEPARTAMENTO';
+                } elseif (empty($distrito) || $distrito === $provincia) {
+                    $nivel = 'PROVINCIA';
+                } else {
+                    $nivel = 'DISTRITO';
+                }
+            }
+            
+            // Formatear según el nivel de especificidad
+            switch ($nivel) {
+                case 'DEPARTAMENTO':
+                    $full = $departamento;
+                    break;
+                case 'PROVINCIA':
+                    $full = $provincia . ', ' . $departamento;
+                    break;
+                case 'DISTRITO':
+                default:
+                    $full = implode(', ', array_filter(array($distrito, $provincia, $departamento)));
+                    break;
+            }
+            
+            return array(
+                'departamento' => $departamento,
+                'provincia' => $provincia,
+                'distrito' => $distrito,
+                'direccion' => $direccion,
+                'nivel' => $nivel,
+                'card' => $departamento, // Para cards: solo departamento
+                'full' => $full, // Para detalles: ubicación formateada según nivel
+            );
+        }
+        
+        // Fallback a taxonomía (solo departamento)
+        $terms = wp_get_post_terms($post_id, 'ubicacion', array('fields' => 'names'));
+        if (!empty($terms)) {
+            return array(
+                'departamento' => $terms[0],
+                'provincia' => '',
+                'distrito' => '',
+                'direccion' => '',
+                'nivel' => 'DEPARTAMENTO',
+                'card' => $terms[0],
+                'full' => $terms[0],
+            );
+        }
+        
+        return null;
+    }
+}
+
 if (!function_exists('agrochamba_add_location_to_rest_response')) {
     function agrochamba_add_location_to_rest_response() {
         // Campo para mostrar ubicación formateada
         register_rest_field('trabajo', 'ubicacion_display', array(
             'get_callback' => function($post) {
-                $ubicacion = get_post_meta($post['id'], '_ubicacion_completa', true);
-                
-                if (!empty($ubicacion) && !empty($ubicacion['departamento'])) {
-                    $departamento = $ubicacion['departamento'];
-                    $provincia = $ubicacion['provincia'] ?? '';
-                    $distrito = $ubicacion['distrito'] ?? '';
-                    $direccion = $ubicacion['direccion'] ?? '';
-                    
-                    // Obtener el nivel de especificidad (DEPARTAMENTO, PROVINCIA, DISTRITO)
-                    $nivel = strtoupper($ubicacion['nivel'] ?? '');
-                    if (!in_array($nivel, array('DEPARTAMENTO', 'PROVINCIA', 'DISTRITO'))) {
-                        // Detectar nivel automáticamente si no está definido
-                        if (empty($provincia) || $provincia === $departamento) {
-                            $nivel = 'DEPARTAMENTO';
-                        } elseif (empty($distrito) || $distrito === $provincia) {
-                            $nivel = 'PROVINCIA';
-                        } else {
-                            $nivel = 'DISTRITO';
-                        }
-                    }
-                    
-                    // Formatear según el nivel de especificidad
-                    switch ($nivel) {
-                        case 'DEPARTAMENTO':
-                            $full = $departamento;
-                            break;
-                        case 'PROVINCIA':
-                            $full = $provincia . ', ' . $departamento;
-                            break;
-                        case 'DISTRITO':
-                        default:
-                            $full = implode(', ', array_filter(array($distrito, $provincia, $departamento)));
-                            break;
-                    }
-                    
-                    return array(
-                        'departamento' => $departamento,
-                        'provincia' => $provincia,
-                        'distrito' => $distrito,
-                        'direccion' => $direccion,
-                        'nivel' => $nivel,
-                        // Para cards: solo departamento
-                        'card' => $departamento,
-                        // Para detalles: ubicación formateada según nivel
-                        'full' => $full,
-                    );
-                }
-                
-                // Fallback a taxonomía (solo departamento)
-                $terms = wp_get_post_terms($post['id'], 'ubicacion', array('fields' => 'names'));
-                if (!empty($terms)) {
-                    return array(
-                        'departamento' => $terms[0],
-                        'provincia' => '',
-                        'distrito' => '',
-                        'direccion' => '',
-                        'nivel' => 'DEPARTAMENTO',
-                        'card' => $terms[0],
-                        'full' => $terms[0],
-                    );
-                }
-                
-                return null;
+                return agrochamba_get_job_location_display_data($post['id']);
             },
             'schema' => array(
                 'type' => 'object',

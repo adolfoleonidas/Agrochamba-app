@@ -101,14 +101,17 @@ function agrochamba_sanitize_sedes($sedes) {
             'distrito' => isset($sede['distrito']) ? $sede['distrito'] : '',
         );
         
-        if (!agrochamba_is_valid_location($ubicacion)) {
-            continue; // Saltar sedes con ubicación inválida
-        }
-        
-        // Normalizar ubicación
+        // Intentar normalizar ubicación
         $ubicacion_normalizada = agrochamba_normalize_location($ubicacion);
+        
+        // Si no se puede normalizar, usar valores originales sanitizados
+        // Esto evita que se pierdan datos si la ubicación no coincide exactamente con nuestra BD
         if (!$ubicacion_normalizada) {
-            continue;
+            $ubicacion_normalizada = array(
+                'departamento' => sanitize_text_field($ubicacion['departamento']),
+                'provincia' => sanitize_text_field($ubicacion['provincia']),
+                'distrito' => sanitize_text_field($ubicacion['distrito']),
+            );
         }
         
         $sanitized[] = array(
@@ -476,11 +479,18 @@ function agrochamba_update_company_sede($request) {
             'distrito' => $body['distrito'],
         );
         
-        if (agrochamba_is_valid_location($ubicacion)) {
-            $ubicacion_normalizada = agrochamba_normalize_location($ubicacion);
+        // Intentar normalizar
+        $ubicacion_normalizada = agrochamba_normalize_location($ubicacion);
+        
+        if ($ubicacion_normalizada) {
             $sedes[$index]['departamento'] = $ubicacion_normalizada['departamento'];
             $sedes[$index]['provincia'] = $ubicacion_normalizada['provincia'];
             $sedes[$index]['distrito'] = $ubicacion_normalizada['distrito'];
+        } else {
+            // Si falla normalización, usar valores enviados sanitizados
+            $sedes[$index]['departamento'] = sanitize_text_field($body['departamento']);
+            $sedes[$index]['provincia'] = sanitize_text_field($body['provincia']);
+            $sedes[$index]['distrito'] = sanitize_text_field($body['distrito']);
         }
     }
     

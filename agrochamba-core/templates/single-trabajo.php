@@ -105,24 +105,29 @@ if (!empty($ubicacion_completa) && !empty($ubicacion_completa['departamento'])) 
     }
     
     // Formatear según el nivel
-    switch ($nivel) {
-        case 'DEPARTAMENTO':
-            $ubicacion_display = $ubicacion_completa['departamento'];
-            break;
-        case 'PROVINCIA':
-            $ubicacion_display = $ubicacion_completa['provincia'] . ', ' . $ubicacion_completa['departamento'];
-            break;
-        case 'DISTRITO':
-        default:
-            $parts = array_filter(array(
-                $ubicacion_completa['distrito'] ?? '',
-                $ubicacion_completa['provincia'] ?? '',
-                $ubicacion_completa['departamento']
-            ));
-            $ubicacion_display = implode(', ', $parts);
-            break;
+        switch ($nivel) {
+            case 'DEPARTAMENTO':
+                $ubicacion_display = $ubicacion_completa['departamento'];
+                break;
+            case 'PROVINCIA':
+                $ubicacion_display = $ubicacion_completa['provincia'] . ', ' . $ubicacion_completa['departamento'];
+                break;
+            case 'DISTRITO':
+            default:
+                $parts = array_filter(array(
+                    $ubicacion_completa['distrito'] ?? '',
+                    $ubicacion_completa['provincia'] ?? '',
+                    $ubicacion_completa['departamento']
+                ));
+                $ubicacion_display = implode(', ', $parts);
+                break;
+        }
+
+        // Agregar dirección exacta si existe
+        if (!empty($ubicacion_completa['direccion'])) {
+            $ubicacion_display = $ubicacion_completa['direccion'] . ', ' . $ubicacion_display;
+        }
     }
-}
 
 // Fallback a taxonomía si no hay ubicación completa
 $ubicaciones = wp_get_post_terms($trabajo_id, 'ubicacion');

@@ -220,7 +220,14 @@ if (!$has_filters && is_post_type_archive('trabajo') && !is_tax()) {
                     $cultivos = wp_get_post_terms($trabajo_id, 'cultivo', array('fields' => 'names'));
                     $empresas = wp_get_post_terms($trabajo_id, 'empresa', array('fields' => 'names'));
                     
-                    $ubicacion = !empty($ubicaciones) ? $ubicaciones[0] : '';
+                    // Obtener ubicación de meta (prioridad)
+                    $ubicacion_meta = get_post_meta($trabajo_id, '_ubicacion_completa', true);
+                    $ubicacion_dept = '';
+                    if (!empty($ubicacion_meta) && !empty($ubicacion_meta['departamento'])) {
+                        $ubicacion_dept = $ubicacion_meta['departamento'];
+                    }
+
+                    $ubicacion = $ubicacion_dept ? $ubicacion_dept : (!empty($ubicaciones) ? $ubicaciones[0] : '');
                     $cultivo = !empty($cultivos) ? $cultivos[0] : '';
                     $empresa = !empty($empresas) ? $empresas[0] : '';
                     

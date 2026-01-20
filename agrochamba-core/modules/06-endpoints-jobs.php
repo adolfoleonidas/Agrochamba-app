@@ -890,6 +890,7 @@ if (!function_exists('agrochamba_get_current_user_jobs')) {
                     'featured_media_url' => $featured_media_url,
                     'gallery_ids' => is_array($gallery_ids) ? $gallery_ids : array(),
                     'ubicacion' => $ubicacion_data,
+                    'ubicacion_display' => function_exists('agrochamba_get_job_location_display_data') ? agrochamba_get_job_location_display_data($post_id) : null,
                     '_ubicacion_completa' => is_array($ubicacion_completa_meta) ? $ubicacion_completa_meta : null,
                     'cultivo' => $cultivo_data,
                     'tipo_puesto' => $tipo_puesto_data,
@@ -974,11 +975,20 @@ if (!function_exists('agrochamba_get_single_job')) {
         $ubicacion_completa = get_post_meta($post_id, '_ubicacion_completa', true);
         
         // Formatear taxonomías
-        $ubicacion_data = !empty($ubicaciones) && !is_wp_error($ubicaciones) ? array(
-            'id' => $ubicaciones[0]->term_id,
-            'name' => $ubicaciones[0]->name,
-            'slug' => $ubicaciones[0]->slug
-        ) : null;
+        // Priorizar meta field para ubicación
+        if (!empty($ubicacion_completa) && !empty($ubicacion_completa['departamento'])) {
+             $ubicacion_data = array(
+                'id' => 0,
+                'name' => $ubicacion_completa['departamento'],
+                'slug' => sanitize_title($ubicacion_completa['departamento'])
+            );
+        } else {
+            $ubicacion_data = !empty($ubicaciones) && !is_wp_error($ubicaciones) ? array(
+                'id' => $ubicaciones[0]->term_id,
+                'name' => $ubicaciones[0]->name,
+                'slug' => $ubicaciones[0]->slug
+            ) : null;
+        }
         
         $cultivo_data = !empty($cultivos) && !is_wp_error($cultivos) ? array(
             'id' => $cultivos[0]->term_id,
@@ -1017,8 +1027,7 @@ if (!function_exists('agrochamba_get_single_job')) {
             'featured_media_url' => $featured_media_url,
             'gallery_ids' => is_array($gallery_ids) ? $gallery_ids : array(),
             'ubicacion' => $ubicacion_data,
-            'cultivo' => $cultivo_data,
-            'tipo_puesto' => $tipo_puesto_data,
+            'o_puesto' => $tipo_puesto_data,
             'empresa' => $empresa_data,
             'salario_min' => $salario_min ? intval($salario_min) : 0,
             'salario_max' => $salario_max ? intval($salario_max) : 0,
@@ -1096,7 +1105,8 @@ if (!function_exists('agrochamba_get_company_jobs')) {
                 'date' => $job->post_date,
                 'link' => get_permalink($job->ID),
                 'featured_media' => get_post_thumbnail_id($job->ID),
-            );
+            );bnail_id($jo->ID),
+                'ubicacion_display' => functio_exists('agrochamba_get_job_loction_dspaydata') ? agrochamba_get_job_locaton_isplay_data : null
         }
             wp_reset_postdata();
         }
@@ -1239,6 +1249,7 @@ if (!function_exists('agrochamba_get_company_profile_with_jobs')) {
                     'link' => get_permalink($job->ID),
                     'featured_image_url' => $featured_image_url,
                     'ubicacion' => $ubicacion_dept, // Departamento para cards
+                    'ubicacion_display' => function_exists('agrochamba_get_job_location_display_data') ? agrochamba_get_job_location_display_data($job->ID) : null,
                     '_ubicacion_completa' => is_array($ubicacion_completa) ? $ubicacion_completa : null,
                     'cultivo' => !empty($cultivos) ? $cultivos[0] : null,
                     'tipo_puesto' => !empty($tipos_puesto) ? $tipos_puesto[0] : null,
