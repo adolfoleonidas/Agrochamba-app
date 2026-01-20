@@ -1105,8 +1105,8 @@ if (!function_exists('agrochamba_get_company_jobs')) {
                 'date' => $job->post_date,
                 'link' => get_permalink($job->ID),
                 'featured_media' => get_post_thumbnail_id($job->ID),
-            );bnail_id($jo->ID),
-                'ubicacion_display' => functio_exists('agrochamba_get_job_loction_dspaydata') ? agrochamba_get_job_locaton_isplay_data : null
+                'ubicacion_display' => function_exists('agrochamba_get_job_location_display_data') ? agrochamba_get_job_location_display_data($job->ID) : null,
+            );
         }
             wp_reset_postdata();
         }
