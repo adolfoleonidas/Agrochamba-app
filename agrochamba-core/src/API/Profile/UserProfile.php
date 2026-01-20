@@ -147,6 +147,7 @@ class UserProfile
         }
 
         $params = $request->get_json_params();
+        $old_display_name = $user->display_name;
 
         $updates = [];
         if (isset($params['first_name'])) {
@@ -181,6 +182,52 @@ class UserProfile
         // Guardar phone y bio en user_meta para TODOS los usuarios (incluidas empresas)
         foreach ($meta_updates as $key => $value) {
             update_user_meta($user_id, $key, $value);
+        }
+
+        if ($is_enterprise && isset($updates['display_name'])) {
+            $new_display_name = $updates['display_name'];
+            $term_id = (int) get_user_meta($user_id, 'empresa_term_id', true);
+
+            if ($term_id) {
+                $term = get_term($term_id, 'empresa');
+                if ($term && !is_wp_error($term)) {
+                    wp_update_term($term_id, 'empresa', [
+                        'name' => $new_display_name,
+                        'slug' => sanitize_title($new_display_name),
+                    ]);
+                } else {
+                    delete_user_meta($user_id, 'empresa_term_id');
+                    $term_id = 0;
+                }
+            }
+
+            if (!$term_id) {
+                $old_term = get_term_by('name', $old_display_name, 'empresa');
+                if ($old_term) {
+                    wp_update_term($old_term->term_id, 'empresa', [
+                        'name' => $new_display_name,
+                        'slug' => sanitize_title($new_display_name),
+                    ]);
+                    update_user_meta($user_id, 'empresa_term_id', $old_term->term_id);
+                } else {
+                    $term_result = wp_insert_term(
+                        $new_display_name,
+                        'empresa',
+                        [
+                            'description' => 'Empresa: ' . $new_display_name,
+                            'slug' => sanitize_title($new_display_name),
+                        ]
+                    );
+                    if (!is_wp_error($term_result) && isset($term_result['term_id'])) {
+                        update_user_meta($user_id, 'empresa_term_id', $term_result['term_id']);
+                    }
+                }
+            }
+
+            if (function_exists('agrochamba_invalidate_company_cache')) {
+                agrochamba_invalidate_company_cache($old_display_name);
+                agrochamba_invalidate_company_cache($new_display_name);
+            }
         }
 
         // Si es empresa, guardar datos adicionales en CPT
@@ -224,11 +271,7 @@ class UserProfile
                 if (isset($updates['display_name'])) {
                     $empresa_updates['post_title'] = $updates['display_name'];
                     update_post_meta($empresa->ID, '_empresa_nombre_comercial', $updates['display_name']);
-                    // También actualizar razón social si no existe
-                    $razon_social = get_post_meta($empresa->ID, '_empresa_razon_social', true);
-                    if (empty($razon_social)) {
-                        update_post_meta($empresa->ID, '_empresa_razon_social', $updates['display_name']);
-                    }
+                    update_post_meta($empresa->ID, '_empresa_razon_social', $updates['display_name']);
                 }
 
                 // Actualizar contenido del post si hay cambios
