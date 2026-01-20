@@ -87,9 +87,33 @@ class ProfilePhoto
             );
         }
 
-        $attachment_id = media_handle_upload('file', 0);
-        if (is_wp_error($attachment_id)) {
-            return new WP_Error('upload_error', 'Error al subir la imagen: ' . $attachment_id->get_error_message(), ['status' => 400]);
+        // Usar wp_handle_upload directamente para evitar problemas con test_form en REST API
+        $upload_overrides = ['test_form' => false];
+        $movefile = wp_handle_upload($file, $upload_overrides);
+
+        if ($movefile && !isset($movefile['error'])) {
+            // El archivo se subió correctamente, ahora creamos el attachment
+            $filename = $movefile['file'];
+            $filetype = wp_check_filetype(basename($filename), null);
+            
+            $attachment = [
+                'post_mime_type' => $filetype['type'],
+                'post_title'     => sanitize_file_name(preg_replace('/\.[^.]+$/', '', basename($filename))),
+                'post_content'   => '',
+                'post_status'    => 'inherit'
+            ];
+
+            $attachment_id = wp_insert_attachment($attachment, $filename, 0);
+
+            if (!is_wp_error($attachment_id)) {
+                require_once(ABSPATH . 'wp-admin/includes/image.php');
+                $attach_data = wp_generate_attachment_metadata($attachment_id, $filename);
+                wp_update_attachment_metadata($attachment_id, $attach_data);
+            } else {
+                return new WP_Error('upload_error', 'Error al crear el attachment: ' . $attachment_id->get_error_message(), ['status' => 500]);
+            }
+        } else {
+            return new WP_Error('upload_error', 'Error al subir el archivo: ' . $movefile['error'], ['status' => 400]);
         }
 
         $user = get_userdata($user_id);
