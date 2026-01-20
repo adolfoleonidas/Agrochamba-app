@@ -22,6 +22,7 @@ class UbicacionCompletaAdapter {
                 var direccion: String? = null
                 var lat: Double? = null
                 var lng: Double? = null
+                var nivelStr: String? = null
                 
                 while (reader.hasNext()) {
                     when (reader.nextName()) {
@@ -33,6 +34,7 @@ class UbicacionCompletaAdapter {
                         "lng" -> lng = reader.nextDoubleOrNull()
                         "latitud" -> lat = reader.nextDoubleOrNull()
                         "longitud" -> lng = reader.nextDoubleOrNull()
+                        "nivel" -> nivelStr = reader.nextStringOrNull()
                         else -> reader.skipValue()
                     }
                 }
@@ -40,13 +42,29 @@ class UbicacionCompletaAdapter {
                 
                 // Solo devolver objeto si tiene al menos departamento
                 if (departamento.isNotBlank()) {
+                    // Determinar el nivel: usar el explícito del backend o detectarlo automáticamente
+                    val nivel = when (nivelStr?.uppercase()) {
+                        "DEPARTAMENTO" -> LocationType.DEPARTAMENTO
+                        "PROVINCIA" -> LocationType.PROVINCIA
+                        "DISTRITO" -> LocationType.DISTRITO
+                        else -> {
+                            // Detectar nivel basándose en los datos disponibles
+                            when {
+                                provincia.isBlank() || provincia == departamento -> LocationType.DEPARTAMENTO
+                                distrito.isBlank() || distrito == provincia -> LocationType.PROVINCIA
+                                else -> LocationType.DISTRITO
+                            }
+                        }
+                    }
+                    
                     UbicacionCompleta(
                         departamento = departamento,
-                        provincia = provincia.ifBlank { departamento },
-                        distrito = distrito.ifBlank { provincia.ifBlank { departamento } },
+                        provincia = provincia,
+                        distrito = distrito,
                         direccion = direccion,
                         lat = lat,
-                        lng = lng
+                        lng = lng,
+                        nivel = nivel
                     )
                 } else {
                     null
@@ -84,6 +102,8 @@ class UbicacionCompletaAdapter {
             value.direccion?.let { writer.name("direccion").value(it) }
             value.lat?.let { writer.name("lat").value(it) }
             value.lng?.let { writer.name("lng").value(it) }
+            // Incluir el nivel de especificidad
+            writer.name("nivel").value(value.nivel.name)
             writer.endObject()
         }
     }

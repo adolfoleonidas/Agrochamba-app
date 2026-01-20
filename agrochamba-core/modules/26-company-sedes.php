@@ -50,26 +50,34 @@ if (!function_exists('agrochamba_register_sedes_meta')) {
         ));
         
         // Meta field para ubicación estructurada del trabajo
-        register_post_meta('trabajo', '_ubicacion_completa', array(
-            'type' => 'object',
-            'description' => 'Ubicación completa del trabajo (departamento, provincia, distrito)',
-            'single' => true,
-            'show_in_rest' => array(
-                'schema' => array(
-                    'type' => 'object',
-                    'properties' => array(
-                        'departamento' => array('type' => 'string'),
-                        'provincia' => array('type' => 'string'),
-                        'distrito' => array('type' => 'string'),
-                        'direccion' => array('type' => 'string'),
-                        'lat' => array('type' => 'number'),
-                        'lng' => array('type' => 'number'),
+        // NOTA: Este meta también se registra en 27-location-system.php con la misma estructura
+        if (!registered_meta_key_exists('post', '_ubicacion_completa', 'trabajo')) {
+            register_post_meta('trabajo', '_ubicacion_completa', array(
+                'type' => 'object',
+                'description' => 'Ubicación completa del trabajo con nivel de especificidad',
+                'single' => true,
+                'show_in_rest' => array(
+                    'schema' => array(
+                        'type' => 'object',
+                        'properties' => array(
+                            'departamento' => array('type' => 'string'),
+                            'provincia' => array('type' => 'string'),
+                            'distrito' => array('type' => 'string'),
+                            'direccion' => array('type' => 'string'),
+                            'lat' => array('type' => 'number'),
+                            'lng' => array('type' => 'number'),
+                            'nivel' => array(
+                                'type' => 'string',
+                                'enum' => array('DEPARTAMENTO', 'PROVINCIA', 'DISTRITO'),
+                                'description' => 'Nivel de especificidad de la ubicación',
+                            ),
+                        ),
                     ),
                 ),
-            ),
-            'default' => array(),
-            'sanitize_callback' => 'agrochamba_sanitize_ubicacion',
-        ));
+                'default' => array(),
+                'sanitize_callback' => 'agrochamba_sanitize_ubicacion',
+            ));
+        }
     }
     add_action('init', 'agrochamba_register_sedes_meta');
 }

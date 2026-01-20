@@ -1,223 +1,3 @@
-﻿package agrochamba.com.data
-
-import java.text.Normalizer
-import java.util.UUID
-
-/**
- * =============================================================================
- * PERU LOCATIONS - Fuente única de verdad para ubicaciones del Perú
- * =============================================================================
- * 
- * Este archivo contiene:
- * - Datos completos de departamentos, provincias y distritos del Perú
- * - Funciones de búsqueda inteligente con fuzzy matching
- * - Funciones de resolución (reverse lookup)
- * - Funciones de validación y normalización
- * - Modelos de datos para ubicaciones y sedes
- */
-
-// =============================================================================
-// MODELOS DE DATOS
-// =============================================================================
-
-/**
- * Tipo de ubicación en la jerarquía
- */
-enum class LocationType {
-    DEPARTAMENTO,
-    PROVINCIA,
-    DISTRITO
-}
-
-/**
- * Ubicación completa con los 3 niveles jerárquicos
- * 
- * @param nivel Indica el nivel de especificidad que el usuario seleccionó:
- *              - DEPARTAMENTO: Solo se especificó el departamento
- *              - PROVINCIA: Se especificó departamento y provincia  
- *              - DISTRITO: Se especificó la ubicación completa (departamento, provincia, distrito)
- */
-data class UbicacionCompleta(
-    val departamento: String,
-    val provincia: String,
-    val distrito: String,
-    val direccion: String? = null,
-    val coordenadas: Coordenadas? = null,
-    // Campos alternativos para compatibilidad con backend que guarda lat/lng directamente
-    val lat: Double? = null,
-    val lng: Double? = null,
-    // Nivel de especificidad seleccionado por el usuario
-    val nivel: LocationType = LocationType.DISTRITO
-) {
-    /**
-     * Obtiene las coordenadas, ya sea del objeto coordenadas o de lat/lng directos
-     */
-    fun obtenerCoordenadas(): Coordenadas? {
-        return coordenadas ?: if (lat != null && lng != null && lat != 0.0 && lng != 0.0) {
-            Coordenadas(lat, lng)
-        } else null
-    }
-    
-    /**
-     * Formato para mostrar en cards (solo departamento)
-     */
-    fun formatForCard(): String = departamento
-    
-    /**
-     * Formato para selector de sedes
-     */
-    fun formatForSedeSelector(): String = when (nivel) {
-        LocationType.DEPARTAMENTO -> departamento
-        LocationType.PROVINCIA -> "$provincia, $departamento"
-        LocationType.DISTRITO -> "$distrito, $provincia"
-    }
-    
-    /**
-     * Formato en una línea según el nivel de especificidad
-     * Respeta el nivel que el usuario seleccionó originalmente
-     */
-    fun formatOneLine(includeDireccion: Boolean = false): String {
-        val base = when (nivel) {
-            LocationType.DEPARTAMENTO -> departamento
-            LocationType.PROVINCIA -> "$provincia, $departamento"
-            LocationType.DISTRITO -> "$distrito, $provincia, $departamento"
-        }
-        return if (includeDireccion && direccion != null) "$base - $direccion" else base
-    }
-    
-    /**
-     * Formato para mostrar en los detalles del trabajo
-     * Muestra solo los niveles que corresponden según la especificidad seleccionada
-     */
-    fun formatForJobDetail(): String = formatOneLine()
-    
-    /**
-     * Detecta el nivel basándose en los datos disponibles
-     * Útil para datos legacy que no tienen el campo nivel
-     */
-    fun detectarNivel(): LocationType {
-        return when {
-            // Si provincia está vacía o es igual a departamento, es solo departamento
-            provincia.isBlank() || provincia == departamento -> LocationType.DEPARTAMENTO
-            // Si distrito está vacío o es igual a provincia, es solo provincia
-            distrito.isBlank() || distrito == provincia -> LocationType.PROVINCIA
-            // Si tiene los tres diferentes, es distrito
-            else -> LocationType.DISTRITO
-        }
-    }
-    
-    /**
-     * Obtiene el nivel efectivo: usa el nivel explícito si es válido, sino lo detecta
-     */
-    fun getNivelEfectivo(): LocationType {
-        // Si el nivel es DISTRITO pero los datos sugieren algo diferente, detectar
-        return if (nivel == LocationType.DISTRITO) {
-            detectarNivel()
-        } else {
-            nivel
-        }
-    }
-}
-
-data class Coordenadas(
-    val lat: Double,
-    val lng: Double
-)
-
-/**
- * Departamento popular para sugerencias rápidas
- */
-data class PopularDepartamento(
-    val departamento: String,
-    val description: String
-)
-
-/**
- * Resultado de búsqueda de ubicación
- */
-data class LocationSearchResult(
-    val texto: String,
-    val tipo: LocationType,
-    val departamento: String,
-    val provincia: String? = null,
-    val distrito: String? = null,
-    val displayLabel: String,
-    val score: Int // Score de relevancia (mayor = más relevante)
-) {
-    /**
-     * Convierte el resultado a UbicacionCompleta
-     * IMPORTANTE: Respeta el nivel de especificidad seleccionado por el usuario
-     * - Si seleccionó departamento, solo guarda departamento
-     * - Si seleccionó provincia, guarda departamento y provincia
-     * - Si seleccionó distrito, guarda todo
-     */
-    fun toUbicacionCompleta(): UbicacionCompleta? {
-        return when (tipo) {
-            LocationType.DISTRITO -> UbicacionCompleta(
-                departamento = departamento,
-                provincia = provincia ?: return null,
-                distrito = distrito ?: return null,
-                nivel = LocationType.DISTRITO
-            )
-            LocationType.PROVINCIA -> {
-                // Solo guardar departamento y provincia, SIN rellenar distrito
-                UbicacionCompleta(
-                    departamento = departamento,
-                    provincia = provincia ?: return null,
-                    distrito = "", // Vacío - el usuario no especificó distrito
-                    nivel = LocationType.PROVINCIA
-                )
-            }
-            LocationType.DEPARTAMENTO -> {
-                // Solo guardar departamento, SIN rellenar provincia ni distrito
-                UbicacionCompleta(
-                    departamento = departamento,
-                    provincia = "", // Vacío - el usuario no especificó provincia
-                    distrito = "", // Vacío - el usuario no especificó distrito
-                    nivel = LocationType.DEPARTAMENTO
-                )
-            }
-        }
-    }
-}
-
-/**
- * Sede de empresa
- */
-data class SedeEmpresa(
-    val id: String,
-    val nombre: String,
-    val ubicacion: UbicacionCompleta,
-    val esPrincipal: Boolean,
-    val activa: Boolean = true
-)
-
-/**
- * Estructura interna para provincia
- */
-data class Provincia(
-    val provincia: String,
-    val distritos: List<String>
-)
-
-/**
- * Estructura interna para departamento
- */
-data class Departamento(
-    val departamento: String,
-    val provincias: List<Provincia>
-)
-
-// =============================================================================
-// OBJETO PRINCIPAL CON DATOS Y FUNCIONES
-// =============================================================================
-
-object PeruLocations {
-    
-    // =========================================================================
-    // DATOS DE DEPARTAMENTOS, PROVINCIAS Y DISTRITOS
-    // =========================================================================
-    
     val departamentosPeru: List<Departamento> = listOf(
         Departamento(
             departamento = "Amazonas",
@@ -263,7 +43,7 @@ object PeruLocations {
                 Provincia("Andahuaylas", listOf("Andahuaylas", "Andarapa", "Chiara", "Huancarama", "Huancaray", "Huayana", "Jose Maria Arguedas", "Kaquiabamba", "Kishuara", "Pacobamba", "Pacucha", "Pampachiri", "Pomacocha", "San Antonio de Cachi", "San Jeronimo", "San Miguel de Chaccrampa", "Santa Maria de Chicmo", "Talavera", "Tumay Huaraca", "Turpo")),
                 Provincia("Antabamba", listOf("Antabamba", "El Oro", "Huaquirca", "Juan Espinoza Medrano", "Oropesa", "Pachaconas", "Sabaino")),
                 Provincia("Aymaraes", listOf("Capaya", "Caraybamba", "Chalhuanca", "Chapimarca", "Colcabamba", "Cotaruse", "Huayllu", "Justo Apu Sahuaraura", "Lucre", "Pocohuanca", "San Juan de Chacña", "Sañayca", "Soraya", "Tapairihua", "Tintay", "Toraya", "Yanaca")),
-                Provincia("Chincheros", listOf("Ahuayro", "Anco-huallo", "Chincheros", "Cocharcas", "El Porvenir", "Huaccana", "Los Chankas", "Ocobamba", "Ongoy", "Ranracancha", "Rocchacc", "Uranmarca")),
+                Provincia("Chincheros", listOf("Ahuayro", "Anco-Huallo", "Chincheros", "Cocharcas", "El Porvenir", "Huaccana", "Los Chankas", "Ocobamba", "Ongoy", "Ranracancha", "Rocchacc", "Uranmarca")),
                 Provincia("Cotabambas", listOf("Challhuahuacho", "Cotabambas", "Coyllurqui", "Haquira", "Mara", "Tambobamba")),
                 Provincia("Grau", listOf("Chuquibambilla", "Curasco", "Curpahuasi", "Huayllati", "Mamara", "Mariscal Gamarra", "Micaela Bastidas", "Pataypampa", "Progreso", "San Antonio", "Santa Rosa", "Turpay", "Vilcabamba", "Virundo"))
             )
@@ -274,7 +54,7 @@ object PeruLocations {
                 Provincia("Arequipa", listOf("Alto Selva Alegre", "Arequipa", "Cayma", "Cerro Colorado", "Characato", "Chiguata", "Jacobo Hunter", "Jose Luis Bustamante y Rivero", "La Joya", "Mariano Melgar", "Miraflores", "Mollebaya", "Paucarpata", "Pocsi", "Polobaya", "Quequeña", "Sabandia", "Sachaca", "San Juan de Siguas", "San Juan de Tarucani", "Santa Isabel de Siguas", "Santa Rita de Siguas", "Socabaya", "Tiabaya", "Uchumayo", "Vitor", "Yanahuara", "Yarabamba", "Yura")),
                 Provincia("Camana", listOf("Camana", "Jose Maria Quimper", "Mariano Nicolas Valcarcel", "Mariscal Caceres", "Nicolas de Pierola", "Ocoña", "Quilca", "Samuel Pastor")),
                 Provincia("Caraveli", listOf("Acari", "Atico", "Atiquipa", "Bella Union", "Cahuacho", "Caraveli", "Chala", "Chaparra", "Huanuhuanu", "Jaqui", "Lomas", "Quicacha", "Yauca")),
-                Provincia("Castilla", listOf("Andagua", "Aplao", "Ayo", "Chachas", "Chilcaymarca", "Choco", "Huancarqui", "Machaguay", "Orcopampa", "Pampacolca", "Tipan", "Uraca", "Uñon", "Viraco")),
+                Provincia("Castilla", listOf("Andagua", "Aplao", "Ayo", "Chachas", "Chilcaymarca", "Choco", "Huancarqui", "Machaguay", "Orcopampa", "Pampacolca", "Tipan", "Uñon", "Uraca", "Viraco")),
                 Provincia("Caylloma", listOf("Achoma", "Cabanaconde", "Callalli", "Caylloma", "Chivay", "Coporaque", "Huambo", "Huanca", "Ichupampa", "Lari", "Lluta", "Maca", "Madrigal", "Majes", "San Antonio de Chuca", "Sibayo", "Tapay", "Tisco", "Tuti", "Yanque")),
                 Provincia("Condesuyos", listOf("Andaray", "Cayarani", "Chichas", "Chuquibamba", "Iray", "Rio Grande", "Salamanca", "Yanaquihua")),
                 Provincia("Islay", listOf("Cocachacra", "Dean Valdivia", "Islay", "Mejia", "Mollendo", "Punta de Bombon")),
@@ -289,7 +69,7 @@ object PeruLocations {
                 Provincia("Huanca Sancos", listOf("Carapo", "Sacsamarca", "Sancos", "Santiago de Lucanamarca")),
                 Provincia("Huanta", listOf("Ayahuanco", "Canayre", "Chaca", "Huamanguilla", "Huanta", "Iguain", "Llochegua", "Luricocha", "Pucacolpa", "Putis", "Santillana", "Sivia", "Uchuraccay")),
                 Provincia("La Mar", listOf("Anchihuay", "Anco", "Ayna", "Chilcas", "Chungui", "Luis Carranza", "Ninabamba", "Oronccoy", "Patibamba", "Rio Magdalena", "Samugari", "San Miguel", "Santa Rosa", "Tambo", "Union Progreso")),
-                Provincia("Lucanas", listOf("Aucara", "Cabana", "Carmen Salcedo", "Chaviña", "Chipao", "Huac-huas", "Laramate", "Leoncio Prado", "Llauta", "Lucanas", "Ocaña", "Otoca", "Puquio", "Saisa", "San Cristobal", "San Juan", "San Pedro", "San Pedro de Palco", "Sancos", "Santa Ana de Huaycahuacho", "Santa Lucia")),
+                Provincia("Lucanas", listOf("Aucara", "Cabana", "Carmen Salcedo", "Chaviña", "Chipao", "Huac-Huas", "Laramate", "Leoncio Prado", "Llauta", "Lucanas", "Ocaña", "Otoca", "Puquio", "Saisa", "San Cristobal", "San Juan", "San Pedro", "San Pedro de Palco", "Sancos", "Santa Ana de Huaycahuacho", "Santa Lucia")),
                 Provincia("Parinacochas", listOf("Chumpi", "Coracora", "Coronel Castañeda", "Pacapausa", "Pullo", "Puyusca", "San Francisco de Ravacayco", "Upahuacho")),
                 Provincia("Paucar del Sara Sara", listOf("Colta", "Corculla", "Lampa", "Marcabamba", "Oyolo", "Pararca", "Pausa", "San Javier de Alpabamba", "San Jose de Ushua", "Sara Sara")),
                 Provincia("Sucre", listOf("Belen", "Chalcos", "Chilcayoc", "Huacaña", "Morcolla", "Paico", "Querobamba", "San Pedro de Larcay", "San Salvador de Quije", "Santiago de Paucaray", "Soras")),
@@ -318,7 +98,7 @@ object PeruLocations {
         Departamento(
             departamento = "Callao",
             provincias = listOf(
-                Provincia("Callao", listOf("Bellavista", "Callao", "Carmen de la Legua-reynoso", "La Perla", "La Punta", "Mi Peru", "Ventanilla"))
+                Provincia("Callao", listOf("Bellavista", "Callao", "Carmen de la Legua-Reynoso", "La Perla", "La Punta", "Mi Peru", "Ventanilla"))
             )
         ),
         Departamento(
@@ -343,12 +123,12 @@ object PeruLocations {
             departamento = "Huancavelica",
             provincias = listOf(
                 Provincia("Acobamba", listOf("Acobamba", "Andabamba", "Anta", "Caja", "Marcas", "Paucara", "Pomacocha", "Rosario")),
-                Provincia("Angaraes", listOf("Anchonga", "Callanmarca", "Ccochaccasa", "Chincho", "Congalla", "Huanca-huanca", "Huayllay Grande", "Julcamarca", "Lircay", "San Antonio de Antaparco", "Santo Tomas de Pata", "Secclla")),
+                Provincia("Angaraes", listOf("Anchonga", "Callanmarca", "Ccochaccasa", "Chincho", "Congalla", "Huanca-Huanca", "Huayllay Grande", "Julcamarca", "Lircay", "San Antonio de Antaparco", "Santo Tomas de Pata", "Secclla")),
                 Provincia("Castrovirreyna", listOf("Arma", "Aurahua", "Capillas", "Castrovirreyna", "Chupamarca", "Cocas", "Huachos", "Huamatambo", "Mollepampa", "San Juan", "Santa Ana", "Tantara", "Ticrapo")),
                 Provincia("Churcampa", listOf("Anco", "Chinchihuasi", "Churcampa", "Cosme", "El Carmen", "La Merced", "Locroja", "Pachamarca", "Paucarbamba", "San Miguel de Mayocc", "San Pedro de Coris")),
                 Provincia("Huancavelica", listOf("Acobambilla", "Acoria", "Ascension", "Conayca", "Cuenca", "Huachocolpa", "Huancavelica", "Huando", "Huayllahuara", "Izcuchaca", "Laria", "Manta", "Mariscal Caceres", "Moya", "Nuevo Occoro", "Palca", "Pilchaca", "Vilca", "Yauli")),
                 Provincia("Huaytara", listOf("Ayavi", "Cordova", "Huayacundo Arma", "Huaytara", "Laramarca", "Ocoyo", "Pilpichaca", "Querco", "Quito Arma", "San Antonio de Cusicancha", "San Francisco de Sangayaico", "San Isidro", "Santiago de Chocorvos", "Santiago de Quirahuara", "Santo Domingo de Capillas", "Tambo")),
-                Provincia("Tayacaja", listOf("Acostambo", "Acraquia", "Ahuaycha", "Andaymarca", "Cochabamba", "Colcabamba", "Daniel Hernandez", "Huachocolpa", "Huaribamba", "Lambras", "Pampas", "Pazos", "Pichos", "Quichuas", "Quishuar", "Roble", "Salcabamba", "Salcahuasi", "San Marcos de Rocchac", "Santiago de Tucuma", "Surcubamba", "Tintay Puncu", "Ñahuimpuquio"))
+                Provincia("Tayacaja", listOf("Acostambo", "Acraquia", "Ahuaycha", "Andaymarca", "Cochabamba", "Colcabamba", "Daniel Hernandez", "Huachocolpa", "Huaribamba", "Lambras", "Ñahuimpuquio", "Pampas", "Pazos", "Pichos", "Quichuas", "Quishuar", "Roble", "Salcabamba", "Salcahuasi", "San Marcos de Rocchac", "Santiago de Tucuma", "Surcubamba", "Tintay Puncu"))
             )
         ),
         Departamento(
@@ -360,7 +140,7 @@ object PeruLocations {
                 Provincia("Huamalies", listOf("Arancay", "Chavin de Pariarca", "Jacas Grande", "Jircan", "Llata", "Miraflores", "Monzon", "Punchao", "Puños", "Singa", "Tantamayo")),
                 Provincia("Huanuco", listOf("Amarilis", "Chinchao", "Churubamba", "Huanuco", "Margos", "Pillco Marca", "Quisqui", "San Francisco de Cayran", "San Pablo de Pillao", "San Pedro de Chaulan", "Santa Maria del Valle", "Yacus", "Yarumayo")),
                 Provincia("Lauricocha", listOf("Baños", "Jesus", "Jivia", "Queropalca", "Rondos", "San Francisco de Asis", "San Miguel de Cauri")),
-                Provincia("Leoncio Prado", listOf("Castillo Grande", "Daniel Alomia Robles", "Hermilio Valdizan", "Jose Crespo y Castillo", "Luyando", "Mariano Damaso Beraun", "Pucayacu", "Pueblo Nuevo", "Rupa-rupa", "Santo Domingo de Anda")),
+                Provincia("Leoncio Prado", listOf("Castillo Grande", "Daniel Alomia Robles", "Hermilio Valdizan", "Jose Crespo y Castillo", "Luyando", "Mariano Damaso Beraun", "Pucayacu", "Pueblo Nuevo", "Rupa-Rupa", "Santo Domingo de Anda")),
                 Provincia("Marañon", listOf("Cholon", "Huacrachuco", "La Morada", "San Buenaventura", "Santa Rosa de Alto Yanajanca")),
                 Provincia("Pachitea", listOf("Chaglla", "Molino", "Panao", "Umari")),
                 Provincia("Puerto Inca", listOf("Codo del Pozuzo", "Honoria", "Puerto Inca", "Tournavista", "Yuyapichis")),
@@ -383,12 +163,12 @@ object PeruLocations {
                 Provincia("Chanchamayo", listOf("Chanchamayo", "Perene", "Pichanaqui", "San Luis de Shuaro", "San Ramon", "Vitoc")),
                 Provincia("Chupaca", listOf("Ahuac", "Chongos Bajo", "Chupaca", "Huachac", "Huamancaca Chico", "San Juan de Jarpa", "San Juan de Yscos", "Tres de Diciembre", "Yanacancha")),
                 Provincia("Concepcion", listOf("Aco", "Andamarca", "Chambara", "Cochas", "Comas", "Concepcion", "Heroinas Toledo", "Manzanares", "Mariscal Castilla", "Matahuasi", "Mito", "Nueve de Julio", "Orcotuna", "San Jose de Quero", "Santa Rosa de Ocopa")),
-                Provincia("Huancayo", listOf("Carhuacallanga", "Chacapampa", "Chicche", "Chilca", "Chongos Alto", "Chupuro", "Colca", "Cullhuas", "El Tambo", "Huacrapuquio", "Hualhuas", "Huancan", "Huancayo", "Huasicancha", "Huayucachi", "Ingenio", "Pariahuanca", "Pilcomayo", "Pucara", "Quichuay", "Quilcas", "San Agustin", "San Jeronimo de Tunan", "Santo Domingo de Acobamba", "Sapallanga", "Saño", "Sicaya", "Viques")),
+                Provincia("Huancayo", listOf("Carhuacallanga", "Chacapampa", "Chicche", "Chilca", "Chongos Alto", "Chupuro", "Colca", "Cullhuas", "El Tambo", "Huacrapuquio", "Hualhuas", "Huancan", "Huancayo", "Huasicancha", "Huayucachi", "Ingenio", "Pariahuanca", "Pilcomayo", "Pucara", "Quichuay", "Quilcas", "San Agustin", "San Jeronimo de Tunan", "Santo Domingo de Acobamba", "Saño", "Sapallanga", "Sicaya", "Viques")),
                 Provincia("Jauja", listOf("Acolla", "Apata", "Ataura", "Canchayllo", "Curicaca", "El Mantaro", "Huamali", "Huaripampa", "Huertas", "Janjaillo", "Jauja", "Julcan", "Leonor Ordoñez", "Llocllapampa", "Marco", "Masma", "Masma Chicche", "Molinos", "Monobamba", "Muqui", "Muquiyauyo", "Paca", "Paccha", "Pancan", "Parco", "Pomacancha", "Ricran", "San Lorenzo", "San Pedro de Chunan", "Sausa", "Sincos", "Tunan Marca", "Yauli", "Yauyos")),
                 Provincia("Junin", listOf("Carhuamayo", "Junin", "Ondores", "Ulcumayo")),
                 Provincia("Satipo", listOf("Coviriali", "Llaylla", "Mazamari", "Pampa Hermosa", "Pangoa", "Rio Negro", "Rio Tambo", "Satipo", "Vizcatan del Ene")),
                 Provincia("Tarma", listOf("Acobamba", "Huaricolca", "Huasahuasi", "La Union", "Palca", "Palcamayo", "San Pedro de Cajas", "Tapo", "Tarma")),
-                Provincia("Yauli", listOf("Chacapalpa", "Huay-huay", "La Oroya", "Marcapomacocha", "Morococha", "Paccha", "Santa Barbara de Carhuacayan", "Santa Rosa de Sacco", "Suitucancha", "Yauli"))
+                Provincia("Yauli", listOf("Chacapalpa", "Huay-Huay", "La Oroya", "Marcapomacocha", "Morococha", "Paccha", "Santa Barbara de Carhuacayan", "Santa Rosa de Sacco", "Suitucancha", "Yauli"))
             )
         ),
         Departamento(
@@ -428,7 +208,7 @@ object PeruLocations {
                 Provincia("Huaura", listOf("Ambar", "Caleta de Carquin", "Checras", "Huacho", "Hualmay", "Huaura", "Leoncio Prado", "Paccho", "Santa Leonor", "Santa Maria", "Sayan", "Vegueta")),
                 Provincia("Lima", listOf("Ancon", "Ate", "Barranco", "Breña", "Carabayllo", "Chaclacayo", "Chorrillos", "Cieneguilla", "Comas", "El Agustino", "Independencia", "Jesus Maria", "La Molina", "La Victoria", "Lima", "Lince", "Los Olivos", "Lurigancho", "Lurin", "Magdalena del Mar", "Miraflores", "Pachacamac", "Pucusana", "Pueblo Libre", "Puente Piedra", "Punta Hermosa", "Punta Negra", "Rimac", "San Bartolo", "San Borja", "San Isidro", "San Juan de Lurigancho", "San Juan de Miraflores", "San Luis", "San Martin de Porres", "San Miguel", "Santa Anita", "Santa Maria del Mar", "Santa Rosa", "Santiago de Surco", "Surquillo", "Villa el Salvador", "Villa Maria del Triunfo")),
                 Provincia("Oyon", listOf("Andajes", "Caujul", "Cochamarca", "Navan", "Oyon", "Pachangara")),
-                Provincia("Yauyos", listOf("Alis", "Ayauca", "Ayaviri", "Azangaro", "Cacra", "Carania", "Catahuasi", "Chocos", "Cochas", "Colonia", "Hongos", "Huampara", "Huancaya", "Huangascar", "Huantan", "Huañec", "Laraos", "Lincha", "Madean", "Miraflores", "Omas", "Putinza", "Quinches", "Quinocay", "San Joaquin", "San Pedro de Pilas", "Tanta", "Tauripampa", "Tomas", "Tupe", "Vitis", "Viñac", "Yauyos"))
+                Provincia("Yauyos", listOf("Alis", "Ayauca", "Ayaviri", "Azangaro", "Cacra", "Carania", "Catahuasi", "Chocos", "Cochas", "Colonia", "Hongos", "Huampara", "Huancaya", "Huangascar", "Huantan", "Huañec", "Laraos", "Lincha", "Madean", "Miraflores", "Omas", "Putinza", "Quinches", "Quinocay", "San Joaquin", "San Pedro de Pilas", "Tanta", "Tauripampa", "Tomas", "Tupe", "Viñac", "Vitis", "Yauyos"))
             )
         ),
         Departamento(
@@ -476,7 +256,7 @@ object PeruLocations {
                 Provincia("Morropon", listOf("Buenos Aires", "Chalaco", "Chulucanas", "La Matanza", "Morropon", "Salitral", "San Juan de Bigote", "Santa Catalina de Mossa", "Santo Domingo", "Yamango")),
                 Provincia("Paita", listOf("Amotape", "Arenal", "Colan", "La Huaca", "Paita", "Tamarindo", "Vichayal")),
                 Provincia("Piura", listOf("Castilla", "Catacaos", "Cura Mori", "El Tallan", "La Arena", "La Union", "Las Lomas", "Piura", "Tambo Grande", "Veintiseis de Octubre")),
-                Provincia("Sechura", listOf("Bellavista de la Union", "Bernal", "Cristo Nos Valga", "Rinconada-llicuar", "Sechura", "Vice")),
+                Provincia("Sechura", listOf("Bellavista de la Union", "Bernal", "Cristo Nos Valga", "Rinconada-Llicuar", "Sechura", "Vice")),
                 Provincia("Sullana", listOf("Bellavista", "Ignacio Escudero", "Lancones", "Marcavelica", "Miguel Checa", "Querecotillo", "Salitral", "Sullana")),
                 Provincia("Talara", listOf("El Alto", "La Brea", "Lobitos", "Los Organos", "Mancora", "Pariñas"))
             )
@@ -541,377 +321,3 @@ object PeruLocations {
             )
         )
     )
-    
-    // =========================================================================
-    // FUNCIONES DE NORMALIZACIÓN
-    // =========================================================================
-    
-    /**
-     * Normaliza texto para búsqueda (quita tildes, minúsculas, espacios extras)
-     */
-    fun normalizeText(text: String): String {
-        return Normalizer.normalize(text.lowercase().trim(), Normalizer.Form.NFD)
-            .replace(Regex("[\\p{InCombiningDiacriticalMarks}]"), "")
-            .replace("ñ", "n")
-            .replace(Regex("\\s+"), " ")
-    }
-    
-    /**
-     * Calcula score de similitud entre dos strings (0-100)
-     */
-    private fun calculateSimilarity(query: String, target: String): Int {
-        val normalizedQuery = normalizeText(query)
-        val normalizedTarget = normalizeText(target)
-        
-        return when {
-            normalizedTarget == normalizedQuery -> 100
-            normalizedTarget.startsWith(normalizedQuery) -> 90
-            normalizedTarget.contains(normalizedQuery) -> 70
-            normalizedQuery.contains(normalizedTarget) -> 50
-            else -> 0
-        }
-    }
-    
-    // =========================================================================
-    // FUNCIONES DE BÚSQUEDA INTELIGENTE
-    // =========================================================================
-    
-    /**
-     * Búsqueda inteligente de ubicaciones
-     * Busca en departamentos, provincias y distritos simultáneamente
-     */
-    fun searchLocation(query: String, limit: Int = 10): List<LocationSearchResult> {
-        if (query.isBlank() || query.length < 2) return emptyList()
-        
-        val results = mutableListOf<LocationSearchResult>()
-        val normalizedQuery = normalizeText(query)
-        val seen = mutableSetOf<String>()
-        
-        for (dep in departamentosPeru) {
-            val depNormalized = normalizeText(dep.departamento)
-            
-            // Buscar en departamentos
-            if (depNormalized.contains(normalizedQuery) || normalizedQuery.contains(depNormalized)) {
-                val score = calculateSimilarity(query, dep.departamento)
-                val key = "dep:${dep.departamento}"
-                if (score > 0 && key !in seen) {
-                    seen.add(key)
-                    results.add(LocationSearchResult(
-                        texto = dep.departamento,
-                        tipo = LocationType.DEPARTAMENTO,
-                        departamento = dep.departamento,
-                        displayLabel = "📍 ${dep.departamento} (Departamento)",
-                        score = score + 10
-                    ))
-                }
-            }
-            
-            for (prov in dep.provincias) {
-                val provNormalized = normalizeText(prov.provincia)
-                
-                // Buscar en provincias
-                if (provNormalized.contains(normalizedQuery) || normalizedQuery.contains(provNormalized)) {
-                    val score = calculateSimilarity(query, prov.provincia)
-                    val key = "prov:${dep.departamento}:${prov.provincia}"
-                    if (score > 0 && key !in seen) {
-                        seen.add(key)
-                        results.add(LocationSearchResult(
-                            texto = prov.provincia,
-                            tipo = LocationType.PROVINCIA,
-                            departamento = dep.departamento,
-                            provincia = prov.provincia,
-                            displayLabel = "🏘️ ${prov.provincia}, ${dep.departamento}",
-                            score = score + 5
-                        ))
-                    }
-                }
-                
-                for (dist in prov.distritos) {
-                    val distNormalized = normalizeText(dist)
-                    
-                    // Buscar en distritos
-                    if (distNormalized.contains(normalizedQuery) || normalizedQuery.contains(distNormalized)) {
-                        val score = calculateSimilarity(query, dist)
-                        val key = "dist:${dep.departamento}:${prov.provincia}:$dist"
-                        if (score > 0 && key !in seen) {
-                            seen.add(key)
-                            results.add(LocationSearchResult(
-                                texto = dist,
-                                tipo = LocationType.DISTRITO,
-                                departamento = dep.departamento,
-                                provincia = prov.provincia,
-                                distrito = dist,
-                                displayLabel = "📌 $dist, ${prov.provincia}, ${dep.departamento}",
-                                score = score
-                            ))
-                        }
-                    }
-                }
-            }
-        }
-        
-        return results.sortedByDescending { it.score }.take(limit)
-    }
-    
-    /**
-     * Búsqueda rápida que devuelve solo distritos
-     */
-    fun searchDistritos(query: String, limit: Int = 10): List<LocationSearchResult> {
-        return searchLocation(query, limit * 2)
-            .filter { it.tipo == LocationType.DISTRITO }
-            .take(limit)
-    }
-    
-    // =========================================================================
-    // FUNCIONES DE RESOLUCIÓN (REVERSE LOOKUP)
-    // =========================================================================
-    
-    /**
-     * Resuelve la ubicación completa desde un distrito
-     */
-    /**
-     * Resuelve la ubicación completa desde un distrito con contexto adicional
-     * Prioriza coincidencias que matcheen también provincia y/o departamento
-     */
-    fun resolveFromDistritoWithContext(
-        distrito: String,
-        provincia: String? = null,
-        departamento: String? = null
-    ): UbicacionCompleta? {
-        val normalizedDistrito = normalizeText(distrito)
-        val normalizedProvincia = provincia?.let { normalizeText(it) }
-        val normalizedDepartamento = departamento?.let { normalizeText(it) }
-        
-        var bestMatch: UbicacionCompleta? = null
-        var bestScore = 0
-        
-        for (dep in departamentosPeru) {
-            for (prov in dep.provincias) {
-                for (dist in prov.distritos) {
-                    if (normalizeText(dist) == normalizedDistrito) {
-                        var score = 1 // Match por distrito
-                        
-                        // Bonus si provincia coincide
-                        if (normalizedProvincia != null && normalizeText(prov.provincia) == normalizedProvincia) {
-                            score += 2
-                        }
-                        
-                        // Bonus si departamento coincide
-                        if (normalizedDepartamento != null && normalizeText(dep.departamento) == normalizedDepartamento) {
-                            score += 2
-                        }
-                        
-                        if (score > bestScore) {
-                            bestScore = score
-                            bestMatch = UbicacionCompleta(
-                                departamento = dep.departamento,
-                                provincia = prov.provincia,
-                                distrito = dist
-                            )
-                        }
-                    }
-                }
-            }
-        }
-        return bestMatch
-    }
-    
-    fun resolveFromDistrito(distrito: String): UbicacionCompleta? {
-        val normalizedDistrito = normalizeText(distrito)
-        
-        for (dep in departamentosPeru) {
-            for (prov in dep.provincias) {
-                for (dist in prov.distritos) {
-                    if (normalizeText(dist) == normalizedDistrito) {
-                        return UbicacionCompleta(
-                            departamento = dep.departamento,
-                            provincia = prov.provincia,
-                            distrito = dist
-                        )
-                    }
-                }
-            }
-        }
-        return null
-    }
-    
-    /**
-     * Resuelve la ubicación completa desde una provincia
-     */
-    fun resolveFromProvincia(provincia: String, departamento: String? = null): UbicacionCompleta? {
-        val normalizedProvincia = normalizeText(provincia)
-        
-        for (dep in departamentosPeru) {
-            if (departamento != null && normalizeText(dep.departamento) != normalizeText(departamento)) {
-                continue
-            }
-            
-            for (prov in dep.provincias) {
-                if (normalizeText(prov.provincia) == normalizedProvincia) {
-                    return if (prov.distritos.isNotEmpty()) {
-                        UbicacionCompleta(
-                            departamento = dep.departamento,
-                            provincia = prov.provincia,
-                            distrito = prov.distritos[0]
-                        )
-                    } else null
-                }
-            }
-        }
-        return null
-    }
-    
-    // =========================================================================
-    // FUNCIONES DE VALIDACIÓN
-    // =========================================================================
-    
-    /**
-     * Valida si una ubicación completa es válida
-     */
-    fun isValidLocation(ubicacion: UbicacionCompleta): Boolean {
-        val dep = departamentosPeru.find { 
-            normalizeText(it.departamento) == normalizeText(ubicacion.departamento) 
-        } ?: return false
-        
-        val prov = dep.provincias.find { 
-            normalizeText(it.provincia) == normalizeText(ubicacion.provincia) 
-        } ?: return false
-        
-        return prov.distritos.any { 
-            normalizeText(it) == normalizeText(ubicacion.distrito) 
-        }
-    }
-    
-    /**
-     * Valida y normaliza una ubicación (corrige mayúsculas/tildes)
-     */
-    fun normalizeLocation(ubicacion: UbicacionCompleta): UbicacionCompleta? {
-        for (dep in departamentosPeru) {
-            if (normalizeText(dep.departamento) == normalizeText(ubicacion.departamento)) {
-                for (prov in dep.provincias) {
-                    if (normalizeText(prov.provincia) == normalizeText(ubicacion.provincia)) {
-                        for (dist in prov.distritos) {
-                            if (normalizeText(dist) == normalizeText(ubicacion.distrito)) {
-                                return UbicacionCompleta(
-                                    departamento = dep.departamento,
-                                    provincia = prov.provincia,
-                                    distrito = dist,
-                                    direccion = ubicacion.direccion,
-                                    coordenadas = ubicacion.coordenadas
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        return null
-    }
-    
-    // =========================================================================
-    // FUNCIONES PARA LISTAS SIMPLES (compatibilidad)
-    // =========================================================================
-    
-    /**
-     * Obtiene lista de nombres de departamentos
-     */
-    fun getDepartamentos(): List<String> = departamentosPeru.map { it.departamento }
-
-    /**
-     * Departamentos populares para sugerencias cuando no hay resultados
-     */
-    fun getPopularDepartamentos(): List<PopularDepartamento> = listOf(
-        PopularDepartamento("Ica", "🍇 Zona agrícola principal"),
-        PopularDepartamento("Lima", "🏙️ Capital del Perú"),
-        PopularDepartamento("La Libertad", "🌾 Agroindustria del norte"),
-        PopularDepartamento("Arequipa", "🏔️ Sur productivo"),
-        PopularDepartamento("Piura", "🥭 Frutas tropicales"),
-        PopularDepartamento("Lambayeque", "🌿 Costa norte")
-    )
-    
-    /**
-     * Obtiene provincias de un departamento
-     */
-    fun getProvincias(departamento: String): List<String> {
-        val dep = departamentosPeru.find { 
-            normalizeText(it.departamento) == normalizeText(departamento) 
-        }
-        return dep?.provincias?.map { it.provincia } ?: emptyList()
-    }
-    
-    /**
-     * Obtiene distritos de una provincia
-     */
-    fun getDistritos(departamento: String, provincia: String): List<String> {
-        val dep = departamentosPeru.find { 
-            normalizeText(it.departamento) == normalizeText(departamento) 
-        } ?: return emptyList()
-        
-        val prov = dep.provincias.find { 
-            normalizeText(it.provincia) == normalizeText(provincia) 
-        }
-        return prov?.distritos ?: emptyList()
-    }
-    
-    // =========================================================================
-    // FUNCIONES PARA SEDES
-    // =========================================================================
-    
-    /**
-     * Crea una nueva sede con ID único
-     */
-    fun createSede(
-        nombre: String,
-        ubicacion: UbicacionCompleta,
-        esPrincipal: Boolean = false
-    ): SedeEmpresa {
-        return SedeEmpresa(
-            id = "sede_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(8)}",
-            nombre = nombre,
-            ubicacion = ubicacion,
-            esPrincipal = esPrincipal,
-            activa = true
-        )
-    }
-    
-    /**
-     * Valida una sede completa
-     */
-    fun isValidSede(sede: SedeEmpresa): Boolean {
-        return sede.id.isNotBlank() &&
-               sede.nombre.isNotBlank() &&
-               isValidLocation(sede.ubicacion)
-    }
-    
-    // =========================================================================
-    // ESTADÍSTICAS
-    // =========================================================================
-    
-    data class LocationStats(
-        val totalDepartamentos: Int,
-        val totalProvincias: Int,
-        val totalDistritos: Int
-    )
-    
-    /**
-     * Obtiene estadísticas del dataset
-     */
-    fun getLocationStats(): LocationStats {
-        var totalProvincias = 0
-        var totalDistritos = 0
-        
-        for (dep in departamentosPeru) {
-            totalProvincias += dep.provincias.size
-            for (prov in dep.provincias) {
-                totalDistritos += prov.distritos.size
-            }
-        }
-        
-        return LocationStats(
-            totalDepartamentos = departamentosPeru.size,
-            totalProvincias = totalProvincias,
-            totalDistritos = totalDistritos
-        )
-    }
-}
-

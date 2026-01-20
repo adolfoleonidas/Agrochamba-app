@@ -307,6 +307,7 @@ fun EditJobScreen(
                         
                         // Agregar ubicación completa - SIEMPRE (es la fuente principal de datos de ubicación)
                         // NOTA: El backend espera _ubicacion_completa (con underscore)
+                        // Incluye el nivel de especificidad para respetar lo que el usuario seleccionó
                         selectedUbicacionCompleta?.let { ubicacion ->
                             jobData["_ubicacion_completa"] = mapOf(
                                 "departamento" to ubicacion.departamento,
@@ -314,7 +315,8 @@ fun EditJobScreen(
                                 "distrito" to ubicacion.distrito,
                                 "direccion" to (ubicacion.direccion ?: ""),
                                 "lat" to (ubicacion.obtenerCoordenadas()?.lat ?: 0.0),
-                                "lng" to (ubicacion.obtenerCoordenadas()?.lng ?: 0.0)
+                                "lng" to (ubicacion.obtenerCoordenadas()?.lng ?: 0.0),
+                                "nivel" to ubicacion.nivel.name // DEPARTAMENTO, PROVINCIA o DISTRITO
                             )
                         }
                         

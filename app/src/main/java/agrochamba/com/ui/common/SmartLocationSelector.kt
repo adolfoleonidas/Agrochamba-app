@@ -85,6 +85,9 @@ import kotlinx.coroutines.launch
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.outlined.AddBusiness
 
 /**
  * =============================================================================
@@ -112,6 +115,7 @@ import androidx.activity.result.contract.ActivityResultContracts
  * @param showSedesFirst Si true, muestra sedes primero (recomendado)
  * @param canManageSedes Si true, permite crear/editar sedes (solo empresas/admins)
  * @param onSedeCreated Callback cuando se crea una nueva sede
+ * @param onNavigateToCreateSede Callback para navegar a crear sede (opcional)
  * @param label Etiqueta del selector
  * @param placeholder Placeholder del campo de búsqueda
  */
@@ -123,20 +127,31 @@ fun SmartLocationSelector(
     showSedesFirst: Boolean = true,
     canManageSedes: Boolean = false,
     onSedeCreated: ((SedeEmpresa) -> Unit)? = null,
-    label: String = "Ubicación",
-    placeholder: String = "Buscar ubicación...",
+    onNavigateToCreateSede: (() -> Unit)? = null,
+    label: String = "Ubicacion",
+    placeholder: String = "Buscar ubicacion...",
     modifier: Modifier = Modifier,
     enabled: Boolean = true
 ) {
     val context = LocalContext.current
     val locationRepository = remember { LocationRepository.getInstance(context) }
-    
+
+    // Inicializar selectedSedeId basándose en la ubicación inicial si corresponde a una sede
+    var selectedSedeId by remember(selectedLocation, sedes) {
+        mutableStateOf(
+            sedes.find { sede ->
+                sede.ubicacion.departamento == selectedLocation?.departamento &&
+                sede.ubicacion.provincia == selectedLocation?.provincia &&
+                sede.ubicacion.distrito == selectedLocation?.distrito
+            }?.id
+        )
+    }
     var showSearch by remember { mutableStateOf(false) }
-    var selectedSedeId by remember { mutableStateOf<String?>(null) }
     var showSaveAsSedeDialog by remember { mutableStateOf(false) }
     var pendingLocationToSave by remember { mutableStateOf<UbicacionCompleta?>(null) }
-    
-    // Detectar si la ubicación actual corresponde a una sede
+    var dismissedInvitation by remember { mutableStateOf(false) }
+
+    // Actualizar cuando cambie la ubicación o las sedes
     LaunchedEffect(selectedLocation, sedes) {
         selectedSedeId = sedes.find { sede ->
             sede.ubicacion.departamento == selectedLocation?.departamento &&
@@ -154,6 +169,15 @@ fun SmartLocationSelector(
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.padding(bottom = 8.dp)
         )
+        
+        // Banner de invitación si no tiene sedes y puede gestionarlas
+        if (sedes.isEmpty() && canManageSedes && !dismissedInvitation && onNavigateToCreateSede != null) {
+            CreateSedeInvitationBanner(
+                onCreateSede = onNavigateToCreateSede,
+                onDismiss = { dismissedInvitation = true }
+            )
+            Spacer(Modifier.height(12.dp))
+        }
         
         // Mostrar sedes primero si hay sedes disponibles
         if (showSedesFirst && sedes.isNotEmpty()) {
@@ -190,18 +214,25 @@ fun SmartLocationSelector(
                     selectedLocation = if (selectedSedeId == null) selectedLocation else null,
                     onLocationSelected = { ubicacion ->
                         onLocationSelected(ubicacion)
-                        locationRepository.addToRecent(ubicacion)
                         
-                        // Si puede gestionar sedes y es una nueva ubicación, preguntar si guardar
-                        if (canManageSedes && onSedeCreated != null) {
-                            val isNewLocation = !sedes.any { sede ->
-                                sede.ubicacion.departamento == ubicacion.departamento &&
-                                sede.ubicacion.provincia == ubicacion.provincia &&
-                                sede.ubicacion.distrito == ubicacion.distrito
-                            }
-                            if (isNewLocation) {
-                                pendingLocationToSave = ubicacion
-                                showSaveAsSedeDialog = true
+                        // Agregar a recientes si la ubicación es válida (al menos tiene departamento)
+                        if (ubicacion.departamento.isNotBlank()) {
+                            locationRepository.addToRecent(ubicacion)
+                            
+                            // Si puede gestionar sedes y es una ubicación completa (nivel DISTRITO), preguntar si guardar
+                            // Solo para ubicaciones completas porque las sedes requieren dirección específica
+                            if (canManageSedes && onSedeCreated != null && 
+                                ubicacion.nivel == LocationType.DISTRITO &&
+                                ubicacion.distrito.isNotBlank()) {
+                                val isNewLocation = !sedes.any { sede ->
+                                    sede.ubicacion.departamento == ubicacion.departamento &&
+                                    sede.ubicacion.provincia == ubicacion.provincia &&
+                                    sede.ubicacion.distrito == ubicacion.distrito
+                                }
+                                if (isNewLocation) {
+                                    pendingLocationToSave = ubicacion
+                                    showSaveAsSedeDialog = true
+                                }
                             }
                         }
                     },
@@ -211,22 +242,24 @@ fun SmartLocationSelector(
             }
         }
         
-        // Mostrar ubicación seleccionada si existe
-        selectedLocation?.takeIf { it.distrito.isNotBlank() }?.let { ubicacion ->
+        // Mostrar ubicación seleccionada si existe (validar que tenga al menos departamento)
+        selectedLocation?.takeIf { it.departamento.isNotBlank() }?.let { ubicacion ->
             Spacer(Modifier.height(8.dp))
             SelectedLocationChip(
                 ubicacion = ubicacion,
                 onClear = {
                     selectedSedeId = null
                     showSearch = sedes.isNotEmpty()
-                    onLocationSelected(UbicacionCompleta("", "", ""))
+                    onLocationSelected(UbicacionCompleta("", "", "", nivel = LocationType.DEPARTAMENTO))
                 }
             )
         }
     }
     
-    // Diálogo para guardar como sede
-    if (showSaveAsSedeDialog && pendingLocationToSave != null) {
+    // Diálogo para guardar como sede (solo si la ubicación es válida)
+    if (showSaveAsSedeDialog && pendingLocationToSave != null && 
+        pendingLocationToSave!!.departamento.isNotBlank() && 
+        pendingLocationToSave!!.distrito.isNotBlank()) {
         SaveAsSedeDialog(
             ubicacion = pendingLocationToSave!!,
             onConfirm = { nombre, esPrincipal ->
@@ -457,7 +490,7 @@ private fun NewLocationItem(
         Spacer(Modifier.width(8.dp))
         
         Text(
-            text = "Nueva ubicación",
+            text = "Nueva ubicacion",
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Medium,
             color = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer
@@ -467,16 +500,142 @@ private fun NewLocationItem(
 }
 
 /**
- * Campo de búsqueda de ubicaciones con autocompletado
+ * Banner de invitacion para crear sede
+ * Se muestra cuando el usuario no tiene sedes guardadas
+ */
+@Composable
+private fun CreateSedeInvitationBanner(
+    onCreateSede: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+        ),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.Top,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                // Icono de bombilla
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                            CircleShape
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Lightbulb,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+                
+                Spacer(Modifier.width(12.dp))
+                
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Publica mas rapido",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "Crea una sede y seleccionala con un toque en tus proximas publicaciones.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 18.sp
+                    )
+                }
+                
+                // Botón de cerrar
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Cerrar",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+            
+            Spacer(Modifier.height(12.dp))
+            
+            // Botón de crear sede
+            Surface(
+                onClick = onCreateSede,
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(vertical = 10.dp, horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.AddBusiness,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "Crear mi primera sede",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Icon(
+                        imageVector = Icons.Default.ArrowForward,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+            
+            // Opción de omitir
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "Ahora no, buscare manualmente",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Campo de busqueda de ubicaciones con autocompletado
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LocationSearchField(
     selectedLocation: UbicacionCompleta?,
     onLocationSelected: (UbicacionCompleta) -> Unit,
-    placeholder: String = "Buscar distrito, provincia o departamento...",
+    placeholder: String = "¿Para dónde es este trabajo?",
     modifier: Modifier = Modifier,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    showGpsButton: Boolean = false // Desactivado por defecto en creación de trabajos
 ) {
     val context = LocalContext.current
     val locationRepository = remember { LocationRepository.getInstance(context) }
@@ -495,6 +654,9 @@ fun LocationSearchField(
     var isGettingLocation by remember { mutableStateOf(false) }
     var gpsError by remember { mutableStateOf<String?>(null) }
     
+    // Estado para indicar si la ubicación fue obtenida por GPS
+    var isGpsActive by remember { mutableStateOf(false) }
+    
     // Launcher para permisos de ubicación
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -509,6 +671,7 @@ fun LocationSearchField(
                 val ubicacion = locationService.getCurrentLocationAsUbicacion()
                 isGettingLocation = false
                 if (ubicacion != null) {
+                    isGpsActive = true
                     onLocationSelected(ubicacion)
                     query = ubicacion.formatOneLine()
                     focusManager.clearFocus()
@@ -530,6 +693,7 @@ fun LocationSearchField(
                 val ubicacion = locationService.getCurrentLocationAsUbicacion()
                 isGettingLocation = false
                 if (ubicacion != null) {
+                    isGpsActive = true
                     onLocationSelected(ubicacion)
                     query = ubicacion.formatOneLine()
                     focusManager.clearFocus()
@@ -558,54 +722,7 @@ fun LocationSearchField(
     }
     
     Column(modifier = modifier.fillMaxWidth()) {
-        // Botón GPS: "Usar mi ubicación actual"
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .clickable(enabled = enabled && !isGettingLocation) { getGpsLocation() },
-            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Row(
-                modifier = Modifier.padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (isGettingLocation) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.MyLocation,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-                Spacer(Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = if (isGettingLocation) "Detectando ubicación..." else "📍 Usar mi ubicación actual",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    if (gpsError != null) {
-                        Text(
-                            text = gpsError!!,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-                }
-            }
-        }
-        
-        Spacer(Modifier.height(12.dp))
-        
-        // Campo de búsqueda
+        // Campo de búsqueda con GPS integrado (igual que LocationSearchBar)
         OutlinedTextField(
             value = query,
             onValueChange = { newQuery ->
@@ -640,16 +757,44 @@ fun LocationSearchField(
                 )
             },
             trailingIcon = {
-                when {
-                    isSearching -> CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.dp
-                    )
-                    query.isNotEmpty() -> IconButton(onClick = {
-                        query = ""
-                        searchResults = emptyList()
-                    }) {
-                        Icon(Icons.Default.Close, contentDescription = "Limpiar")
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Botón GPS (solo si está habilitado)
+                    if (showGpsButton && query.isEmpty() && selectedLocation == null && !isGettingLocation) {
+                        IconButton(onClick = { getGpsLocation() }) {
+                            Icon(
+                                Icons.Default.MyLocation, 
+                                contentDescription = "Usar mi ubicación",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                    
+                    // Indicador de carga GPS
+                    if (showGpsButton && isGettingLocation) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp).padding(4.dp),
+                            strokeWidth = 2.dp
+                        )
+                    }
+                    
+                    // Indicador de búsqueda
+                    if (isSearching && !isGettingLocation) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp
+                        )
+                    }
+                    
+                    // Botón limpiar - solo mostrar cuando hay texto escrito o una ubicación válida seleccionada
+                    if (query.isNotEmpty() || (selectedLocation != null && selectedLocation.departamento.isNotBlank())) {
+                        IconButton(onClick = {
+                            query = ""
+                            searchResults = emptyList()
+                            isGpsActive = false
+                            onLocationSelected(UbicacionCompleta("", "", "", nivel = LocationType.DEPARTAMENTO))
+                        }) {
+                            Icon(Icons.Default.Close, contentDescription = "Limpiar")
+                        }
                     }
                 }
             },
@@ -659,6 +804,22 @@ fun LocationSearchField(
             enabled = enabled,
             singleLine = true,
             shape = RoundedCornerShape(12.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = if (showGpsButton && isGpsActive) Color(0xFF4CAF50) else MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = if (showGpsButton && isGpsActive) Color(0xFF4CAF50).copy(alpha = 0.5f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+            ),
+            isError = showGpsButton && gpsError != null,
+            supportingText = if (showGpsButton && gpsError != null) {
+                { Text(gpsError!!, color = MaterialTheme.colorScheme.error) }
+            } else if (showGpsButton && isGpsActive) {
+                { 
+                    Text(
+                        "📍 Ubicación detectada por GPS", 
+                        color = Color(0xFF4CAF50),
+                        style = MaterialTheme.typography.bodySmall
+                    ) 
+                }
+            } else null,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(
                 onSearch = {
@@ -933,6 +1094,7 @@ private fun QuickSuggestionItem(
 
 /**
  * Chip que muestra la ubicación seleccionada
+ * Respeta el nivel de especificidad: solo muestra lo que el usuario seleccionó
  */
 @Composable
 fun SelectedLocationChip(
@@ -942,7 +1104,18 @@ fun SelectedLocationChip(
     isFavorite: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    if (ubicacion.distrito.isBlank()) return
+    // Verificar que al menos tenga departamento (el mínimo requerido)
+    if (ubicacion.departamento.isBlank()) return
+    
+    // Obtener el nivel efectivo para mostrar la información correcta
+    val nivelEfectivo = ubicacion.getNivelEfectivo()
+    
+    // Determinar qué texto mostrar según el nivel
+    val (textoMain, textoSecundario) = when (nivelEfectivo) {
+        LocationType.DEPARTAMENTO -> ubicacion.departamento to null
+        LocationType.PROVINCIA -> ubicacion.provincia to ubicacion.departamento
+        LocationType.DISTRITO -> ubicacion.distrito to "${ubicacion.provincia}, ${ubicacion.departamento}"
+    }
     
     Surface(
         modifier = modifier,
@@ -968,19 +1141,21 @@ fun SelectedLocationChip(
             
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = ubicacion.distrito,
+                    text = textoMain,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Text(
-                    text = "${ubicacion.provincia}, ${ubicacion.departamento}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                if (textoSecundario != null) {
+                    Text(
+                        text = textoSecundario,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
             
             onFavoriteToggle?.let {
@@ -1217,19 +1392,23 @@ fun LocationBadge(
 
 /**
  * Vista completa de ubicación para detalles del trabajo
- * Muestra: Distrito, Provincia, Departamento + Dirección exacta
+ * Muestra la ubicación según el nivel de especificidad que el usuario seleccionó:
+ * - DEPARTAMENTO: Solo muestra el departamento
+ * - PROVINCIA: Muestra provincia, departamento
+ * - DISTRITO: Muestra distrito, provincia, departamento
  */
 @Composable
 fun LocationDetailView(
     ubicacion: UbicacionCompleta,
     modifier: Modifier = Modifier
 ) {
-    // Ubicación jerárquica en una línea
-    val locationLine = listOf(ubicacion.distrito, ubicacion.provincia, ubicacion.departamento)
-        .filter { it.isNotBlank() }
-        .joinToString(", ")
+    // Usar el nivel efectivo para determinar qué mostrar
+    val nivelEfectivo = ubicacion.getNivelEfectivo()
     
-    // Dirección exacta (opcional)
+    // Ubicación formateada según el nivel de especificidad
+    val locationLine = ubicacion.formatOneLine()
+    
+    // Dirección exacta (opcional, solo si se especificó)
     val direccion = ubicacion.direccion?.takeIf { it.isNotBlank() }
 
     Column(
@@ -1247,7 +1426,7 @@ fun LocationDetailView(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // Ubicación principal (Distrito, Provincia, Departamento)
+        // Ubicación principal (según nivel de especificidad)
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
                 imageVector = Icons.Default.LocationOn,

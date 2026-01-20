@@ -293,13 +293,29 @@ if (!function_exists('agrochamba_create_job')) {
                 }
             }
             
-            // Guardar ubicación completa (departamento, provincia, distrito, dirección, coordenadas)
+            // Guardar ubicación completa (departamento, provincia, distrito, dirección, coordenadas, nivel)
             if (isset($params['_ubicacion_completa']) && is_array($params['_ubicacion_completa'])) {
                 $ubicacion = $params['_ubicacion_completa'];
                 $departamento = sanitize_text_field($ubicacion['departamento'] ?? '');
                 $provincia = sanitize_text_field($ubicacion['provincia'] ?? '');
                 $distrito = sanitize_text_field($ubicacion['distrito'] ?? '');
                 $direccion = sanitize_text_field($ubicacion['direccion'] ?? '');
+                
+                // Determinar el nivel de especificidad
+                // Si viene explícito del frontend, usarlo; sino, detectarlo automáticamente
+                $nivel_recibido = strtoupper(sanitize_text_field($ubicacion['nivel'] ?? ''));
+                if (in_array($nivel_recibido, array('DEPARTAMENTO', 'PROVINCIA', 'DISTRITO'))) {
+                    $nivel = $nivel_recibido;
+                } else {
+                    // Detectar nivel automáticamente basándose en los datos
+                    if (empty($provincia) || $provincia === $departamento) {
+                        $nivel = 'DEPARTAMENTO';
+                    } elseif (empty($distrito) || $distrito === $provincia) {
+                        $nivel = 'PROVINCIA';
+                    } else {
+                        $nivel = 'DISTRITO';
+                    }
+                }
                 
                 $ubicacion_sanitizada = array(
                     'departamento' => $departamento,
@@ -308,6 +324,7 @@ if (!function_exists('agrochamba_create_job')) {
                     'direccion'    => $direccion,
                     'lat'          => floatval($ubicacion['lat'] ?? 0),
                     'lng'          => floatval($ubicacion['lng'] ?? 0),
+                    'nivel'        => $nivel,
                 );
                 update_post_meta($post_id, '_ubicacion_completa', $ubicacion_sanitizada);
                 
@@ -316,20 +333,14 @@ if (!function_exists('agrochamba_create_job')) {
                 update_post_meta($post_id, '_ubicacion_distrito', $distrito);
                 update_post_meta($post_id, '_ubicacion_direccion', $direccion);
                 
-                // SINCRONIZAR CON TAXONOMÍA (para filtrado rápido y SEO)
+                // SINCRONIZAR CON TAXONOMÍA JERÁRQUICA (guardar término más específico según el nivel)
                 if (!empty($departamento)) {
-                    $term = get_term_by('name', $departamento, 'ubicacion');
-                    
-                    if (!$term) {
-                        // Crear el término si no existe
-                        $result = wp_insert_term($departamento, 'ubicacion', array(
-                            'slug' => sanitize_title($departamento)
-                        ));
-                        if (!is_wp_error($result)) {
-                            wp_set_post_terms($post_id, array($result['term_id']), 'ubicacion');
-                        }
-                    } else {
-                        wp_set_post_terms($post_id, array($term->term_id), 'ubicacion');
+                    // Usar solo los datos correspondientes al nivel especificado
+                    $term_provincia = ($nivel === 'DEPARTAMENTO') ? '' : $provincia;
+                    $term_distrito = ($nivel === 'DISTRITO') ? $distrito : '';
+                    $term_id = agrochamba_get_or_create_location_term($departamento, $term_provincia, $term_distrito);
+                    if (!is_wp_error($term_id)) {
+                        wp_set_post_terms($post_id, array($term_id), 'ubicacion', false);
                     }
                 }
             }
@@ -617,6 +628,56 @@ if (!function_exists('agrochamba_update_job')) {
 
         if (isset($params['empresa_id']) && !empty($params['empresa_id'])) {
             wp_set_post_terms($post_id, array(intval($params['empresa_id'])), 'empresa', false);
+        }
+
+        // Actualizar ubicación completa (si se proporciona)
+        if (isset($params['_ubicacion_completa']) && is_array($params['_ubicacion_completa'])) {
+            $ubicacion = $params['_ubicacion_completa'];
+            $departamento = sanitize_text_field($ubicacion['departamento'] ?? '');
+            $provincia = sanitize_text_field($ubicacion['provincia'] ?? '');
+            $distrito = sanitize_text_field($ubicacion['distrito'] ?? '');
+            $direccion = sanitize_text_field($ubicacion['direccion'] ?? '');
+            
+            // Determinar el nivel de especificidad
+            $nivel_recibido = strtoupper(sanitize_text_field($ubicacion['nivel'] ?? ''));
+            if (in_array($nivel_recibido, array('DEPARTAMENTO', 'PROVINCIA', 'DISTRITO'))) {
+                $nivel = $nivel_recibido;
+            } else {
+                // Detectar nivel automáticamente basándose en los datos
+                if (empty($provincia) || $provincia === $departamento) {
+                    $nivel = 'DEPARTAMENTO';
+                } elseif (empty($distrito) || $distrito === $provincia) {
+                    $nivel = 'PROVINCIA';
+                } else {
+                    $nivel = 'DISTRITO';
+                }
+            }
+            
+            $ubicacion_sanitizada = array(
+                'departamento' => $departamento,
+                'provincia'    => $provincia,
+                'distrito'     => $distrito,
+                'direccion'    => $direccion,
+                'lat'          => floatval($ubicacion['lat'] ?? 0),
+                'lng'          => floatval($ubicacion['lng'] ?? 0),
+                'nivel'        => $nivel,
+            );
+            update_post_meta($post_id, '_ubicacion_completa', $ubicacion_sanitizada);
+            
+            // Guardar también en meta fields individuales para búsqueda
+            update_post_meta($post_id, '_ubicacion_provincia', $provincia);
+            update_post_meta($post_id, '_ubicacion_distrito', $distrito);
+            update_post_meta($post_id, '_ubicacion_direccion', $direccion);
+            
+            // SINCRONIZAR CON TAXONOMÍA JERÁRQUICA (guardar término según el nivel)
+            if (!empty($departamento)) {
+                $term_provincia = ($nivel === 'DEPARTAMENTO') ? '' : $provincia;
+                $term_distrito = ($nivel === 'DISTRITO') ? $distrito : '';
+                $term_id = agrochamba_get_or_create_location_term($departamento, $term_provincia, $term_distrito);
+                if (!is_wp_error($term_id)) {
+                    wp_set_post_terms($post_id, array($term_id), 'ubicacion', false);
+                }
+            }
         }
 
         // Guardar meta fields (excluyendo comentarios_habilitados que se maneja por separado)
@@ -1242,9 +1303,10 @@ if (!function_exists('agrochamba_get_pending_jobs')) {
         $page = max(1, intval($request->get_param('page')) ?: 1);
         $per_page = min(100, max(1, intval($request->get_param('per_page')) ?: 20));
 
+        // Incluir tanto 'pending' como 'draft' ya que ambos requieren moderación
         $args = array(
             'post_type' => 'trabajo',
-            'post_status' => 'pending',
+            'post_status' => array('pending', 'draft'),
             'posts_per_page' => $per_page,
             'paged' => $page,
             'orderby' => 'date',

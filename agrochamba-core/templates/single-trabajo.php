@@ -81,9 +81,57 @@ $alimentacion = get_post_meta($trabajo_id, 'alimentacion', true);
 $experiencia = get_post_meta($trabajo_id, 'experiencia', true);
 $estado = get_post_meta($trabajo_id, 'estado', true) ?: 'activa';
 
-// Obtener ubicación
+// Obtener ubicación - priorizar _ubicacion_completa con nivel
+$ubicacion_completa = get_post_meta($trabajo_id, '_ubicacion_completa', true);
+$ubicacion_display = null;
+
+if (!empty($ubicacion_completa) && !empty($ubicacion_completa['departamento'])) {
+    // Obtener el nivel de especificidad
+    $nivel = strtoupper($ubicacion_completa['nivel'] ?? '');
+    
+    // Detectar nivel si no está definido
+    if (!in_array($nivel, array('DEPARTAMENTO', 'PROVINCIA', 'DISTRITO'))) {
+        $provincia = $ubicacion_completa['provincia'] ?? '';
+        $distrito = $ubicacion_completa['distrito'] ?? '';
+        $departamento = $ubicacion_completa['departamento'];
+        
+        if (empty($provincia) || $provincia === $departamento) {
+            $nivel = 'DEPARTAMENTO';
+        } elseif (empty($distrito) || $distrito === $provincia) {
+            $nivel = 'PROVINCIA';
+        } else {
+            $nivel = 'DISTRITO';
+        }
+    }
+    
+    // Formatear según el nivel
+    switch ($nivel) {
+        case 'DEPARTAMENTO':
+            $ubicacion_display = $ubicacion_completa['departamento'];
+            break;
+        case 'PROVINCIA':
+            $ubicacion_display = $ubicacion_completa['provincia'] . ', ' . $ubicacion_completa['departamento'];
+            break;
+        case 'DISTRITO':
+        default:
+            $parts = array_filter(array(
+                $ubicacion_completa['distrito'] ?? '',
+                $ubicacion_completa['provincia'] ?? '',
+                $ubicacion_completa['departamento']
+            ));
+            $ubicacion_display = implode(', ', $parts);
+            break;
+    }
+}
+
+// Fallback a taxonomía si no hay ubicación completa
 $ubicaciones = wp_get_post_terms($trabajo_id, 'ubicacion');
 $ubicacion = !empty($ubicaciones) ? $ubicaciones[0] : null;
+
+// Si no hay ubicación formateada, usar el nombre del término
+if (empty($ubicacion_display) && $ubicacion) {
+    $ubicacion_display = $ubicacion->name;
+}
 
 // Obtener empresa (CPT)
 $empresa_id = get_post_meta($trabajo_id, 'empresa_id', true);
@@ -389,7 +437,7 @@ function agrochamba_make_content_clickable($content) {
                 </h1>
                 
                 <!-- Nombre de la empresa y ubicación (similar a la app) -->
-                <?php if ($empresa_data || $ubicacion): ?>
+                <?php if ($empresa_data || $ubicacion_display): ?>
                     <div class="empresa-meta-header">
                         <?php if ($empresa_data): ?>
                             <a href="<?php echo esc_url($empresa_data['url']); ?>" class="empresa-nombre-link-destacado">
@@ -400,7 +448,7 @@ function agrochamba_make_content_clickable($content) {
                             </a>
                         <?php endif; ?>
                         
-                        <?php if ($ubicacion): ?>
+                        <?php if ($ubicacion_display): ?>
                             <?php if ($empresa_data): ?>
                                 <span class="meta-separator">•</span>
                             <?php endif; ?>
@@ -408,7 +456,7 @@ function agrochamba_make_content_clickable($content) {
                                 <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor">
                                     <path d="M8 0a5 5 0 0 0-5 5c0 4.5 5 10 5 10s5-5.5 5-10a5 5 0 0 0-5-5zm0 7a2 2 0 1 1 0-4 2 2 0 0 1 0 4z"/>
                                 </svg>
-                                <span><?php echo esc_html($ubicacion->name); ?></span>
+                                <span><?php echo esc_html($ubicacion_display); ?></span>
                             </div>
                         <?php endif; ?>
                     </div>

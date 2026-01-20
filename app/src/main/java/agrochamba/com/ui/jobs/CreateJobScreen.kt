@@ -69,6 +69,7 @@ import agrochamba.com.ui.common.RichTextEditor
 import agrochamba.com.ui.common.SearchableDropdown
 import agrochamba.com.ui.common.SmartLocationSelector
 import agrochamba.com.ui.common.LocationSearchField
+import agrochamba.com.ui.company.CreateSedeDialog
 import agrochamba.com.utils.textToHtml
 import coil.compose.AsyncImage
 
@@ -114,6 +115,9 @@ fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel 
     
     var showMoreOptions by remember { mutableStateOf(false) }
     var showOCRDialog by remember { mutableStateOf(false) }
+    
+    // Diálogo para crear sede inline (sin navegar, para no perder el estado del formulario)
+    var showCreateSedeDialog by remember { mutableStateOf(false) }
 
     // Reiniciar el estado cuando se navega a esta pantalla
     LaunchedEffect(Unit) {
@@ -141,6 +145,28 @@ fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel 
         val isAdmin = AuthManager.isUserAdmin()
         if (!isAdmin && uiState.userCompanyId != null && selectedEmpresa == null && uiState.empresas.isNotEmpty()) {
             selectedEmpresa = uiState.empresas.find { it.id == uiState.userCompanyId }
+        }
+    }
+
+    // Auto-seleccionar sede de la empresa si existe
+    // Prioridad: 1) Sede principal, 2) Primera sede activa
+    LaunchedEffect(companySedes) {
+        android.util.Log.d("CreateJobScreen", "companySedes cambió: ${companySedes.size} sedes disponibles")
+        if (selectedUbicacionCompleta == null && companySedes.isNotEmpty()) {
+            val sedesActivas = companySedes.filter { it.activa }
+            android.util.Log.d("CreateJobScreen", "Sedes activas: ${sedesActivas.size}")
+
+            // Buscar la sede principal primero
+            val sedePrincipal = sedesActivas.find { it.esPrincipal }
+            val sedeASeleccionar = sedePrincipal ?: sedesActivas.firstOrNull()
+
+            if (sedeASeleccionar != null) {
+                selectedUbicacionCompleta = sedeASeleccionar.ubicacion
+                android.util.Log.d("CreateJobScreen", "Auto-seleccionada sede: ${sedeASeleccionar.nombre} (principal=${sedeASeleccionar.esPrincipal})")
+                android.util.Log.d("CreateJobScreen", "Ubicación: ${sedeASeleccionar.ubicacion.departamento}, ${sedeASeleccionar.ubicacion.provincia}")
+            } else {
+                android.util.Log.d("CreateJobScreen", "No hay sedes activas para auto-seleccionar")
+            }
         }
     }
 
@@ -232,6 +258,7 @@ fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel 
                         
                         // Agregar ubicación completa - SIEMPRE (es la fuente principal de datos de ubicación)
                         // NOTA: El backend espera _ubicacion_completa (con underscore)
+                        // Incluye el nivel de especificidad para respetar lo que el usuario seleccionó
                         selectedUbicacionCompleta?.let { ubicacion ->
                             jobData["_ubicacion_completa"] = mapOf(
                                 "departamento" to ubicacion.departamento,
@@ -239,7 +266,8 @@ fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel 
                                 "distrito" to ubicacion.distrito,
                                 "direccion" to (ubicacion.direccion ?: ""),
                                 "lat" to (ubicacion.obtenerCoordenadas()?.lat ?: 0.0),
-                                "lng" to (ubicacion.obtenerCoordenadas()?.lng ?: 0.0)
+                                "lng" to (ubicacion.obtenerCoordenadas()?.lng ?: 0.0),
+                                "nivel" to ubicacion.nivel.name // DEPARTAMENTO, PROVINCIA o DISTRITO
                             )
                         }
                         
@@ -514,7 +542,7 @@ fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel 
                         SmartLocationSelector(
                             selectedLocation = selectedUbicacionCompleta,
                             onLocationSelected = { ubicacion ->
-                                android.util.Log.d("CreateJobScreen", "Ubicación seleccionada: depto=${ubicacion.departamento}, prov=${ubicacion.provincia}, dist=${ubicacion.distrito}")
+                                android.util.Log.d("CreateJobScreen", "Ubicacion seleccionada: depto=${ubicacion.departamento}, prov=${ubicacion.provincia}, dist=${ubicacion.distrito}")
                                 selectedUbicacionCompleta = ubicacion
                                 
                                 // Buscar Category correspondiente al departamento para compatibilidad con el sistema anterior
@@ -546,56 +574,35 @@ fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel 
                                 // Actualizar la lista local si es necesario
                                 android.util.Log.d("CreateJobScreen", "Nueva sede creada: ${nuevaSede.nombre}")
                             },
-                            label = "Ubicación *",
-                            placeholder = "Buscar distrito, provincia o departamento...",
+                            onNavigateToCreateSede = {
+                                // Mostrar diálogo inline para crear sede (sin navegar, para no perder el formulario)
+                                showCreateSedeDialog = true
+                            },
+                            label = "Ubicacion *",
+                            placeholder = "Para donde es este trabajo?",
                             modifier = Modifier.fillMaxWidth()
                         )
                         
-                        Spacer(Modifier.height(12.dp))
-                        
-                        // Selector de Empresa
-                        // - Admins: pueden seleccionar cualquier empresa
-                        // - Empresas: su empresa se asigna automáticamente (solo lectura)
+                        // Selector de Empresa (solo para admins)
+                        // Las empresas normales no necesitan ver este campo porque
+                        // el trabajo se asocia automáticamente a su cuenta
                         if (isAdmin) {
-                            // Admin: selector completo con búsqueda
-                        SearchableDropdown(
-                            label = "Empresa",
-                            items = uiState.empresas,
-                            selectedItem = selectedEmpresa,
-                            onItemSelected = { cat -> 
+                            Spacer(Modifier.height(12.dp))
+                            SearchableDropdown(
+                                label = "Empresa",
+                                items = uiState.empresas,
+                                selectedItem = selectedEmpresa,
+                                onItemSelected = { cat ->
                                     android.util.Log.d("CreateJobScreen", "Empresa seleccionada (admin): ${cat.name}")
-                                selectedEmpresa = cat 
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            leadingIcon = Icons.Default.Business,
-                            placeholder = "Buscar empresa...",
-                            emptyMessage = "No se encontraron empresas"
-                        )
-                        } else if (selectedEmpresa != null) {
-                            // Empresa normal: mostrar su empresa asignada (solo lectura)
-                            OutlinedTextField(
-                                value = selectedEmpresa?.name ?: "",
-                                onValueChange = {},
-                                readOnly = true,
-                                enabled = false,
-                                label = { Text("Empresa") },
-                                leadingIcon = { Icon(Icons.Default.Business, contentDescription = null) },
+                                    selectedEmpresa = cat
+                                },
                                 modifier = Modifier.fillMaxWidth(),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                                    disabledBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
-                                    disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
-                                ),
-                                supportingText = {
-                                    Text(
-                                        "Tu empresa se asigna automáticamente",
-                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
-                                    )
-                                }
+                                leadingIcon = Icons.Default.Business,
+                                placeholder = "Buscar empresa...",
+                                emptyMessage = "No se encontraron empresas"
                             )
                         }
-                        // Si no es admin y no tiene empresa, no mostrar nada (el trabajo se crea sin empresa)
+                        // Empresas normales: el trabajo se asocia automáticamente vía userCompanyId
                 }
                 
                 Spacer(Modifier.height(16.dp))
@@ -804,6 +811,27 @@ fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel 
                 }
             },
             onDismiss = { showOCRDialog = false }
+        )
+    }
+    
+    // Diálogo para crear sede inline (sin perder el estado del formulario)
+    if (showCreateSedeDialog) {
+        CreateSedeDialog(
+            onConfirm = { nombre, ubicacion, esPrincipal ->
+                val nuevaSede = SedeEmpresa(
+                    id = java.util.UUID.randomUUID().toString(),
+                    nombre = nombre,
+                    ubicacion = ubicacion,
+                    esPrincipal = esPrincipal,
+                    activa = true
+                )
+                locationRepository.addSede(nuevaSede)
+                showCreateSedeDialog = false
+                // Auto-seleccionar la sede recién creada
+                selectedUbicacionCompleta = ubicacion
+                android.util.Log.d("CreateJobScreen", "Sede creada inline: $nombre - Ubicación aplicada")
+            },
+            onDismiss = { showCreateSedeDialog = false }
         )
     }
 }

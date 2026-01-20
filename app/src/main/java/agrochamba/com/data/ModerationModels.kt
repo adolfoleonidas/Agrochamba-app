@@ -31,11 +31,11 @@ data class AdminJobItem(
     @Json(name = "id") val id: Int,
     @Json(name = "title") val title: String,
     @Json(name = "status") val status: String,
-    @Json(name = "status_label") val statusLabel: String,
+    @Json(name = "status_label") val statusLabel: String? = null,
     @Json(name = "date") val date: String,
-    @Json(name = "date_formatted") val dateFormatted: String,
+    @Json(name = "date_formatted") val dateFormatted: String? = null,
     @Json(name = "modified") val modified: String? = null,
-    @Json(name = "author") val author: JobAuthor,
+    @Json(name = "author") val author: JobAuthor? = null,
     @Json(name = "permalink") val permalink: String? = null,
     @Json(name = "edit_link") val editLink: String? = null,
     @Json(name = "featured_image") val featuredImage: FeaturedImageInfo? = null,
@@ -54,7 +54,7 @@ data class JobAuthor(
 
 @JsonClass(generateAdapter = true)
 data class FeaturedImageInfo(
-    @Json(name = "id") val id: Int,
+    @Json(name = "id") val id: Int? = null,
     @Json(name = "thumbnail") val thumbnail: String? = null,
     @Json(name = "medium") val medium: String? = null,
     @Json(name = "full") val full: String? = null
@@ -64,18 +64,34 @@ data class FeaturedImageInfo(
 data class JobEmpresaInfo(
     @Json(name = "id") val id: Int,
     @Json(name = "name") val name: String,
-    @Json(name = "logo") val logo: String? = null
-)
+    // Logo puede venir como String (URL) o como Boolean (false cuando no hay logo)
+    @Json(name = "logo") val logo: Any? = null
+) {
+    /**
+     * Obtiene la URL del logo como String, o null si no hay logo
+     * Maneja el caso donde el backend envía false en lugar de null
+     */
+    fun getLogoUrl(): String? {
+        return when (logo) {
+            is String -> if (logo.isNotBlank()) logo else null
+            else -> null // Incluye Boolean false, null, etc.
+        }
+    }
+}
 
 @JsonClass(generateAdapter = true)
 data class ModerationInfo(
     @Json(name = "status") val status: String? = null,
-    @Json(name = "approved_by") val approvedBy: Int? = null,
+    // Estos campos pueden venir como Int, String vacío, o null
+    @Json(name = "approved_by") val approvedBy: Any? = null,
     @Json(name = "approved_date") val approvedDate: String? = null,
-    @Json(name = "rejected_by") val rejectedBy: Int? = null,
+    @Json(name = "rejected_by") val rejectedBy: Any? = null,
     @Json(name = "rejected_date") val rejectedDate: String? = null,
     @Json(name = "rejection_reason") val rejectionReason: String? = null
-)
+) {
+    fun getApprovedById(): Int? = (approvedBy as? Number)?.toInt()
+    fun getRejectedById(): Int? = (rejectedBy as? Number)?.toInt()
+}
 
 // ==========================================
 // DETALLE DE TRABAJO PARA ADMIN
@@ -96,11 +112,11 @@ data class AdminJobDetail(
     @Json(name = "content_html") val contentHtml: String? = null,
     @Json(name = "excerpt") val excerpt: String? = null,
     @Json(name = "status") val status: String,
-    @Json(name = "status_label") val statusLabel: String,
+    @Json(name = "status_label") val statusLabel: String? = null,
     @Json(name = "date") val date: String,
-    @Json(name = "date_formatted") val dateFormatted: String,
+    @Json(name = "date_formatted") val dateFormatted: String? = null,
     @Json(name = "modified") val modified: String? = null,
-    @Json(name = "author") val author: JobAuthor,
+    @Json(name = "author") val author: JobAuthor? = null,
     @Json(name = "permalink") val permalink: String? = null,
     @Json(name = "edit_link") val editLink: String? = null,
     @Json(name = "featured_image") val featuredImage: FeaturedImageInfo? = null,

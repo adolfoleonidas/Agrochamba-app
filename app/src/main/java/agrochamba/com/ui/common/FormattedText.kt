@@ -238,15 +238,81 @@ private fun AnnotatedString.Builder.parseFormattedText(
     defaultColor: androidx.compose.ui.graphics.Color,
     linkColor: androidx.compose.ui.graphics.Color
 ) {
-    // Primero convertir HTML a Markdown si es necesario
-    val markdownText = if (text.contains("<")) {
-        text.htmlToMarkdownForDisplay()
+    // PASO 1: Limpiar marcadores ANTES de la conversión HTML
+    // (pueden estar dentro de tags HTML)
+    var cleanedText = cleanBrokenMarkers(text)
+    
+    // PASO 2: Convertir HTML a Markdown si es necesario
+    var markdownText = if (cleanedText.contains("<")) {
+        cleanedText.htmlToMarkdownForDisplay()
     } else {
-        text
+        cleanedText
     }
+    
+    // PASO 3: Limpiar marcadores DESPUÉS de la conversión HTML
+    // (por si quedaron algunos después de la conversión)
+    markdownText = cleanBrokenMarkers(markdownText)
     
     // Parsear Markdown y aplicar estilos, detectando también links
     parseMarkdown(markdownText, baseStyle, defaultColor, linkColor)
+}
+
+/**
+ * Limpia marcadores rotos o mal formateados que pueden venir del backend
+ * Estos marcadores son internos y no deberían mostrarse al usuario
+ * 
+ * Ejemplos de marcadores a limpiar:
+ * - [KEYWORD_START:Importante:] ... [KEYWORD_END]Importante:
+ * - [PHONE_CONTAINER_START] ... [PHONE_CONTAINER_END]
+ * - [LINK_START:PHONE:922491760]922 491 760[LINK_END]
+ */
+private fun cleanBrokenMarkers(text: String): String {
+    var result = text
+    
+    // 1. Limpiar marcadores de KEYWORD completos primero
+    // Patrón: [KEYWORD_START:texto][KEYWORD_END]texto_repetido
+    // El texto después de KEYWORD_END es una duplicación, hay que eliminarlo
+    result = result.replace(Regex("\\[KEYWORD_START:([^\\]]+)\\]\\s*\\n*\\s*\\[KEYWORD_END\\]\\1")) { match ->
+        val keywordText = match.groupValues[1].trimEnd(':')
+        "**$keywordText**"
+    }
+    
+    // 2. Limpiar marcadores de KEYWORD separados por saltos de línea
+    // Caso: [KEYWORD_START:texto] en una línea y [KEYWORD_END]texto en otra
+    result = result.replace(Regex("\\[KEYWORD_START:([^\\]]+)\\]")) { match ->
+        val keywordText = match.groupValues[1].trimEnd(':')
+        "**$keywordText**"
+    }
+    
+    // Limpiar [KEYWORD_END] seguido opcionalmente del texto duplicado
+    result = result.replace(Regex("\\[KEYWORD_END\\][^\\n\\[]*"), "")
+    result = result.replace("[KEYWORD_END]", "")
+    
+    // 3. Limpiar marcadores de PHONE_CONTAINER (exactos)
+    result = result.replace("[PHONE_CONTAINER_START]", "")
+    result = result.replace("[PHONE_CONTAINER_END]", "")
+    
+    // 4. Limpiar marcadores de LINK con teléfonos
+    // Patrón: [LINK_START:PHONE:numero]texto_visible[cualquier_cierre]
+    result = result.replace(Regex("\\[LINK_START:PHONE:([0-9]+)\\]([^\\[]+)(?:\\[(?:LINK_END|PHONE_CONTAINER_END)\\])?")) { match ->
+        val phoneNumber = match.groupValues[1]
+        val displayText = match.groupValues[2].trim()
+        // Mantener solo el texto visible (el número formateado)
+        if (displayText.isNotEmpty()) displayText else phoneNumber
+    }
+    
+    // 5. Limpiar cualquier marcador LINK_START huérfano
+    result = result.replace(Regex("\\[LINK_START:[^\\]]+\\]"), "")
+    result = result.replace("[LINK_END]", "")
+    
+    // 6. Limpiar cualquier otro marcador con corchetes que haya quedado
+    // Patrón genérico para marcadores internos: [ALGO_START...] o [ALGO_END]
+    result = result.replace(Regex("\\[(?:KEYWORD|PHONE|LINK|CONTAINER)_(?:START|END)[^\\]]*\\]"), "")
+    
+    // 7. Eliminar líneas que quedaron vacías después de la limpieza
+    result = result.replace(Regex("\\n\\s*\\n\\s*\\n"), "\n\n")
+    
+    return result
 }
 
 /**

@@ -194,10 +194,32 @@ class LocationService(private val context: Context) {
      * Busca la mejor coincidencia en PeruLocations basándose en el geocoding
      */
     private fun findBestMatch(geocoded: GeocodingResult): UbicacionCompleta? {
-        // Primero intentar por distrito
+        Log.d(TAG, "Finding best match for: distrito=${geocoded.distrito}, provincia=${geocoded.provincia}, departamento=${geocoded.departamento}")
+        
+        // Normalizar departamento de Google
+        val normalizedDepartamento = geocoded.departamento?.let { normalizeDepartamento(it) }
+        
+        // 1. Intentar búsqueda exacta con contexto completo (distrito + provincia + departamento)
+        geocoded.distrito?.let { distrito ->
+            val result = PeruLocations.resolveFromDistritoWithContext(
+                distrito = distrito,
+                provincia = geocoded.provincia,
+                departamento = normalizedDepartamento
+            )
+            if (result != null) {
+                Log.d(TAG, "Found exact match with context: ${result.distrito}, ${result.provincia}, ${result.departamento}")
+                return result.copy(
+                    direccion = geocoded.direccion,
+                    coordenadas = Coordenadas(geocoded.lat, geocoded.lng)
+                )
+            }
+        }
+        
+        // 2. Intentar solo por distrito (sin contexto)
         geocoded.distrito?.let { distrito ->
             val result = PeruLocations.resolveFromDistrito(distrito)
             if (result != null) {
+                Log.d(TAG, "Found match by district only: ${result.distrito}, ${result.provincia}, ${result.departamento}")
                 return result.copy(
                     direccion = geocoded.direccion,
                     coordenadas = Coordenadas(geocoded.lat, geocoded.lng)
@@ -205,10 +227,11 @@ class LocationService(private val context: Context) {
             }
         }
         
-        // Luego intentar por provincia
+        // 3. Intentar por provincia
         geocoded.provincia?.let { provincia ->
-            val result = PeruLocations.resolveFromProvincia(provincia, geocoded.departamento)
+            val result = PeruLocations.resolveFromProvincia(provincia, normalizedDepartamento)
             if (result != null) {
+                Log.d(TAG, "Found match by province: ${result.provincia}, ${result.departamento}")
                 return result.copy(
                     direccion = geocoded.direccion,
                     coordenadas = Coordenadas(geocoded.lat, geocoded.lng)
@@ -216,10 +239,11 @@ class LocationService(private val context: Context) {
             }
         }
         
-        // Finalmente intentar por departamento
-        geocoded.departamento?.let { departamento ->
+        // 4. Intentar por departamento
+        normalizedDepartamento?.let { departamento ->
             val searchResults = PeruLocations.searchLocation(departamento, 1)
             if (searchResults.isNotEmpty()) {
+                Log.d(TAG, "Found match by department search")
                 return searchResults.first().toUbicacionCompleta()?.copy(
                     direccion = geocoded.direccion,
                     coordenadas = Coordenadas(geocoded.lat, geocoded.lng)
@@ -227,10 +251,11 @@ class LocationService(private val context: Context) {
             }
         }
         
-        // Si nada funciona, crear ubicación con lo que tenemos
+        // 5. Si nada funciona, crear ubicación con lo que tenemos
+        Log.w(TAG, "No exact match found, creating fallback location")
         return if (geocoded.departamento != null) {
             UbicacionCompleta(
-                departamento = geocoded.departamento,
+                departamento = normalizedDepartamento ?: geocoded.departamento,
                 provincia = geocoded.provincia ?: geocoded.departamento,
                 distrito = geocoded.distrito ?: geocoded.provincia ?: geocoded.departamento,
                 direccion = geocoded.direccion,

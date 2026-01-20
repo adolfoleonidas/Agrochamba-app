@@ -116,11 +116,14 @@ fun SedesManagementScreen(
             )
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = { showCreateDialog = true },
-                icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text("Nueva Sede") }
-            )
+            // Solo mostrar FAB cuando hay sedes (cuando está vacío, el EmptySedesState tiene su propio botón)
+            if (sedes.isNotEmpty()) {
+                ExtendedFloatingActionButton(
+                    onClick = { showCreateDialog = true },
+                    icon = { Icon(Icons.Default.Add, contentDescription = null) },
+                    text = { Text("Nueva Sede") }
+                )
+            }
         }
     ) { paddingValues ->
         if (sedes.isEmpty()) {
@@ -455,8 +458,12 @@ private fun SedeCard(
     }
 }
 
+/**
+ * Diálogo para crear una nueva sede de empresa
+ * Público para poder reutilizarse desde otras pantallas (ej: CreateJobScreen)
+ */
 @Composable
-private fun CreateSedeDialog(
+fun CreateSedeDialog(
     onConfirm: (nombre: String, ubicacion: UbicacionCompleta, esPrincipal: Boolean) -> Unit,
     onDismiss: () -> Unit
 ) {

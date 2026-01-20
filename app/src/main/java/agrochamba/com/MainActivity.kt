@@ -4,10 +4,13 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import dagger.hilt.android.AndroidEntryPoint
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BedroomParent
@@ -85,7 +88,12 @@ sealed class Screen(val route: String, val label: String? = null, val icon: Imag
     object SedesManagement : Screen("sedes_management")
 }
 
-val bottomBarItems = listOf(Screen.Jobs, Screen.Routes, Screen.Dates, Screen.Rooms, Screen.Profile)
+// Bottom bar items según tipo de usuario:
+// - Usuarios normales: 5 items (con Cuartos)
+// - Empresas/Admin: 4 items + FAB en el centro
+val bottomBarItemsNormal = listOf(Screen.Jobs, Screen.Routes, Screen.Dates, Screen.Rooms, Screen.Profile)
+val bottomBarItemsEnterpriseLeft = listOf(Screen.Jobs, Screen.Routes)
+val bottomBarItemsEnterpriseRight = listOf(Screen.Dates, Screen.Profile)
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -199,30 +207,92 @@ fun MainAppScreen() {
         android.util.Log.d("MainAppScreen", "🔄 LaunchedEffect - isUserEnterprise: $isUserEnterprise, Roles: $userRoles")
     }
 
+    // Detectar la ruta actual para ocultar el FAB en ciertas pantallas
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
+    val currentDestination = navBackStackEntry?.destination
+    
+    // Ocultar FAB cuando ya estamos en crear trabajo o editar trabajo
+    val showFab = isUserEnterprise && currentRoute != Screen.CreateJob.route && 
+                  currentRoute != Screen.EditJob.route && 
+                  !currentRoute.orEmpty().startsWith("${Screen.EditJob.route}/")
+
     Scaffold(
         bottomBar = {
-            BottomAppBar {
-                val navBackStackEntry by navController.currentBackStackEntryAsState()
-                val currentDestination = navBackStackEntry?.destination
-
-                bottomBarItems.forEach { screen ->
-                    NavigationBarItem(
-                        icon = { Icon(screen.icon!!, contentDescription = screen.label) },
-                        label = { Text(screen.label!!) },
-                        selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
-                        onClick = { navController.navigate(screen.route) { 
-                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
-                        } }
-                    )
-                }
-            }
-        },
-        floatingActionButton = {
-            if (isUserEnterprise) {
-                FloatingActionButton(onClick = { navController.navigate(Screen.CreateJob.route) }) {
-                    Icon(Icons.Default.Add, contentDescription = "Publicar Anuncio")
+            NavigationBar {
+                if (isUserEnterprise) {
+                    // EMPRESAS/ADMIN: Layout con FAB en el centro
+                    // Items de la izquierda (Chambas, Rutas)
+                    bottomBarItemsEnterpriseLeft.forEach { screen ->
+                        NavigationBarItem(
+                            icon = { Icon(screen.icon!!, contentDescription = screen.label) },
+                            label = { Text(screen.label!!) },
+                            selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
+                            onClick = { navController.navigate(screen.route) { 
+                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            } }
+                        )
+                    }
+                    
+                    // FAB en el centro (solo cuando no están en crear/editar trabajo)
+                    if (showFab) {
+                        NavigationBarItem(
+                            icon = { 
+                                Box(
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .background(
+                                            MaterialTheme.colorScheme.primary,
+                                            shape = CircleShape
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.Add, 
+                                        contentDescription = "Publicar",
+                                        tint = MaterialTheme.colorScheme.onPrimary
+                                    )
+                                }
+                            },
+                            label = { Text("Publicar") },
+                            selected = currentRoute == Screen.CreateJob.route,
+                            onClick = { 
+                                navController.navigate(Screen.CreateJob.route) {
+                                    launchSingleTop = true
+                                }
+                            }
+                        )
+                    }
+                    
+                    // Items de la derecha (Fechas, Perfil)
+                    bottomBarItemsEnterpriseRight.forEach { screen ->
+                        NavigationBarItem(
+                            icon = { Icon(screen.icon!!, contentDescription = screen.label) },
+                            label = { Text(screen.label!!) },
+                            selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
+                            onClick = { navController.navigate(screen.route) { 
+                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            } }
+                        )
+                    }
+                } else {
+                    // USUARIOS NORMALES: 5 items (con Cuartos)
+                    bottomBarItemsNormal.forEach { screen ->
+                        NavigationBarItem(
+                            icon = { Icon(screen.icon!!, contentDescription = screen.label) },
+                            label = { Text(screen.label!!) },
+                            selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
+                            onClick = { navController.navigate(screen.route) { 
+                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            } }
+                        )
+                    }
                 }
             }
         }

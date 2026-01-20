@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Work
+import androidx.compose.material.icons.filled.BedroomParent
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -203,6 +204,17 @@ fun ProfileScreen(navController: NavController, viewModel: ProfileViewModel = vi
                     onClick = { navController.navigate(Screen.Saved.route) },
                     isLoading = uiState.isLoadingSaved
                 )
+            }
+            
+            // Cuartos (solo para empresas/admin que no lo tienen en el bottom bar)
+            if (AuthManager.isUserAnEnterprise()) {
+                item {
+                    MenuItem(
+                        icon = Icons.Default.BedroomParent,
+                        title = "Cuartos",
+                        onClick = { navController.navigate(Screen.Rooms.route) }
+                    )
+                }
             }
 
             item {

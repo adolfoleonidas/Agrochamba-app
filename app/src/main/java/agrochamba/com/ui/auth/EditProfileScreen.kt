@@ -87,16 +87,14 @@ fun EditProfileScreen(navController: NavController, viewModel: ProfileViewModel 
     }
 
     // Mostrar mensaje de éxito y navegar de vuelta cuando se actualice el perfil
-    var showSuccessToast by remember { mutableStateOf(false) }
-    
-    LaunchedEffect(uiState.isLoading, uiState.userProfile) {
-        if (!uiState.isLoading && uiState.error == null && showSuccessToast) {
+    // Usamos updateSuccess para asegurar que los datos ya están cargados
+    LaunchedEffect(uiState.updateSuccess) {
+        if (uiState.updateSuccess) {
             Toast.makeText(
                 context,
                 "Perfil actualizado correctamente",
                 Toast.LENGTH_SHORT
             ).show()
-            showSuccessToast = false
             navController.popBackStack()
         }
     }
@@ -431,8 +429,7 @@ fun EditProfileScreen(navController: NavController, viewModel: ProfileViewModel 
                                 profileData["company_linkedin"] = companyLinkedin
                                 profileData["company_twitter"] = companyTwitter
                             }
-                            
-                            showSuccessToast = true
+
                             viewModel.updateProfile(profileData)
                         },
                         modifier = Modifier

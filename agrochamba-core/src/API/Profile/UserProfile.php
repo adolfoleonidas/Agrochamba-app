@@ -171,15 +171,26 @@ class UserProfile
         }
 
         $is_enterprise = in_array('employer', (array)$user->roles, true) || in_array('administrator', (array)$user->roles, true);
-        
-        // Si es empresa, guardar datos en CPT en lugar de user_meta
+
+        // Aplicar updates básicos del usuario (display_name, first_name, last_name)
+        if (!empty($updates)) {
+            $userdata = ['ID' => $user_id] + $updates;
+            wp_update_user($userdata);
+        }
+
+        // Guardar phone y bio en user_meta para TODOS los usuarios (incluidas empresas)
+        foreach ($meta_updates as $key => $value) {
+            update_user_meta($user_id, $key, $value);
+        }
+
+        // Si es empresa, guardar datos adicionales en CPT
         if ($is_enterprise) {
             $empresa = agrochamba_get_empresa_by_user_id($user_id);
-            
+
             if ($empresa) {
                 // Actualizar datos en el CPT de empresa
                 $empresa_updates = [];
-                
+
                 // Mapeo de campos del request a campos del CPT
                 $cpt_field_mapping = [
                     'company_description' => 'post_content',
@@ -193,30 +204,33 @@ class UserProfile
                     'company_sector' => '_empresa_sector',
                     'company_ciudad' => '_empresa_ciudad',
                 ];
-                
+
+                // Campos que son URLs y necesitan sanitización especial
+                $url_fields = ['company_website', 'company_facebook', 'company_instagram', 'company_linkedin', 'company_twitter'];
+
                 foreach ($cpt_field_mapping as $param_key => $cpt_key) {
                     if (isset($params[$param_key])) {
                         if ($cpt_key === 'post_content') {
                             $empresa_updates['post_content'] = sanitize_textarea_field($params[$param_key]);
-                        } elseif (in_array($param_key, ['company_website', 'company_facebook', 'company_linkedin'])) {
+                        } elseif (in_array($param_key, $url_fields)) {
                             update_post_meta($empresa->ID, $cpt_key, esc_url_raw((string)$params[$param_key]));
                         } else {
                             update_post_meta($empresa->ID, $cpt_key, sanitize_text_field($params[$param_key]));
                         }
                     }
                 }
-                
-                        // Actualizar título y nombre comercial si cambió display_name
-                        if (isset($updates['display_name'])) {
-                            $empresa_updates['post_title'] = $updates['display_name'];
-                            update_post_meta($empresa->ID, '_empresa_nombre_comercial', $updates['display_name']);
-                            // También actualizar razón social si no existe
-                            $razon_social = get_post_meta($empresa->ID, '_empresa_razon_social', true);
-                            if (empty($razon_social)) {
-                                update_post_meta($empresa->ID, '_empresa_razon_social', $updates['display_name']);
-                            }
-                        }
-                
+
+                // Actualizar título y nombre comercial si cambió display_name
+                if (isset($updates['display_name'])) {
+                    $empresa_updates['post_title'] = $updates['display_name'];
+                    update_post_meta($empresa->ID, '_empresa_nombre_comercial', $updates['display_name']);
+                    // También actualizar razón social si no existe
+                    $razon_social = get_post_meta($empresa->ID, '_empresa_razon_social', true);
+                    if (empty($razon_social)) {
+                        update_post_meta($empresa->ID, '_empresa_razon_social', $updates['display_name']);
+                    }
+                }
+
                 // Actualizar contenido del post si hay cambios
                 if (!empty($empresa_updates)) {
                     $empresa_updates['ID'] = $empresa->ID;
@@ -235,24 +249,6 @@ class UserProfile
                         ]);
                     }
                 }
-            }
-        } else {
-            // Para usuarios normales, guardar en user_meta como antes
-            foreach ($meta_updates as $key => $value) {
-                update_user_meta($user_id, $key, $value);
-            }
-        }
-
-        // Aplicar updates básicos del usuario (display_name, first_name, last_name)
-        if (!empty($updates)) {
-            $userdata = ['ID' => $user_id] + $updates;
-            wp_update_user($userdata);
-        }
-        
-        // Para usuarios no-empresa, aplicar meta_updates
-        if (!$is_enterprise) {
-            foreach ($meta_updates as $key => $value) {
-                update_user_meta($user_id, $key, $value);
             }
         }
 

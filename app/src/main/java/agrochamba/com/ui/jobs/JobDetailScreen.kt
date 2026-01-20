@@ -52,6 +52,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import agrochamba.com.data.CompanyProfileResponse
 import agrochamba.com.data.WordPressApi
 import agrochamba.com.data.UbicacionCompleta
+import agrochamba.com.data.LocationType
 import agrochamba.com.ui.common.LocationDetailView
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -223,33 +224,41 @@ private fun JobDetailContent(
     
     // Usar ubicación completa del meta field si existe, sino parsear del nombre de taxonomía
     val ubicacionCompleta = remember(job.meta?.ubicacionCompleta, locationName) {
-        // Prioridad 1: usar _ubicacion_completa del meta field
+        // Prioridad 1: usar _ubicacion_completa del meta field (ya incluye nivel)
         job.meta?.ubicacionCompleta?.let { return@remember it }
         
-        // Prioridad 2: parsear del nombre de la taxonomía
+        // Prioridad 2: parsear del nombre de la taxonomía y detectar el nivel
         if (locationName == null) return@remember null
         
         val parts = locationName.split(",").map { it.trim() }
         when (parts.size) {
+            // Solo departamento: nivel = DEPARTAMENTO
             1 -> UbicacionCompleta(
                 departamento = parts[0],
-                provincia = parts[0],
-                distrito = parts[0]
+                provincia = "", // Vacío porque el usuario no especificó
+                distrito = "",  // Vacío porque el usuario no especificó
+                nivel = LocationType.DEPARTAMENTO
             )
+            // Provincia, Departamento: nivel = PROVINCIA
             2 -> UbicacionCompleta(
                 departamento = parts[1],
                 provincia = parts[0],
-                distrito = parts[0]
+                distrito = "", // Vacío porque el usuario no especificó distrito
+                nivel = LocationType.PROVINCIA
             )
+            // Distrito, Provincia, Departamento: nivel = DISTRITO
             3 -> UbicacionCompleta(
                 departamento = parts[2],
                 provincia = parts[1],
-                distrito = parts[0]
+                distrito = parts[0],
+                nivel = LocationType.DISTRITO
             )
+            // Más de 3 partes: asumir formato completo (distrito)
             else -> UbicacionCompleta(
                 departamento = parts.lastOrNull() ?: "",
                 provincia = parts.getOrNull(parts.size - 2) ?: "",
-                distrito = parts.firstOrNull() ?: ""
+                distrito = parts.firstOrNull() ?: "",
+                nivel = LocationType.DISTRITO
             )
         }
     }

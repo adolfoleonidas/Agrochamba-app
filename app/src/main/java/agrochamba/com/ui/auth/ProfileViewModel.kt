@@ -33,7 +33,9 @@ data class ProfileScreenState(
     val isLoadingFavorites: Boolean = false,
     val isLoadingSaved: Boolean = false,
     // Flag para indicar que una eliminación fue exitosa (utilizado por la UI para disparar efectos)
-    val deleteSuccess: Boolean = false
+    val deleteSuccess: Boolean = false,
+    // Flag para indicar que una actualización de perfil fue exitosa
+    val updateSuccess: Boolean = false
 )
 
 class ProfileViewModel : ViewModel() {
@@ -50,27 +52,35 @@ class ProfileViewModel : ViewModel() {
 
     fun loadUserProfile() {
         viewModelScope.launch {
-            uiState = uiState.copy(isLoadingProfile = true, error = null)
-            try {
-                val token = AuthManager.token ?: throw Exception("No estás autenticado.")
-                val authHeader = "Bearer $token"
+            loadUserProfileInternal()
+        }
+    }
 
-                val profile = WordPressApi.retrofitService.getUserProfile(authHeader)
-                uiState = uiState.copy(
-                    isLoadingProfile = false,
-                    userProfile = profile
-                )
-                
-                // Actualizar el display name en AuthManager si cambió
-                if (profile.displayName != AuthManager.userDisplayName) {
-                    AuthManager.userDisplayName = profile.displayName
-                }
-            } catch (e: Exception) {
-                uiState = uiState.copy(
-                    isLoadingProfile = false,
-                    error = "No se pudo cargar el perfil: ${e.message}"
-                )
+    /**
+     * Versión suspendible interna para cargar el perfil.
+     * Útil cuando necesitamos esperar a que termine (ej: después de actualizar)
+     */
+    private suspend fun loadUserProfileInternal() {
+        uiState = uiState.copy(isLoadingProfile = true, error = null)
+        try {
+            val token = AuthManager.token ?: throw Exception("No estás autenticado.")
+            val authHeader = "Bearer $token"
+
+            val profile = WordPressApi.retrofitService.getUserProfile(authHeader)
+            uiState = uiState.copy(
+                isLoadingProfile = false,
+                userProfile = profile
+            )
+
+            // Actualizar el display name en AuthManager si cambió
+            if (profile.displayName != AuthManager.userDisplayName) {
+                AuthManager.userDisplayName = profile.displayName
             }
+        } catch (e: Exception) {
+            uiState = uiState.copy(
+                isLoadingProfile = false,
+                error = "No se pudo cargar el perfil: ${e.message}"
+            )
         }
     }
 
@@ -147,9 +157,12 @@ class ProfileViewModel : ViewModel() {
                 val response = WordPressApi.retrofitService.updateUserProfile(authHeader, profileData)
 
                 if (response.isSuccessful) {
-                    // Recargar el perfil después de actualizar
-                    loadUserProfile()
-                    uiState = uiState.copy(isLoading = false)
+                    // Recargar el perfil y ESPERAR a que termine antes de quitar el loading
+                    loadUserProfileInternal()
+                    uiState = uiState.copy(isLoading = false, updateSuccess = true)
+                    // Resetear el flag después de un momento
+                    kotlinx.coroutines.delay(100)
+                    uiState = uiState.copy(updateSuccess = false)
                 } else {
                     uiState = uiState.copy(
                         isLoading = false,
@@ -178,9 +191,11 @@ class ProfileViewModel : ViewModel() {
                 val response = WordPressApi.retrofitService.uploadProfilePhoto(authHeader, part)
 
                 if (response.success) {
-                    // Recargar el perfil después de subir la foto
-                    loadUserProfile()
-                    uiState = uiState.copy(isLoading = false)
+                    // Recargar el perfil y ESPERAR a que termine
+                    loadUserProfileInternal()
+                    uiState = uiState.copy(isLoading = false, updateSuccess = true)
+                    kotlinx.coroutines.delay(100)
+                    uiState = uiState.copy(updateSuccess = false)
                 } else {
                     uiState = uiState.copy(
                         isLoading = false,
@@ -206,9 +221,11 @@ class ProfileViewModel : ViewModel() {
                 val response = WordPressApi.retrofitService.deleteProfilePhoto(authHeader)
 
                 if (response.isSuccessful) {
-                    // Recargar el perfil después de eliminar la foto
-                    loadUserProfile()
-                    uiState = uiState.copy(isLoading = false)
+                    // Recargar el perfil y ESPERAR a que termine
+                    loadUserProfileInternal()
+                    uiState = uiState.copy(isLoading = false, updateSuccess = true)
+                    kotlinx.coroutines.delay(100)
+                    uiState = uiState.copy(updateSuccess = false)
                 } else {
                     uiState = uiState.copy(
                         isLoading = false,

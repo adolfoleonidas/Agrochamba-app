@@ -40,6 +40,10 @@ class ModerationViewModel : ViewModel() {
     private val _selectedJobIds = MutableStateFlow<Set<Int>>(emptySet())
     val selectedJobIds: StateFlow<Set<Int>> = _selectedJobIds.asStateFlow()
     
+    // Modo de selección múltiple (activado por long press)
+    private val _isSelectionMode = MutableStateFlow(false)
+    val isSelectionMode: StateFlow<Boolean> = _isSelectionMode.asStateFlow()
+    
     // Cache de todos los trabajos para filtrado local
     private var allJobsCache: List<JobPost> = emptyList()
 
@@ -53,6 +57,7 @@ class ModerationViewModel : ViewModel() {
 
     /**
      * Carga todos los trabajos y luego aplica el filtro actual
+     * Usa el endpoint de admin que incluye todos los estados (publish, pending, draft)
      */
     private fun loadAllJobs() {
         viewModelScope.launch {
@@ -65,22 +70,52 @@ class ModerationViewModel : ViewModel() {
                     return@launch
                 }
 
-                // Cargar trabajos del endpoint estándar
-                val jobs = WordPressApi.retrofitService.getJobs(
+                // Usar endpoint de admin que incluye TODOS los estados (publish, pending, draft)
+                val response = WordPressApi.retrofitService.getAdminJobs(
+                    token = "Bearer $token",
                     page = 1,
-                    perPage = 100
+                    perPage = 100,
+                    status = "all" // Incluye todos los estados
                 )
+                
+                // Convertir AdminJobItem a JobPost para compatibilidad con la UI existente
+                val jobs = response.data.map { adminJob ->
+                    JobPost(
+                        id = adminJob.id,
+                        status = adminJob.status,
+                        title = Title(rendered = adminJob.title),
+                        date = adminJob.date,
+                        featuredImageUrl = adminJob.featuredImage?.medium ?: adminJob.featuredImage?.full,
+                        meta = JobMeta(
+                            salarioMin = null,
+                            salarioMax = null,
+                            vacantes = null,
+                            tipoContrato = null,
+                            jornada = null,
+                            alojamiento = null,
+                            transporte = null,
+                            alimentacion = null,
+                            requisitos = null,
+                            beneficios = null,
+                            galleryIds = null,
+                            facebookPostId = null,
+                            ubicacionCompleta = adminJob.ubicacion
+                        )
+                    )
+                }
                 
                 allJobsCache = jobs
                 
-                // Contar pendientes (si el endpoint devuelve status)
-                val pendingCount = jobs.count { it.status == "pending" }
+                // Contar pendientes y borradores (ambos necesitan moderación)
+                val pendingCount = jobs.count { it.status == "pending" || it.status == "draft" }
+                
+                Log.d(TAG, "Loaded ${jobs.size} jobs. Pending/Draft: $pendingCount")
                 
                 // Aplicar filtro
                 applyFilter(pendingCount)
                 
             } catch (e: Exception) {
-                Log.e(TAG, "Error loading jobs: ${e.message}", e)
+                Log.e(TAG, "Error loading admin jobs: ${e.message}", e)
                 _uiState.update { it.copy(isLoading = false, error = e.message ?: "Error desconocido") }
             }
         }
@@ -91,7 +126,8 @@ class ModerationViewModel : ViewModel() {
      */
     private fun applyFilter(pendingCount: Int) {
         val filteredJobs = when (_currentFilter.value) {
-            "pending" -> allJobsCache.filter { it.status == "pending" }
+            // "pending" incluye tanto pending como draft (ambos necesitan moderación)
+            "pending" -> allJobsCache.filter { it.status == "pending" || it.status == "draft" }
             else -> allJobsCache
         }
         
@@ -128,8 +164,8 @@ class ModerationViewModel : ViewModel() {
         _currentFilter.value = status
         _selectedJobIds.value = emptySet()
         
-        // Re-aplicar filtro sin recargar
-        val pendingCount = allJobsCache.count { it.status == "pending" }
+        // Re-aplicar filtro sin recargar (pending + draft = pendientes de moderación)
+        val pendingCount = allJobsCache.count { it.status == "pending" || it.status == "draft" }
         applyFilter(pendingCount)
     }
 
@@ -138,12 +174,72 @@ class ModerationViewModel : ViewModel() {
     }
 
     fun search() {
-        val pendingCount = allJobsCache.count { it.status == "pending" }
+        val pendingCount = allJobsCache.count { it.status == "pending" || it.status == "draft" }
         applyFilter(pendingCount)
     }
 
+
+    /**
+     * Selecciona un trabajo y carga sus detalles completos para preview
+     */
     fun selectJob(job: JobPost) {
         _selectedJob.value = job
+        // Cargar detalles completos en segundo plano
+        loadJobDetails(job.id)
+    }
+    
+    /**
+     * Carga los detalles completos del trabajo desde el endpoint admin
+     */
+    private fun loadJobDetails(jobId: Int) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingDetail = true) }
+            
+            try {
+                val token = AuthManager.token ?: return@launch
+                
+                val response = WordPressApi.retrofitService.getAdminJobDetail(
+                    token = "Bearer $token",
+                    id = jobId
+                )
+                
+                // Convertir AdminJobDetail a JobPost con contenido completo
+                val detail = response.data
+                val jobWithContent = JobPost(
+                    id = detail.id,
+                    status = detail.status,
+                    title = Title(rendered = detail.title),
+                    content = Content(rendered = detail.contentHtml ?: detail.content),
+                    date = detail.date,
+                    featuredImageUrl = detail.featuredImage?.medium ?: detail.featuredImage?.full,
+                    meta = JobMeta(
+                        salarioMin = detail.meta?.salarioMin?.toString(),
+                        salarioMax = detail.meta?.salarioMax?.toString(),
+                        vacantes = detail.meta?.vacantes?.toString(),
+                        tipoContrato = null,
+                        jornada = null,
+                        alojamiento = detail.meta?.alojamiento,
+                        transporte = detail.meta?.transporte,
+                        alimentacion = detail.meta?.alimentacion,
+                        requisitos = null,
+                        beneficios = null,
+                        galleryIds = null,
+                        facebookPostId = null,
+                        ubicacionCompleta = detail.ubicacion
+                    )
+                )
+                
+                _selectedJob.value = jobWithContent
+                _uiState.update { it.copy(isLoadingDetail = false) }
+                
+                Log.d(TAG, "Loaded job details for ID $jobId: ${detail.title}")
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "Error loading job details: ${e.message}", e)
+                _uiState.update { it.copy(isLoadingDetail = false) }
+                // Mantener el job original aunque no se puedan cargar los detalles
+            }
+        }
     }
 
     fun clearSelectedJob() {
@@ -159,7 +255,8 @@ class ModerationViewModel : ViewModel() {
                 
                 val response = WordPressApi.retrofitService.approveJob(
                     token = "Bearer $token",
-                    id = jobId
+                    id = jobId,
+                    data = emptyMap() // Body requerido por Retrofit
                 )
                 
                 if (response.isSuccessful) {
@@ -245,8 +342,8 @@ class ModerationViewModel : ViewModel() {
                     )}
                     clearSelectedJob()
                     
-                    // Re-aplicar filtro
-                    val pendingCount = allJobsCache.count { it.status == "pending" }
+                    // Re-aplicar filtro (pending + draft = pendientes de moderación)
+                    val pendingCount = allJobsCache.count { it.status == "pending" || it.status == "draft" }
                     applyFilter(pendingCount)
                 } else {
                     _uiState.update { it.copy(
@@ -264,23 +361,67 @@ class ModerationViewModel : ViewModel() {
         }
     }
 
-    // Selección múltiple
+    // ==========================================
+    // MODO DE SELECCIÓN MÚLTIPLE
+    // ==========================================
+    
+    /**
+     * Activa el modo de selección y selecciona el primer elemento (long press)
+     */
+    fun enterSelectionMode(jobId: Int) {
+        _isSelectionMode.value = true
+        _selectedJobIds.value = setOf(jobId)
+    }
+    
+    /**
+     * Sale del modo de selección y limpia la selección
+     */
+    fun exitSelectionMode() {
+        _isSelectionMode.value = false
+        _selectedJobIds.value = emptySet()
+    }
+    
+    /**
+     * Alterna la selección de un trabajo (solo en modo selección)
+     */
     fun toggleJobSelection(jobId: Int) {
+        if (!_isSelectionMode.value) return
+        
         _selectedJobIds.update { current ->
-            if (current.contains(jobId)) {
+            val newSet = if (current.contains(jobId)) {
                 current - jobId
             } else {
                 current + jobId
             }
+            // Si no queda ninguno seleccionado, salir del modo selección
+            if (newSet.isEmpty()) {
+                _isSelectionMode.value = false
+            }
+            newSet
         }
     }
 
+    /**
+     * Selecciona todos los trabajos visibles
+     */
     fun selectAllJobs() {
+        _isSelectionMode.value = true
         _selectedJobIds.value = _uiState.value.jobs.map { it.id }.toSet()
+    }
+    
+    /**
+     * Selecciona trabajos por fecha
+     */
+    fun selectJobsByDate(date: String) {
+        _isSelectionMode.value = true
+        _selectedJobIds.value = _uiState.value.jobs
+            .filter { it.date?.startsWith(date) == true }
+            .map { it.id }
+            .toSet()
     }
 
     fun clearSelection() {
-        _selectedJobIds.value = emptySet()
+        exitSelectionMode()
     }
 
     fun clearMessages() {

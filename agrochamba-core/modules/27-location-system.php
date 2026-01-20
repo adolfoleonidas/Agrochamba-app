@@ -88,8 +88,9 @@ if (!function_exists('agrochamba_register_location_meta_fields')) {
         if (!registered_meta_key_exists('post', '_ubicacion_completa', 'trabajo')) {
             register_post_meta('trabajo', '_ubicacion_completa', array(
                 'type' => 'object',
-                'description' => 'Ubicación completa del trabajo',
+                'description' => 'Ubicación completa del trabajo con nivel de especificidad',
                 'single' => true,
+                'auth_callback' => '__return_true', // Permitir lectura sin autenticación
                 'show_in_rest' => array(
                     'schema' => array(
                         'type' => 'object',
@@ -100,6 +101,11 @@ if (!function_exists('agrochamba_register_location_meta_fields')) {
                             'direccion' => array('type' => 'string'),
                             'lat' => array('type' => 'number'),
                             'lng' => array('type' => 'number'),
+                            'nivel' => array(
+                                'type' => 'string',
+                                'enum' => array('DEPARTAMENTO', 'PROVINCIA', 'DISTRITO'),
+                                'description' => 'Nivel de especificidad de la ubicación',
+                            ),
                         ),
                     ),
                 ),
@@ -501,6 +507,14 @@ if (!function_exists('agrochamba_save_location_data')) {
         update_post_meta($post_id, '_ubicacion_direccion', $direccion);
         
         // Guardar objeto completo para la app
+        // Determinar el nivel de especificidad basándose en los datos
+        $nivel = 'DISTRITO'; // Por defecto
+        if (empty($provincia) || $provincia === $departamento) {
+            $nivel = 'DEPARTAMENTO';
+        } elseif (empty($distrito) || $distrito === $provincia) {
+            $nivel = 'PROVINCIA';
+        }
+
         $ubicacion_completa = array(
             'departamento' => $departamento,
             'provincia' => $provincia,
@@ -508,6 +522,7 @@ if (!function_exists('agrochamba_save_location_data')) {
             'direccion' => $direccion,
             'lat' => 0,
             'lng' => 0,
+            'nivel' => $nivel,
         );
         update_post_meta($post_id, '_ubicacion_completa', $ubicacion_completa);
     }
@@ -584,6 +599,82 @@ if (!function_exists('agrochamba_render_location_column')) {
 
 // El filtro por departamento ya está disponible nativamente
 // gracias a la taxonomía 'ubicacion'
+
+// ==========================================
+// 7.5. ASEGURAR _ubicacion_completa EN REST API
+// ==========================================
+// Filtro para asegurar que _ubicacion_completa esté incluido en la respuesta
+// del endpoint estándar wp/v2/trabajos, ya que el meta field registrado
+// debería aparecer en 'meta', pero a veces no se incluye correctamente
+
+if (!function_exists('agrochamba_ensure_ubicacion_in_rest_response')) {
+    function agrochamba_ensure_ubicacion_in_rest_response($response, $post, $request) {
+        $data = $response->get_data();
+
+        // Obtener _ubicacion_completa desde post meta
+        $ubicacion_completa = get_post_meta($post->ID, '_ubicacion_completa', true);
+
+        // Si no existe en meta, inicializar desde taxonomía (migración/fallback)
+        if (empty($ubicacion_completa) || !is_array($ubicacion_completa)) {
+            $ubicacion_terms = wp_get_post_terms($post->ID, 'ubicacion', array('fields' => 'names'));
+            $provincia = get_post_meta($post->ID, '_ubicacion_provincia', true);
+            $distrito = get_post_meta($post->ID, '_ubicacion_distrito', true);
+            $direccion = get_post_meta($post->ID, '_ubicacion_direccion', true);
+
+            if (!empty($ubicacion_terms)) {
+                $departamento = $ubicacion_terms[0];
+
+                // Determinar nivel
+                $nivel = 'DISTRITO';
+                if (empty($provincia) || $provincia === $departamento) {
+                    $nivel = 'DEPARTAMENTO';
+                } elseif (empty($distrito) || $distrito === $provincia) {
+                    $nivel = 'PROVINCIA';
+                }
+
+                $ubicacion_completa = array(
+                    'departamento' => $departamento,
+                    'provincia' => $provincia ?: '',
+                    'distrito' => $distrito ?: '',
+                    'direccion' => $direccion ?: '',
+                    'lat' => 0,
+                    'lng' => 0,
+                    'nivel' => $nivel,
+                );
+
+                // Guardar para futuras consultas
+                update_post_meta($post->ID, '_ubicacion_completa', $ubicacion_completa);
+            }
+        }
+
+        // Asegurar que el array meta exista
+        if (!isset($data['meta'])) {
+            $data['meta'] = array();
+        }
+
+        // Agregar _ubicacion_completa al meta si existe
+        if (!empty($ubicacion_completa) && is_array($ubicacion_completa)) {
+            // Asegurar que tenga el campo nivel
+            if (!isset($ubicacion_completa['nivel'])) {
+                $ubicacion_completa['nivel'] = 'DISTRITO';
+                $dep = $ubicacion_completa['departamento'] ?? '';
+                $prov = $ubicacion_completa['provincia'] ?? '';
+                $dist = $ubicacion_completa['distrito'] ?? '';
+
+                if (empty($prov) || $prov === $dep) {
+                    $ubicacion_completa['nivel'] = 'DEPARTAMENTO';
+                } elseif (empty($dist) || $dist === $prov) {
+                    $ubicacion_completa['nivel'] = 'PROVINCIA';
+                }
+            }
+            $data['meta']['_ubicacion_completa'] = $ubicacion_completa;
+        }
+
+        $response->set_data($data);
+        return $response;
+    }
+    add_filter('rest_prepare_trabajo', 'agrochamba_ensure_ubicacion_in_rest_response', 20, 3);
+}
 
 // ==========================================
 // 8. REST API - ENDPOINTS DE UBICACIONES
@@ -797,23 +888,52 @@ if (!function_exists('agrochamba_add_location_to_rest_response')) {
                 $ubicacion = get_post_meta($post['id'], '_ubicacion_completa', true);
                 
                 if (!empty($ubicacion) && !empty($ubicacion['departamento'])) {
+                    $departamento = $ubicacion['departamento'];
+                    $provincia = $ubicacion['provincia'] ?? '';
+                    $distrito = $ubicacion['distrito'] ?? '';
+                    $direccion = $ubicacion['direccion'] ?? '';
+                    
+                    // Obtener el nivel de especificidad (DEPARTAMENTO, PROVINCIA, DISTRITO)
+                    $nivel = strtoupper($ubicacion['nivel'] ?? '');
+                    if (!in_array($nivel, array('DEPARTAMENTO', 'PROVINCIA', 'DISTRITO'))) {
+                        // Detectar nivel automáticamente si no está definido
+                        if (empty($provincia) || $provincia === $departamento) {
+                            $nivel = 'DEPARTAMENTO';
+                        } elseif (empty($distrito) || $distrito === $provincia) {
+                            $nivel = 'PROVINCIA';
+                        } else {
+                            $nivel = 'DISTRITO';
+                        }
+                    }
+                    
+                    // Formatear según el nivel de especificidad
+                    switch ($nivel) {
+                        case 'DEPARTAMENTO':
+                            $full = $departamento;
+                            break;
+                        case 'PROVINCIA':
+                            $full = $provincia . ', ' . $departamento;
+                            break;
+                        case 'DISTRITO':
+                        default:
+                            $full = implode(', ', array_filter(array($distrito, $provincia, $departamento)));
+                            break;
+                    }
+                    
                     return array(
-                        'departamento' => $ubicacion['departamento'],
-                        'provincia' => $ubicacion['provincia'] ?? '',
-                        'distrito' => $ubicacion['distrito'] ?? '',
-                        'direccion' => $ubicacion['direccion'] ?? '',
+                        'departamento' => $departamento,
+                        'provincia' => $provincia,
+                        'distrito' => $distrito,
+                        'direccion' => $direccion,
+                        'nivel' => $nivel,
                         // Para cards: solo departamento
-                        'card' => $ubicacion['departamento'],
-                        // Para detalles: ubicación completa en una línea
-                        'full' => implode(', ', array_filter(array(
-                            $ubicacion['distrito'] ?? '',
-                            $ubicacion['provincia'] ?? '',
-                            $ubicacion['departamento']
-                        ))),
+                        'card' => $departamento,
+                        // Para detalles: ubicación formateada según nivel
+                        'full' => $full,
                     );
                 }
                 
-                // Fallback a taxonomía
+                // Fallback a taxonomía (solo departamento)
                 $terms = wp_get_post_terms($post['id'], 'ubicacion', array('fields' => 'names'));
                 if (!empty($terms)) {
                     return array(
@@ -821,6 +941,7 @@ if (!function_exists('agrochamba_add_location_to_rest_response')) {
                         'provincia' => '',
                         'distrito' => '',
                         'direccion' => '',
+                        'nivel' => 'DEPARTAMENTO',
                         'card' => $terms[0],
                         'full' => $terms[0],
                     );
@@ -830,7 +951,7 @@ if (!function_exists('agrochamba_add_location_to_rest_response')) {
             },
             'schema' => array(
                 'type' => 'object',
-                'description' => 'Ubicación formateada para UI',
+                'description' => 'Ubicación formateada para UI con nivel de especificidad',
             ),
         ));
     }
@@ -1042,4 +1163,164 @@ if (!function_exists('agrochamba_migrate_locations')) {
             'skipped' => $skipped,
         );
     }
+}
+
+// ==========================================
+// ENDPOINT PARA POBLAR TAXONOMÍA COMPLETA
+// ==========================================
+
+add_action('rest_api_init', function() {
+    register_rest_route('agrochamba/v1', '/populate-locations', array(
+        'methods' => 'POST',
+        'callback' => 'agrochamba_populate_locations_endpoint',
+        'permission_callback' => function() {
+            // Solo administradores pueden ejecutar esto
+            return current_user_can('manage_options');
+        }
+    ));
+});
+
+if (!function_exists('agrochamba_populate_locations_endpoint')) {
+    function agrochamba_populate_locations_endpoint($request) {
+        if (!function_exists('agrochamba_populate_all_location_terms')) {
+            return new WP_Error(
+                'function_not_found',
+                'La función agrochamba_populate_all_location_terms no está disponible.',
+                array('status' => 500)
+            );
+        }
+        
+        $stats = agrochamba_populate_all_location_terms();
+        
+        return new WP_REST_Response(array(
+            'success' => true,
+            'message' => 'Taxonomía de ubicaciones poblada correctamente.',
+            'stats' => $stats,
+            'summary' => sprintf(
+                'Creados: %d departamentos, %d provincias, %d distritos. Errores: %d',
+                $stats['departamentos'],
+                $stats['provincias'],
+                $stats['distritos'],
+                count($stats['errores'])
+            )
+        ), 200);
+    }
+}
+
+// ==========================================
+// PÁGINA DE ADMIN PARA POBLAR UBICACIONES
+// ==========================================
+
+add_action('admin_menu', function() {
+    add_submenu_page(
+        'edit.php?post_type=trabajo',
+        'Poblar Ubicaciones del Peru',
+        'Poblar Ubicaciones',
+        'manage_options',
+        'agrochamba-populate-locations',
+        'agrochamba_populate_locations_page'
+    );
+});
+
+function agrochamba_populate_locations_page() {
+    // Verificar permisos
+    if (!current_user_can('manage_options')) {
+        wp_die('No tienes permisos para acceder a esta página.');
+    }
+
+    // Procesar acción si se envió el formulario
+    $message = '';
+    $message_type = '';
+    
+    if (isset($_POST['populate_locations']) && wp_verify_nonce($_POST['_wpnonce'], 'populate_locations_action')) {
+        // Aumentar límites para operación larga
+        set_time_limit(300); // 5 minutos
+        wp_raise_memory_limit('admin');
+        
+        if (function_exists('agrochamba_populate_all_location_terms')) {
+            $stats = agrochamba_populate_all_location_terms();
+            $message = sprintf(
+                'Taxonomia poblada correctamente:<br>
+                - Departamentos: %d<br>
+                - Provincias: %d<br>
+                - Distritos: %d<br>
+                - Errores: %d',
+                $stats['departamentos'],
+                $stats['provincias'],
+                $stats['distritos'],
+                count($stats['errores'])
+            );
+            $message_type = 'success';
+            
+            if (!empty($stats['errores'])) {
+                $message .= '<br><br>Errores encontrados:<br>' . implode('<br>', array_slice($stats['errores'], 0, 10));
+            }
+        } else {
+            $message = 'Error: La funcion agrochamba_populate_all_location_terms no esta disponible.';
+            $message_type = 'error';
+        }
+    }
+
+    // Contar términos existentes
+    $term_count = wp_count_terms(array('taxonomy' => 'ubicacion', 'hide_empty' => false));
+    if (is_wp_error($term_count)) {
+        $term_count = 0;
+    }
+    
+    ?>
+    <div class="wrap">
+        <h1>Poblar Ubicaciones del Peru</h1>
+        
+        <?php if ($message): ?>
+            <div class="notice notice-<?php echo esc_attr($message_type); ?> is-dismissible">
+                <p><?php echo wp_kses_post($message); ?></p>
+            </div>
+        <?php endif; ?>
+        
+        <div class="card" style="max-width: 600px; padding: 20px;">
+            <h2>Estado Actual</h2>
+            <p><strong>Terminos en taxonomia "ubicacion":</strong> <?php echo intval($term_count); ?></p>
+            
+            <hr>
+            
+            <h2>Que hace este script?</h2>
+            <p>Crea la estructura jerarquica completa de ubicaciones del Peru:</p>
+            <ul>
+                <li><strong>25</strong> Departamentos</li>
+                <li><strong>196</strong> Provincias</li>
+                <li><strong>1,892</strong> Distritos</li>
+            </ul>
+            <p><em>Total: ~2,113 terminos jerarquicos</em></p>
+            
+            <hr>
+            
+            <h2>Importante</h2>
+            <ul>
+                <li>Este proceso puede tomar <strong>2-5 minutos</strong></li>
+                <li>No cierres el navegador mientras se ejecuta</li>
+                <li>Los terminos existentes NO se duplicaran</li>
+                <li>Es seguro ejecutarlo multiples veces</li>
+            </ul>
+            
+            <hr>
+            
+            <form method="post" onsubmit="return confirm('Estas seguro de que deseas poblar las ubicaciones? Este proceso tomara unos minutos.');">
+                <?php wp_nonce_field('populate_locations_action'); ?>
+                <p>
+                    <button type="submit" name="populate_locations" class="button button-primary button-hero" style="width: 100%;">
+                        Poblar Ubicaciones del Peru
+                    </button>
+                </p>
+            </form>
+        </div>
+        
+        <div class="card" style="max-width: 600px; padding: 20px; margin-top: 20px;">
+            <h2>Alternativas</h2>
+            <p><strong>API REST:</strong></p>
+            <code>POST <?php echo esc_url(rest_url('agrochamba/v1/populate-locations')); ?></code>
+            <p style="margin-top: 15px;"><strong>WP-CLI:</strong></p>
+            <code>wp eval "agrochamba_populate_all_location_terms();"</code>
+        </div>
+    </div>
+    <?php
 }

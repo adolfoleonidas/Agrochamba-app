@@ -114,6 +114,7 @@ import agrochamba.com.data.PeruLocations
 import agrochamba.com.data.UbicacionCompleta
 import agrochamba.com.data.repository.LocationRepository
 import java.util.Date
+import androidx.activity.compose.BackHandler
 
 fun getEmojiForCrop(cropName: String): String {
     return when {
@@ -185,17 +186,23 @@ fun JobsScreen(jobsViewModel: JobsViewModel = viewModel()) {
     val uiState = jobsViewModel.uiState
     android.util.Log.d("JobsScreen", "📊 Estado: isLoading=${uiState.isLoading}, jobs=${uiState.allJobs.size}, filtered=${uiState.filteredJobs.size}")
 
-        if (uiState.selectedJob == null) {
+    // Manejar el botón atrás del sistema cuando se está viendo un trabajo
+    // Si hay un trabajo seleccionado, volver a la lista en lugar de cerrar la app
+    BackHandler(enabled = uiState.selectedJob != null) {
+        jobsViewModel.onDetailScreenNavigated()
+    }
+
+    if (uiState.selectedJob == null) {
         android.util.Log.d("JobsScreen", "📋 Mostrando JobsListWithSearchScreen...")
-            JobsListWithSearchScreen(jobsViewModel)
-        } else {
+        JobsListWithSearchScreen(jobsViewModel)
+    } else {
         android.util.Log.d("JobsScreen", "📄 Mostrando JobDetailScreen para: ${uiState.selectedJob.id}")
-            JobDetailScreen(
-                job = uiState.selectedJob,
+        JobDetailScreen(
+            job = uiState.selectedJob,
             mediaItems = uiState.selectedJobMedia,
-                onNavigateUp = { jobsViewModel.onDetailScreenNavigated() },
+            onNavigateUp = { jobsViewModel.onDetailScreenNavigated() },
             navController = null
-            )
+        )
     }
 }
 
@@ -705,9 +712,15 @@ fun extractDepartamento(locationName: String?): String? {
 fun JobCard(job: JobPost, onClick: () -> Unit, viewModel: JobsViewModel) {
     val terms = job.embedded?.terms?.flatten() ?: emptyList()
     val companyName = terms.find { it.taxonomy == "empresa" }?.name
-    val fullLocationName = terms.find { it.taxonomy == "ubicacion" }?.name
+
     // UX: En cards mostramos SOLO el departamento
-    val locationName = extractDepartamento(fullLocationName)
+    // PRIORIDAD: meta.ubicacionCompleta > taxonomía embebida
+    val locationName = remember(job.meta?.ubicacionCompleta, job.embedded?.terms) {
+        // 1. Primero intentar desde meta.ubicacionCompleta (fuente principal)
+        job.meta?.ubicacionCompleta?.departamento?.takeIf { it.isNotBlank() }
+            // 2. Fallback a taxonomía embebida
+            ?: terms.find { it.taxonomy == "ubicacion" }?.name?.let { extractDepartamento(it) }
+    }
     val cropName = terms.find { it.taxonomy == "cultivo" }?.name
     
     // Obtener imagen desde featuredMedia embebido o desde el mapa de imágenes cargadas
