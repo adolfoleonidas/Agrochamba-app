@@ -19,7 +19,8 @@ if (!defined('ABSPATH')) {
 // ==========================================
 
 if (!function_exists('agrochamba_register_sedes_meta')) {
-    function agrochamba_register_sedes_meta() {
+    function agrochamba_register_sedes_meta()
+    {
         // Meta field para sedes de empresa
         register_post_meta('empresa', '_sedes', array(
             'type' => 'array',
@@ -48,7 +49,7 @@ if (!function_exists('agrochamba_register_sedes_meta')) {
             'default' => array(),
             'sanitize_callback' => 'agrochamba_sanitize_sedes',
         ));
-        
+
         // Meta field para ubicación estructurada del trabajo
         // NOTA: Este meta también se registra en 27-location-system.php con la misma estructura
         if (!registered_meta_key_exists('post', '_ubicacion_completa', 'trabajo')) {
@@ -85,25 +86,27 @@ if (!function_exists('agrochamba_register_sedes_meta')) {
 /**
  * Sanitiza el array de sedes
  */
-function agrochamba_sanitize_sedes($sedes) {
+function agrochamba_sanitize_sedes($sedes)
+{
     if (!is_array($sedes)) {
         return array();
     }
-    
+
     $sanitized = array();
     foreach ($sedes as $sede) {
-        if (!is_array($sede)) continue;
-        
+        if (!is_array($sede))
+            continue;
+
         // Validar ubicación
         $ubicacion = array(
             'departamento' => isset($sede['departamento']) ? $sede['departamento'] : '',
             'provincia' => isset($sede['provincia']) ? $sede['provincia'] : '',
             'distrito' => isset($sede['distrito']) ? $sede['distrito'] : '',
         );
-        
+
         // Intentar normalizar ubicación
         $ubicacion_normalizada = agrochamba_normalize_location($ubicacion);
-        
+
         // Si no se puede normalizar, usar valores originales sanitizados
         // Esto evita que se pierdan datos si la ubicación no coincide exactamente con nuestra BD
         if (!$ubicacion_normalizada) {
@@ -113,7 +116,7 @@ function agrochamba_sanitize_sedes($sedes) {
                 'distrito' => sanitize_text_field($ubicacion['distrito']),
             );
         }
-        
+
         $sanitized[] = array(
             'id' => isset($sede['id']) ? sanitize_text_field($sede['id']) : 'sede_' . time() . '_' . wp_rand(),
             'nombre' => isset($sede['nombre']) ? sanitize_text_field($sede['nombre']) : 'Sede Principal',
@@ -127,7 +130,7 @@ function agrochamba_sanitize_sedes($sedes) {
             'lng' => isset($sede['lng']) ? floatval($sede['lng']) : null,
         );
     }
-    
+
     // Asegurar que solo una sede sea principal
     $has_principal = false;
     foreach ($sanitized as &$sede) {
@@ -139,30 +142,31 @@ function agrochamba_sanitize_sedes($sedes) {
             }
         }
     }
-    
+
     // Si no hay principal, marcar la primera
     if (!$has_principal && !empty($sanitized)) {
         $sanitized[0]['es_principal'] = true;
     }
-    
+
     return $sanitized;
 }
 
 /**
  * Sanitiza ubicación completa
  */
-function agrochamba_sanitize_ubicacion($ubicacion) {
+function agrochamba_sanitize_ubicacion($ubicacion)
+{
     if (!is_array($ubicacion)) {
         return array();
     }
-    
+
     $sanitized = array(
         'departamento' => isset($ubicacion['departamento']) ? sanitize_text_field($ubicacion['departamento']) : '',
         'provincia' => isset($ubicacion['provincia']) ? sanitize_text_field($ubicacion['provincia']) : '',
         'distrito' => isset($ubicacion['distrito']) ? sanitize_text_field($ubicacion['distrito']) : '',
         'direccion' => isset($ubicacion['direccion']) ? sanitize_text_field($ubicacion['direccion']) : '',
     );
-    
+
     // Validar y normalizar
     if (!empty($sanitized['departamento']) && !empty($sanitized['provincia']) && !empty($sanitized['distrito'])) {
         $normalizada = agrochamba_normalize_location($sanitized);
@@ -172,7 +176,7 @@ function agrochamba_sanitize_ubicacion($ubicacion) {
             $sanitized['distrito'] = $normalizada['distrito'];
         }
     }
-    
+
     // Coordenadas opcionales
     if (isset($ubicacion['lat'])) {
         $sanitized['lat'] = floatval($ubicacion['lat']);
@@ -180,7 +184,7 @@ function agrochamba_sanitize_ubicacion($ubicacion) {
     if (isset($ubicacion['lng'])) {
         $sanitized['lng'] = floatval($ubicacion['lng']);
     }
-    
+
     return $sanitized;
 }
 
@@ -189,7 +193,8 @@ function agrochamba_sanitize_ubicacion($ubicacion) {
 // ==========================================
 
 if (!function_exists('agrochamba_register_sedes_endpoints')) {
-    function agrochamba_register_sedes_endpoints() {
+    function agrochamba_register_sedes_endpoints()
+    {
 
         // CRUD de sedes usando query params (más compatible con algunos servidores)
         register_rest_route('agrochamba/v1', '/company-sedes', array(
@@ -201,7 +206,7 @@ if (!function_exists('agrochamba_register_sedes_endpoints')) {
                 'args' => array(
                     'company_id' => array(
                         'required' => true,
-                        'validate_callback' => function($param) {
+                        'validate_callback' => function ($param) {
                             return is_numeric($param);
                         },
                     ),
@@ -215,7 +220,7 @@ if (!function_exists('agrochamba_register_sedes_endpoints')) {
                 'args' => array(
                     'company_id' => array(
                         'required' => true,
-                        'validate_callback' => function($param) {
+                        'validate_callback' => function ($param) {
                             return is_numeric($param);
                         },
                     ),
@@ -229,7 +234,7 @@ if (!function_exists('agrochamba_register_sedes_endpoints')) {
                 'args' => array(
                     'company_id' => array(
                         'required' => true,
-                        'validate_callback' => function($param) {
+                        'validate_callback' => function ($param) {
                             return is_numeric($param);
                         },
                     ),
@@ -246,7 +251,7 @@ if (!function_exists('agrochamba_register_sedes_endpoints')) {
                 'args' => array(
                     'company_id' => array(
                         'required' => true,
-                        'validate_callback' => function($param) {
+                        'validate_callback' => function ($param) {
                             return is_numeric($param);
                         },
                     ),
@@ -266,7 +271,7 @@ if (!function_exists('agrochamba_register_sedes_endpoints')) {
                 'args' => array(
                     'id' => array(
                         'required' => true,
-                        'validate_callback' => function($param) {
+                        'validate_callback' => function ($param) {
                             return is_numeric($param);
                         },
                     ),
@@ -279,14 +284,14 @@ if (!function_exists('agrochamba_register_sedes_endpoints')) {
                 'args' => array(
                     'id' => array(
                         'required' => true,
-                        'validate_callback' => function($param) {
+                        'validate_callback' => function ($param) {
                             return is_numeric($param);
                         },
                     ),
                 ),
             ),
         ));
-        
+
         // PUT/DELETE sede específica
         register_rest_route('agrochamba/v1', '/companies/(?P<company_id>\d+)/sedes/(?P<sede_id>[a-zA-Z0-9_-]+)', array(
             array(
@@ -300,7 +305,7 @@ if (!function_exists('agrochamba_register_sedes_endpoints')) {
                 'permission_callback' => 'agrochamba_can_manage_company',
             ),
         ));
-        
+
         // Endpoint para búsqueda de ubicaciones
         register_rest_route('agrochamba/v1', '/locations/search', array(
             'methods' => 'GET',
@@ -317,7 +322,7 @@ if (!function_exists('agrochamba_register_sedes_endpoints')) {
                 ),
             ),
         ));
-        
+
         // Endpoint para resolver ubicación desde distrito
         register_rest_route('agrochamba/v1', '/locations/resolve', array(
             'methods' => 'GET',
@@ -335,14 +340,14 @@ if (!function_exists('agrochamba_register_sedes_endpoints')) {
                 ),
             ),
         ));
-        
+
         // Endpoint para obtener lista de departamentos
         register_rest_route('agrochamba/v1', '/locations/departamentos', array(
             'methods' => 'GET',
             'callback' => 'agrochamba_api_get_departamentos',
             'permission_callback' => '__return_true',
         ));
-        
+
         // Endpoint para obtener provincias de un departamento
         register_rest_route('agrochamba/v1', '/locations/provincias', array(
             'methods' => 'GET',
@@ -355,7 +360,7 @@ if (!function_exists('agrochamba_register_sedes_endpoints')) {
                 ),
             ),
         ));
-        
+
         // Endpoint para obtener distritos de una provincia
         register_rest_route('agrochamba/v1', '/locations/distritos', array(
             'methods' => 'GET',
@@ -379,36 +384,38 @@ if (!function_exists('agrochamba_register_sedes_endpoints')) {
 /**
  * Verifica si el usuario puede gestionar la empresa
  */
-function agrochamba_can_manage_company($request) {
+function agrochamba_can_manage_company($request)
+{
     $user_id = get_current_user_id();
     if (!$user_id) {
         return false;
     }
-    
+
     // Admins pueden gestionar cualquier empresa
     if (current_user_can('administrator')) {
         return true;
     }
-    
+
     // Obtener ID de empresa (puede venir como 'id' o 'company_id')
     $company_id = $request->get_param('id') ?: $request->get_param('company_id');
     if (!$company_id) {
         return false;
     }
-    
+
     // Verificar que el usuario es el autor de la empresa
     $company = get_post($company_id);
     if (!$company || $company->post_type !== 'empresa') {
         return false;
     }
-    
+
     return (int) $company->post_author === $user_id;
 }
 
 /**
  * Obtiene las sedes de una empresa (v2 - usando query param)
  */
-function agrochamba_get_company_sedes_v2($request) {
+function agrochamba_get_company_sedes_v2($request)
+{
     $company_id = $request->get_param('company_id');
     return agrochamba_get_company_sedes_internal($company_id);
 }
@@ -416,7 +423,8 @@ function agrochamba_get_company_sedes_v2($request) {
 /**
  * Obtiene las sedes de una empresa (v1 - usando path param)
  */
-function agrochamba_get_company_sedes($request) {
+function agrochamba_get_company_sedes($request)
+{
     $company_id = $request->get_param('id');
     return agrochamba_get_company_sedes_internal($company_id);
 }
@@ -424,7 +432,8 @@ function agrochamba_get_company_sedes($request) {
 /**
  * Lógica interna para obtener sedes
  */
-function agrochamba_get_company_sedes_internal($company_id) {
+function agrochamba_get_company_sedes_internal($company_id)
+{
     $company = get_post($company_id);
     if (!$company || $company->post_type !== 'empresa') {
         return new WP_Error('not_found', 'Empresa no encontrada', array('status' => 404));
@@ -440,7 +449,7 @@ function agrochamba_get_company_sedes_internal($company_id) {
     $is_owner = (int) $company->post_author === $user_id || current_user_can('administrator');
 
     if (!$is_owner) {
-        $sedes = array_filter($sedes, function($sede) {
+        $sedes = array_filter($sedes, function ($sede) {
             return isset($sede['activa']) && $sede['activa'];
         });
     }
@@ -456,29 +465,30 @@ function agrochamba_get_company_sedes_internal($company_id) {
 /**
  * Crea una nueva sede
  */
-function agrochamba_create_company_sede($request) {
+function agrochamba_create_company_sede($request)
+{
     $company_id = $request->get_param('id');
     $body = $request->get_json_params();
-    
+
     // Validar datos requeridos
     if (empty($body['nombre']) || empty($body['departamento']) || empty($body['provincia']) || empty($body['distrito'])) {
         return new WP_Error('missing_fields', 'Nombre y ubicación completa son requeridos', array('status' => 400));
     }
-    
+
     // Validar ubicación
     $ubicacion = array(
         'departamento' => $body['departamento'],
         'provincia' => $body['provincia'],
         'distrito' => $body['distrito'],
     );
-    
+
     if (!agrochamba_is_valid_location($ubicacion)) {
         return new WP_Error('invalid_location', 'Ubicación inválida', array('status' => 400));
     }
-    
+
     // Normalizar ubicación
     $ubicacion_normalizada = agrochamba_normalize_location($ubicacion);
-    
+
     // Crear nueva sede
     $new_sede = array(
         'id' => 'sede_' . time() . '_' . wp_rand(1000, 9999),
@@ -492,29 +502,29 @@ function agrochamba_create_company_sede($request) {
         'lat' => isset($body['lat']) ? floatval($body['lat']) : null,
         'lng' => isset($body['lng']) ? floatval($body['lng']) : null,
     );
-    
+
     // Obtener sedes actuales
     $sedes = get_post_meta($company_id, '_sedes', true);
     if (!is_array($sedes)) {
         $sedes = array();
     }
-    
+
     // Si es principal, desmarcar las demás
     if ($new_sede['es_principal']) {
         foreach ($sedes as &$sede) {
             $sede['es_principal'] = false;
         }
     }
-    
+
     // Si es la primera sede, marcarla como principal
     if (empty($sedes)) {
         $new_sede['es_principal'] = true;
     }
-    
+
     $sedes[] = $new_sede;
-    
+
     update_post_meta($company_id, '_sedes', $sedes);
-    
+
     return new WP_REST_Response(array(
         'success' => true,
         'message' => 'Sede creada exitosamente',
@@ -525,16 +535,17 @@ function agrochamba_create_company_sede($request) {
 /**
  * Actualiza una sede existente
  */
-function agrochamba_update_company_sede($request) {
+function agrochamba_update_company_sede($request)
+{
     $company_id = $request->get_param('company_id');
     $sede_id = $request->get_param('sede_id');
     $body = $request->get_json_params();
-    
+
     $sedes = get_post_meta($company_id, '_sedes', true);
     if (!is_array($sedes)) {
         return new WP_Error('not_found', 'No hay sedes', array('status' => 404));
     }
-    
+
     $index = -1;
     foreach ($sedes as $i => $sede) {
         if ($sede['id'] === $sede_id) {
@@ -542,26 +553,26 @@ function agrochamba_update_company_sede($request) {
             break;
         }
     }
-    
+
     if ($index === -1) {
         return new WP_Error('not_found', 'Sede no encontrada', array('status' => 404));
     }
-    
+
     // Actualizar campos
     if (isset($body['nombre'])) {
         $sedes[$index]['nombre'] = sanitize_text_field($body['nombre']);
     }
-    
+
     if (isset($body['departamento']) && isset($body['provincia']) && isset($body['distrito'])) {
         $ubicacion = array(
             'departamento' => $body['departamento'],
             'provincia' => $body['provincia'],
             'distrito' => $body['distrito'],
         );
-        
+
         // Intentar normalizar
         $ubicacion_normalizada = agrochamba_normalize_location($ubicacion);
-        
+
         if ($ubicacion_normalizada) {
             $sedes[$index]['departamento'] = $ubicacion_normalizada['departamento'];
             $sedes[$index]['provincia'] = $ubicacion_normalizada['provincia'];
@@ -573,11 +584,11 @@ function agrochamba_update_company_sede($request) {
             $sedes[$index]['distrito'] = sanitize_text_field($body['distrito']);
         }
     }
-    
+
     if (isset($body['direccion'])) {
         $sedes[$index]['direccion'] = sanitize_text_field($body['direccion']);
     }
-    
+
     if (isset($body['es_principal'])) {
         $is_principal = (bool) $body['es_principal'];
         if ($is_principal) {
@@ -588,21 +599,21 @@ function agrochamba_update_company_sede($request) {
         }
         $sedes[$index]['es_principal'] = $is_principal;
     }
-    
+
     if (isset($body['activa'])) {
         $sedes[$index]['activa'] = (bool) $body['activa'];
     }
-    
+
     if (isset($body['lat'])) {
         $sedes[$index]['lat'] = floatval($body['lat']);
     }
-    
+
     if (isset($body['lng'])) {
         $sedes[$index]['lng'] = floatval($body['lng']);
     }
-    
+
     update_post_meta($company_id, '_sedes', $sedes);
-    
+
     return new WP_REST_Response(array(
         'success' => true,
         'message' => 'Sede actualizada',
@@ -613,26 +624,27 @@ function agrochamba_update_company_sede($request) {
 /**
  * Elimina una sede
  */
-function agrochamba_delete_company_sede($request) {
+function agrochamba_delete_company_sede($request)
+{
     $company_id = $request->get_param('company_id');
     $sede_id = $request->get_param('sede_id');
-    
+
     $sedes = get_post_meta($company_id, '_sedes', true);
     if (!is_array($sedes)) {
         return new WP_Error('not_found', 'No hay sedes', array('status' => 404));
     }
-    
-    $new_sedes = array_filter($sedes, function($sede) use ($sede_id) {
+
+    $new_sedes = array_filter($sedes, function ($sede) use ($sede_id) {
         return $sede['id'] !== $sede_id;
     });
-    
+
     if (count($new_sedes) === count($sedes)) {
         return new WP_Error('not_found', 'Sede no encontrada', array('status' => 404));
     }
-    
+
     // Reindexar y asegurar que hay una principal
     $new_sedes = array_values($new_sedes);
-    
+
     if (!empty($new_sedes)) {
         $has_principal = false;
         foreach ($new_sedes as $sede) {
@@ -645,7 +657,7 @@ function agrochamba_delete_company_sede($request) {
             $new_sedes[0]['es_principal'] = true;
         }
     }
-    
+
     update_post_meta($company_id, '_sedes', $new_sedes);
 
     return new WP_REST_Response(array(
@@ -661,7 +673,8 @@ function agrochamba_delete_company_sede($request) {
 /**
  * Verifica permisos para endpoints v2 (usando company_id de query)
  */
-function agrochamba_can_manage_company_v2($request) {
+function agrochamba_can_manage_company_v2($request)
+{
     $user_id = get_current_user_id();
 
     // Debug log
@@ -709,7 +722,8 @@ function agrochamba_can_manage_company_v2($request) {
 /**
  * Crear sede v2 (usando query param company_id)
  */
-function agrochamba_create_company_sede_v2($request) {
+function agrochamba_create_company_sede_v2($request)
+{
     $company_id = $request->get_param('company_id');
     $body = $request->get_json_params();
 
@@ -720,32 +734,35 @@ function agrochamba_create_company_sede_v2($request) {
     if (empty($body['nombre'])) {
         return new WP_Error('missing_nombre', 'El nombre de la sede es requerido', array('status' => 400));
     }
-    
-    if (empty($body['departamento']) || empty($body['provincia']) || empty($body['distrito'])) {
-        $missing = array();
-        if (empty($body['departamento'])) $missing[] = 'departamento';
-        if (empty($body['provincia'])) $missing[] = 'provincia';
-        if (empty($body['distrito'])) $missing[] = 'distrito';
-        return new WP_Error('missing_location', 'Faltan campos de ubicación: ' . implode(', ', $missing), array('status' => 400));
+
+    // Solo el departamento es obligatorio, provincia y distrito son opcionales
+    if (empty($body['departamento'])) {
+        return new WP_Error('missing_location', 'El departamento es requerido', array('status' => 400));
     }
 
-    // Validar ubicación
-    $ubicacion = array(
-        'departamento' => $body['departamento'],
-        'provincia' => $body['provincia'],
-        'distrito' => $body['distrito'],
-    );
+    // Ubicación con campos opcionales
+    $departamento = sanitize_text_field($body['departamento']);
+    $provincia = isset($body['provincia']) ? sanitize_text_field($body['provincia']) : '';
+    $distrito = isset($body['distrito']) ? sanitize_text_field($body['distrito']) : '';
 
-    // Intentar normalizar ubicación
-    $ubicacion_normalizada = agrochamba_normalize_location($ubicacion);
-    
-    // Si no se puede normalizar, usar valores sanitizados (más flexible)
+    // Intentar normalizar ubicación si está completa
+    $ubicacion_normalizada = null;
+    if (!empty($departamento) && !empty($provincia) && !empty($distrito)) {
+        $ubicacion = array(
+            'departamento' => $departamento,
+            'provincia' => $provincia,
+            'distrito' => $distrito,
+        );
+        $ubicacion_normalizada = agrochamba_normalize_location($ubicacion);
+    }
+
+    // Si no se puede normalizar, usar valores sanitizados
     if (!$ubicacion_normalizada) {
-        error_log("agrochamba_create_company_sede_v2: Ubicación no normalizada, usando valores sanitizados");
+        error_log("agrochamba_create_company_sede_v2: Usando ubicación parcial o no normalizada");
         $ubicacion_normalizada = array(
-            'departamento' => sanitize_text_field($body['departamento']),
-            'provincia' => sanitize_text_field($body['provincia']),
-            'distrito' => sanitize_text_field($body['distrito']),
+            'departamento' => $departamento,
+            'provincia' => $provincia,
+            'distrito' => $distrito,
         );
     }
 
@@ -797,7 +814,8 @@ function agrochamba_create_company_sede_v2($request) {
 /**
  * Actualizar sede v2 (usando query params)
  */
-function agrochamba_update_company_sede_v2($request) {
+function agrochamba_update_company_sede_v2($request)
+{
     // Llama a la función original que ya usa company_id
     return agrochamba_update_company_sede($request);
 }
@@ -805,7 +823,8 @@ function agrochamba_update_company_sede_v2($request) {
 /**
  * Eliminar sede v2 (usando query params)
  */
-function agrochamba_delete_company_sede_v2($request) {
+function agrochamba_delete_company_sede_v2($request)
+{
     // Llama a la función original que ya usa company_id
     return agrochamba_delete_company_sede($request);
 }
@@ -817,12 +836,13 @@ function agrochamba_delete_company_sede_v2($request) {
 /**
  * Búsqueda de ubicaciones
  */
-function agrochamba_api_search_locations($request) {
+function agrochamba_api_search_locations($request)
+{
     $query = $request->get_param('q');
     $limit = $request->get_param('limit');
-    
+
     $results = agrochamba_search_locations($query, $limit);
-    
+
     return new WP_REST_Response(array(
         'query' => $query,
         'results' => $results,
@@ -833,18 +853,19 @@ function agrochamba_api_search_locations($request) {
 /**
  * Resolver ubicación desde distrito
  */
-function agrochamba_api_resolve_location($request) {
+function agrochamba_api_resolve_location($request)
+{
     $distrito = $request->get_param('distrito');
     $provincia = $request->get_param('provincia');
     $departamento = $request->get_param('departamento');
-    
+
     if ($distrito) {
         $result = agrochamba_resolve_from_distrito($distrito);
         if ($result) {
             return new WP_REST_Response($result, 200);
         }
     }
-    
+
     // Si se proporcionan los tres, validar
     if ($departamento && $provincia && $distrito) {
         $ubicacion = array(
@@ -852,20 +873,21 @@ function agrochamba_api_resolve_location($request) {
             'provincia' => $provincia,
             'distrito' => $distrito,
         );
-        
+
         if (agrochamba_is_valid_location($ubicacion)) {
             $normalizada = agrochamba_normalize_location($ubicacion);
             return new WP_REST_Response($normalizada, 200);
         }
     }
-    
+
     return new WP_Error('not_found', 'Ubicación no encontrada', array('status' => 404));
 }
 
 /**
  * Obtener lista de departamentos
  */
-function agrochamba_api_get_departamentos($request) {
+function agrochamba_api_get_departamentos($request)
+{
     $departamentos = agrochamba_get_departamentos();
     return new WP_REST_Response(array(
         'departamentos' => $departamentos,
@@ -876,14 +898,15 @@ function agrochamba_api_get_departamentos($request) {
 /**
  * Obtener provincias de un departamento
  */
-function agrochamba_api_get_provincias($request) {
+function agrochamba_api_get_provincias($request)
+{
     $departamento = $request->get_param('departamento');
     $provincias = agrochamba_get_provincias($departamento);
-    
+
     if (empty($provincias)) {
         return new WP_Error('not_found', 'Departamento no encontrado', array('status' => 404));
     }
-    
+
     return new WP_REST_Response(array(
         'departamento' => $departamento,
         'provincias' => $provincias,
@@ -894,15 +917,16 @@ function agrochamba_api_get_provincias($request) {
 /**
  * Obtener distritos de una provincia
  */
-function agrochamba_api_get_distritos($request) {
+function agrochamba_api_get_distritos($request)
+{
     $departamento = $request->get_param('departamento');
     $provincia = $request->get_param('provincia');
     $distritos = agrochamba_get_distritos($departamento, $provincia);
-    
+
     if (empty($distritos)) {
         return new WP_Error('not_found', 'Provincia no encontrada', array('status' => 404));
     }
-    
+
     return new WP_REST_Response(array(
         'departamento' => $departamento,
         'provincia' => $provincia,
@@ -918,15 +942,16 @@ function agrochamba_api_get_distritos($request) {
 /**
  * Obtiene las sedes de las empresas del usuario actual
  */
-function agrochamba_get_user_company_sedes($user_id = null) {
+function agrochamba_get_user_company_sedes($user_id = null)
+{
     if (!$user_id) {
         $user_id = get_current_user_id();
     }
-    
+
     if (!$user_id) {
         return array();
     }
-    
+
     // Obtener empresas del usuario
     $empresas = get_posts(array(
         'post_type' => 'empresa',
@@ -934,9 +959,9 @@ function agrochamba_get_user_company_sedes($user_id = null) {
         'author' => $user_id,
         'posts_per_page' => -1,
     ));
-    
+
     $all_sedes = array();
-    
+
     foreach ($empresas as $empresa) {
         $sedes = get_post_meta($empresa->ID, '_sedes', true);
         if (is_array($sedes)) {
@@ -949,14 +974,14 @@ function agrochamba_get_user_company_sedes($user_id = null) {
             }
         }
     }
-    
+
     // Ordenar: principales primero
-    usort($all_sedes, function($a, $b) {
+    usort($all_sedes, function ($a, $b) {
         $a_principal = isset($a['es_principal']) && $a['es_principal'] ? 1 : 0;
         $b_principal = isset($b['es_principal']) && $b['es_principal'] ? 1 : 0;
         return $b_principal - $a_principal;
     });
-    
+
     return $all_sedes;
 }
 

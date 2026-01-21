@@ -640,13 +640,10 @@ fun CreateSedeDialog(
                                 hasError = true
                             }
 
-                            // Validar que la ubicación tenga departamento, provincia y distrito
+                            // Validar que la ubicación tenga al menos el departamento
                             val ub = ubicacion
-                            if (ub == null) {
+                            if (ub == null || ub.departamento.isBlank()) {
                                 ubicacionError = "Selecciona una ubicación"
-                                hasError = true
-                            } else if (ub.departamento.isBlank() || ub.provincia.isBlank() || ub.distrito.isBlank()) {
-                                ubicacionError = "Debes seleccionar un distrito completo"
                                 hasError = true
                             }
 
