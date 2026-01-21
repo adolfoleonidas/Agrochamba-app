@@ -1,12 +1,6 @@
 package agrochamba.com.ui.company
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,7 +22,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Business
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocationOn
@@ -37,6 +30,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
@@ -46,30 +40,30 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import agrochamba.com.data.SedeEmpresa
 import agrochamba.com.data.UbicacionCompleta
-import agrochamba.com.data.repository.LocationRepository
 import agrochamba.com.ui.common.LocationSearchField
 
 /**
@@ -85,27 +79,45 @@ import agrochamba.com.ui.common.LocationSearchField
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SedesManagementScreen(
-    navController: NavController
+    navController: NavController,
+    viewModel: SedesViewModel = hiltViewModel()
 ) {
-    val context = LocalContext.current
-    val locationRepository = remember { LocationRepository.getInstance(context) }
-    val sedes by locationRepository.companySedes.collectAsState(initial = emptyList())
-    
+    val uiState = viewModel.uiState
+    val sedes = uiState.sedes
+    val snackbarHostState = remember { SnackbarHostState() }
+
     var showCreateDialog by remember { mutableStateOf(false) }
     var sedeToEdit by remember { mutableStateOf<SedeEmpresa?>(null) }
     var sedeToDelete by remember { mutableStateOf<SedeEmpresa?>(null) }
-    
+
+    // Mostrar mensajes de error o éxito
+    LaunchedEffect(uiState.error) {
+        uiState.error?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearError()
+        }
+    }
+
+    LaunchedEffect(uiState.successMessage) {
+        uiState.successMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearSuccessMessage()
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { 
+                title = {
                     Column {
                         Text("Mis Sedes")
-                        Text(
-                            text = "${sedes.size} ubicaciones registradas",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        if (!uiState.isLoading) {
+                            Text(
+                                text = "${sedes.size} ubicaciones registradas",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 },
                 navigationIcon = {
@@ -116,112 +128,126 @@ fun SedesManagementScreen(
             )
         },
         floatingActionButton = {
-            // Solo mostrar FAB cuando hay sedes (cuando está vacío, el EmptySedesState tiene su propio botón)
-            if (sedes.isNotEmpty()) {
+            // Solo mostrar FAB cuando hay sedes y no está cargando
+            if (sedes.isNotEmpty() && !uiState.isLoading) {
                 ExtendedFloatingActionButton(
                     onClick = { showCreateDialog = true },
                     icon = { Icon(Icons.Default.Add, contentDescription = null) },
                     text = { Text("Nueva Sede") }
                 )
             }
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
-        if (sedes.isEmpty()) {
-            // Estado vacío
-            EmptySedesState(
-                onCreateClick = { showCreateDialog = true },
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-            )
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                // Info de ayuda
-                item {
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                Icons.Default.LocationOn,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(Modifier.width(12.dp))
-                            Text(
-                                text = "Las sedes te permiten seleccionar ubicaciones rápidamente al publicar ofertas de trabajo.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
+        when {
+            uiState.isLoading -> {
+                // Estado de carga
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator()
+                        Spacer(Modifier.height(16.dp))
+                        Text("Cargando sedes...")
                     }
                 }
-                
-                items(sedes, key = { it.id }) { sede ->
-                    SedeCard(
-                        sede = sede,
-                        onEdit = { sedeToEdit = sede },
-                        onDelete = { sedeToDelete = sede },
-                        onSetPrimary = {
-                            val updatedSede = sede.copy(esPrincipal = true)
-                            locationRepository.updateSede(updatedSede)
+            }
+            sedes.isEmpty() -> {
+                // Estado vacío
+                EmptySedesState(
+                    onCreateClick = { showCreateDialog = true },
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues)
+                )
+            }
+            else -> {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Info de ayuda
+                    item {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Default.LocationOn,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(Modifier.width(12.dp))
+                                Text(
+                                    text = "Las sedes te permiten seleccionar ubicaciones rápidamente al publicar ofertas de trabajo.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
                         }
-                    )
-                }
-                
-                // Espacio para FAB
-                item {
-                    Spacer(Modifier.height(80.dp))
+                    }
+
+                    items(sedes, key = { it.id }) { sede ->
+                        SedeCard(
+                            sede = sede,
+                            isLoading = uiState.isSaving,
+                            onEdit = { sedeToEdit = sede },
+                            onDelete = { sedeToDelete = sede },
+                            onSetPrimary = {
+                                viewModel.setAsPrimary(sede)
+                            }
+                        )
+                    }
+
+                    // Espacio para FAB
+                    item {
+                        Spacer(Modifier.height(80.dp))
+                    }
                 }
             }
         }
     }
-    
+
     // Diálogo para crear sede
     if (showCreateDialog) {
         CreateSedeDialog(
+            isSaving = uiState.isSaving,
             onConfirm = { nombre, ubicacion, esPrincipal ->
-                val nuevaSede = SedeEmpresa(
-                    id = java.util.UUID.randomUUID().toString(),
-                    nombre = nombre,
-                    ubicacion = ubicacion,
-                    esPrincipal = esPrincipal,
-                    activa = true
-                )
-                locationRepository.addSede(nuevaSede)
+                viewModel.createSede(nombre, ubicacion, esPrincipal)
                 showCreateDialog = false
             },
             onDismiss = { showCreateDialog = false }
         )
     }
-    
+
     // Diálogo para editar sede
     sedeToEdit?.let { sede ->
         EditSedeDialog(
             sede = sede,
+            isSaving = uiState.isSaving,
             onConfirm = { nombre, ubicacion, esPrincipal ->
                 val updatedSede = sede.copy(
                     nombre = nombre,
                     ubicacion = ubicacion,
                     esPrincipal = esPrincipal
                 )
-                locationRepository.updateSede(updatedSede)
+                viewModel.updateSede(updatedSede)
                 sedeToEdit = null
             },
             onDismiss = { sedeToEdit = null }
         )
     }
-    
+
     // Diálogo para confirmar eliminación
     sedeToDelete?.let { sede ->
         AlertDialog(
@@ -269,18 +295,29 @@ fun SedesManagementScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        locationRepository.removeSede(sede.id)
+                        viewModel.deleteSede(sede.id)
                         sedeToDelete = null
                     },
+                    enabled = !uiState.isSaving,
                     colors = androidx.compose.material3.ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.error
                     )
                 ) {
-                    Text("Eliminar")
+                    if (uiState.isSaving) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            color = MaterialTheme.colorScheme.onError
+                        )
+                    } else {
+                        Text("Eliminar")
+                    }
                 }
             },
             dismissButton = {
-                OutlinedButton(onClick = { sedeToDelete = null }) {
+                OutlinedButton(
+                    onClick = { sedeToDelete = null },
+                    enabled = !uiState.isSaving
+                ) {
                     Text("Cancelar")
                 }
             }
@@ -336,6 +373,7 @@ private fun EmptySedesState(
 @Composable
 private fun SedeCard(
     sede: SedeEmpresa,
+    isLoading: Boolean = false,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onSetPrimary: () -> Unit
@@ -464,6 +502,7 @@ private fun SedeCard(
  */
 @Composable
 fun CreateSedeDialog(
+    isSaving: Boolean = false,
     onConfirm: (nombre: String, ubicacion: UbicacionCompleta, esPrincipal: Boolean) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -586,25 +625,26 @@ fun CreateSedeDialog(
                 ) {
                     OutlinedButton(
                         onClick = onDismiss,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        enabled = !isSaving
                     ) {
                         Text("Cancelar")
                     }
-                    
+
                     Button(
                         onClick = {
                             var hasError = false
-                            
+
                             if (nombre.isBlank()) {
                                 nombreError = "Ingresa un nombre"
                                 hasError = true
                             }
-                            
+
                             if (ubicacion == null || ubicacion?.distrito?.isBlank() == true) {
                                 ubicacionError = "Selecciona una ubicación"
                                 hasError = true
                             }
-                            
+
                             if (!hasError && ubicacion != null) {
                                 val ubicacionConDireccion = if (direccion.isNotBlank()) {
                                     ubicacion!!.copy(direccion = direccion.trim())
@@ -614,11 +654,19 @@ fun CreateSedeDialog(
                                 onConfirm(nombre.trim(), ubicacionConDireccion, esPrincipal)
                             }
                         },
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        enabled = !isSaving
                     ) {
-                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                        if (isSaving) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                        } else {
+                            Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                        }
                         Spacer(Modifier.width(4.dp))
-                        Text("Crear")
+                        Text(if (isSaving) "Guardando..." else "Crear")
                     }
                 }
             }
@@ -629,6 +677,7 @@ fun CreateSedeDialog(
 @Composable
 private fun EditSedeDialog(
     sede: SedeEmpresa,
+    isSaving: Boolean = false,
     onConfirm: (nombre: String, ubicacion: UbicacionCompleta, esPrincipal: Boolean) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -727,11 +776,12 @@ private fun EditSedeDialog(
                 ) {
                     OutlinedButton(
                         onClick = onDismiss,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        enabled = !isSaving
                     ) {
                         Text("Cancelar")
                     }
-                    
+
                     Button(
                         onClick = {
                             if (nombre.isBlank()) {
@@ -745,9 +795,17 @@ private fun EditSedeDialog(
                                 onConfirm(nombre.trim(), ubicacionConDireccion, esPrincipal)
                             }
                         },
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        enabled = !isSaving
                     ) {
-                        Text("Guardar")
+                        if (isSaving) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                            Spacer(Modifier.width(4.dp))
+                        }
+                        Text(if (isSaving) "Guardando..." else "Guardar")
                     }
                 }
             }

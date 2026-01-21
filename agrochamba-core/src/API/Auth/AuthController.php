@@ -197,9 +197,9 @@ class AuthController {
 
         $roles = !empty($user->roles) ? array_values($user->roles) : array();
         
-        // Obtener empresa_term_id para enviarlo como user_company_id
-        $empresa_term_id = get_user_meta($user_id, 'empresa_term_id', true);
-        $user_company_id = $empresa_term_id ? intval($empresa_term_id) : null;
+        // Obtener empresa_cpt_id (ID del CPT empresa) para enviarlo como user_company_id
+        $empresa_cpt_id = get_user_meta($user_id, 'empresa_cpt_id', true);
+        $user_company_id = $empresa_cpt_id ? intval($empresa_cpt_id) : null;
 
         return new WP_REST_Response(array(
             'token' => $jwt_token,
@@ -322,11 +322,27 @@ class AuthController {
         $user_obj = new WP_User($user->ID);
         $roles = !empty($user_obj->roles) ? array_values($user_obj->roles) : array();
         
-        // Obtener empresa_term_id para enviarlo como user_company_id (si es employer)
+        // Obtener empresa_cpt_id (ID del CPT empresa) para enviarlo como user_company_id
         $user_company_id = null;
         if (in_array('employer', $roles) || in_array('administrator', $roles)) {
-            $empresa_term_id = get_user_meta($user->ID, 'empresa_term_id', true);
-            $user_company_id = $empresa_term_id ? intval($empresa_term_id) : null;
+            // Primero intentar obtener el ID del CPT empresa
+            $empresa_cpt_id = get_user_meta($user->ID, 'empresa_cpt_id', true);
+            if ($empresa_cpt_id) {
+                $user_company_id = intval($empresa_cpt_id);
+            } else {
+                // Fallback: buscar la empresa del usuario por autor
+                $empresa_posts = get_posts(array(
+                    'post_type' => 'empresa',
+                    'author' => $user->ID,
+                    'posts_per_page' => 1,
+                    'post_status' => 'publish',
+                ));
+                if (!empty($empresa_posts)) {
+                    $user_company_id = $empresa_posts[0]->ID;
+                    // Guardar para futuras consultas
+                    update_user_meta($user->ID, 'empresa_cpt_id', $user_company_id);
+                }
+            }
         }
 
         return new WP_REST_Response(array(

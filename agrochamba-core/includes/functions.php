@@ -159,7 +159,10 @@ function agrochamba_create_empresa_on_user_register($user_id) {
     if (!is_wp_error($empresa_id) && $empresa_id > 0) {
         // Asociar con el usuario
         update_post_meta($empresa_id, '_empresa_user_id', $user_id);
-        
+
+        // IMPORTANTE: Guardar el ID del CPT en el user_meta para el login
+        update_user_meta($user_id, 'empresa_cpt_id', $empresa_id);
+
         // Sincronizar datos básicos del usuario al CPT
         $ruc = get_user_meta($user_id, 'ruc', true);
         if ($ruc) {
@@ -169,7 +172,7 @@ function agrochamba_create_empresa_on_user_register($user_id) {
             update_post_meta($empresa_id, '_empresa_razon_social', $razon_social);
         }
         update_post_meta($empresa_id, '_empresa_nombre_comercial', $display_name);
-        
+
         // Sincronizar todos los datos de empresa del usuario al CPT
         agrochamba_sync_user_data_to_empresa_cpt($user_id, $empresa_id);
     }

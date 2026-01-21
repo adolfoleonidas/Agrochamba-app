@@ -324,33 +324,37 @@ interface WordPressApiService {
     // ==========================================
     // ENDPOINTS DE SEDES DE EMPRESA
     // ==========================================
-    
-    @GET("agrochamba/v1/companies/{id}/sedes")
+
+    // Endpoint usando query parameter (más compatible)
+    @GET("agrochamba/v1/company-sedes")
     suspend fun getCompanySedes(
         @Header("Authorization") token: String,
-        @Path("id") companyId: Int
+        @Query("company_id") companyId: Int
     ): SedesResponse
-    
-    @POST("agrochamba/v1/companies/{id}/sedes")
+
+    // Crear sede usando query parameter
+    @POST("agrochamba/v1/company-sedes")
     suspend fun createSede(
         @Header("Authorization") token: String,
-        @Path("id") companyId: Int,
+        @Query("company_id") companyId: Int,
         @Body sedeData: Map<String, @JvmSuppressWildcards Any?>
     ): CreateSedeResponse
-    
-    @PUT("agrochamba/v1/companies/{company_id}/sedes/{sede_id}")
+
+    // Actualizar sede usando query parameters
+    @PUT("agrochamba/v1/company-sedes")
     suspend fun updateSede(
         @Header("Authorization") token: String,
-        @Path("company_id") companyId: Int,
-        @Path("sede_id") sedeId: String,
+        @Query("company_id") companyId: Int,
+        @Query("sede_id") sedeId: String,
         @Body sedeData: Map<String, @JvmSuppressWildcards Any?>
     ): UpdateSedeResponse
-    
-    @DELETE("agrochamba/v1/companies/{company_id}/sedes/{sede_id}")
+
+    // Eliminar sede usando query parameters
+    @DELETE("agrochamba/v1/company-sedes")
     suspend fun deleteSede(
         @Header("Authorization") token: String,
-        @Path("company_id") companyId: Int,
-        @Path("sede_id") sedeId: String
+        @Query("company_id") companyId: Int,
+        @Query("sede_id") sedeId: String
     ): Response<DeleteSedeResponse>
 }
 
