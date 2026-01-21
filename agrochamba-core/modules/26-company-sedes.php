@@ -713,9 +713,20 @@ function agrochamba_create_company_sede_v2($request) {
     $company_id = $request->get_param('company_id');
     $body = $request->get_json_params();
 
+    // Log para debug
+    error_log("agrochamba_create_company_sede_v2: company_id=$company_id, body=" . json_encode($body));
+
     // Validar datos requeridos
-    if (empty($body['nombre']) || empty($body['departamento']) || empty($body['provincia']) || empty($body['distrito'])) {
-        return new WP_Error('missing_fields', 'Nombre y ubicación completa son requeridos', array('status' => 400));
+    if (empty($body['nombre'])) {
+        return new WP_Error('missing_nombre', 'El nombre de la sede es requerido', array('status' => 400));
+    }
+    
+    if (empty($body['departamento']) || empty($body['provincia']) || empty($body['distrito'])) {
+        $missing = array();
+        if (empty($body['departamento'])) $missing[] = 'departamento';
+        if (empty($body['provincia'])) $missing[] = 'provincia';
+        if (empty($body['distrito'])) $missing[] = 'distrito';
+        return new WP_Error('missing_location', 'Faltan campos de ubicación: ' . implode(', ', $missing), array('status' => 400));
     }
 
     // Validar ubicación
@@ -725,12 +736,18 @@ function agrochamba_create_company_sede_v2($request) {
         'distrito' => $body['distrito'],
     );
 
-    if (!agrochamba_is_valid_location($ubicacion)) {
-        return new WP_Error('invalid_location', 'Ubicación inválida', array('status' => 400));
-    }
-
-    // Normalizar ubicación
+    // Intentar normalizar ubicación
     $ubicacion_normalizada = agrochamba_normalize_location($ubicacion);
+    
+    // Si no se puede normalizar, usar valores sanitizados (más flexible)
+    if (!$ubicacion_normalizada) {
+        error_log("agrochamba_create_company_sede_v2: Ubicación no normalizada, usando valores sanitizados");
+        $ubicacion_normalizada = array(
+            'departamento' => sanitize_text_field($body['departamento']),
+            'provincia' => sanitize_text_field($body['provincia']),
+            'distrito' => sanitize_text_field($body['distrito']),
+        );
+    }
 
     // Crear nueva sede
     $new_sede = array(
@@ -767,6 +784,8 @@ function agrochamba_create_company_sede_v2($request) {
     $sedes[] = $new_sede;
 
     update_post_meta($company_id, '_sedes', $sedes);
+
+    error_log("agrochamba_create_company_sede_v2: Sede creada exitosamente: " . json_encode($new_sede));
 
     return new WP_REST_Response(array(
         'success' => true,
