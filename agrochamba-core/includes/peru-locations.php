@@ -674,6 +674,227 @@ function agrochamba_format_location_one_line($ubicacion, $include_direccion = fa
 
 /**
  * =============================================================================
+ * EXTRACCIÓN DE UBICACIÓN DESDE TEXTO
+ * =============================================================================
+ * Intenta detectar ubicaciones del Perú mencionadas en un texto
+ */
+
+/**
+ * Extrae la ubicación más probable de un texto (título + contenido)
+ *
+ * Usa búsqueda de PALABRAS COMPLETAS para evitar falsos positivos
+ * como "llamar" → "Llama" (distrito de Ancash)
+ *
+ * @param string $text Texto donde buscar ubicaciones
+ * @return array|null Ubicación encontrada o null
+ */
+function agrochamba_extract_location_from_text($text) {
+    if (empty($text)) {
+        return null;
+    }
+
+    $locations = agrochamba_get_peru_locations();
+    $text_normalized = agrochamba_normalize_text($text);
+    $found = array();
+
+    // Función auxiliar para buscar PALABRA COMPLETA (evitar "llamar" → "Llama")
+    $match_whole_word = function($haystack, $needle) {
+        // Usar regex con word boundaries para palabras completas
+        // \b no funciona bien con caracteres no-ASCII, así que usamos espacios/puntuación
+        $pattern = '/(?:^|[\s,.\-:;()¿?¡!"]|ubicacion\s*:?\s*)' . preg_quote($needle, '/') . '(?:[\s,.\-:;()¿?¡!"]|$)/iu';
+        return preg_match($pattern, $haystack) === 1;
+    };
+
+    // Buscar departamentos PRIMERO (más confiables, menos ambiguos)
+    foreach ($locations as $dep) {
+        $dep_normalized = agrochamba_normalize_text($dep['departamento']);
+        // Departamentos requieren mínimo 3 caracteres
+        if (strlen($dep['departamento']) >= 3 && $match_whole_word($text_normalized, $dep_normalized)) {
+            $found[] = array(
+                'departamento' => $dep['departamento'],
+                'provincia' => '',
+                'distrito' => '',
+                'nivel' => 'DEPARTAMENTO',
+                'score' => 10 + strlen($dep['departamento']), // Departamentos tienen alta prioridad
+            );
+        }
+    }
+
+    // Buscar provincias (solo si son diferentes al departamento)
+    foreach ($locations as $dep) {
+        foreach ($dep['provincias'] as $prov) {
+            $prov_normalized = agrochamba_normalize_text($prov['provincia']);
+            // Solo provincias de 4+ caracteres para evitar falsos positivos
+            if (strlen($prov['provincia']) >= 4 &&
+                agrochamba_normalize_text($prov['provincia']) !== agrochamba_normalize_text($dep['departamento']) &&
+                $match_whole_word($text_normalized, $prov_normalized)) {
+                $found[] = array(
+                    'departamento' => $dep['departamento'],
+                    'provincia' => $prov['provincia'],
+                    'distrito' => '',
+                    'nivel' => 'PROVINCIA',
+                    'score' => 5 + strlen($prov['provincia']),
+                );
+            }
+        }
+    }
+
+    // Buscar distritos (solo los más largos/específicos para evitar falsos positivos)
+    foreach ($locations as $dep) {
+        foreach ($dep['provincias'] as $prov) {
+            foreach ($prov['distritos'] as $dist) {
+                $dist_normalized = agrochamba_normalize_text($dist);
+                // Solo distritos de 5+ caracteres para evitar falsos positivos
+                // Y que no sean iguales a la provincia
+                if (strlen($dist) >= 5 &&
+                    agrochamba_normalize_text($dist) !== agrochamba_normalize_text($prov['provincia']) &&
+                    $match_whole_word($text_normalized, $dist_normalized)) {
+                    $found[] = array(
+                        'departamento' => $dep['departamento'],
+                        'provincia' => $prov['provincia'],
+                        'distrito' => $dist,
+                        'nivel' => 'DISTRITO',
+                        'score' => 3 + strlen($dist),
+                    );
+                }
+            }
+        }
+    }
+
+    if (empty($found)) {
+        return null;
+    }
+
+    // Ordenar por score (mayor primero = más confiable)
+    usort($found, function($a, $b) {
+        return $b['score'] - $a['score'];
+    });
+
+    // Devolver la ubicación más confiable encontrada
+    $best = $found[0];
+    return array(
+        'departamento' => $best['departamento'],
+        'provincia' => $best['provincia'],
+        'distrito' => $best['distrito'],
+        'direccion' => '',
+        'lat' => 0,
+        'lng' => 0,
+        'nivel' => $best['nivel'],
+    );
+}
+
+/**
+ * =============================================================================
+ * AUTO-RESOLUCIÓN DE UBICACIONES
+ * =============================================================================
+ * Corrige ubicaciones mal clasificadas (ej: "Chincha" guardada como departamento
+ * cuando en realidad es una provincia de Ica)
+ */
+
+/**
+ * Intenta resolver/corregir una ubicación automáticamente
+ *
+ * Casos que maneja:
+ * - "Chincha" como departamento → corrige a provincia Chincha de Ica
+ * - Nombres de distritos como departamento → resuelve la jerarquía completa
+ *
+ * @param array $ubicacion Array con departamento, provincia, distrito
+ * @return array Ubicación corregida con nivel adecuado
+ */
+function agrochamba_auto_resolve_location($ubicacion) {
+    if (!is_array($ubicacion) || empty($ubicacion['departamento'])) {
+        return $ubicacion;
+    }
+
+    $locations = agrochamba_get_peru_locations();
+    $departamentos = agrochamba_get_departamentos();
+    $nombre = trim($ubicacion['departamento']);
+    $nombre_normalizado = agrochamba_normalize_text($nombre);
+
+    // Verificar si el "departamento" es realmente un departamento válido
+    $es_departamento_valido = false;
+    foreach ($departamentos as $dep) {
+        if (agrochamba_normalize_text($dep) === $nombre_normalizado) {
+            $es_departamento_valido = true;
+            $nombre = $dep; // Usar nombre normalizado
+            break;
+        }
+    }
+
+    if ($es_departamento_valido) {
+        // Es un departamento válido, devolver con el nivel correcto
+        return array(
+            'departamento' => $nombre,
+            'provincia' => $ubicacion['provincia'] ?? '',
+            'distrito' => $ubicacion['distrito'] ?? '',
+            'direccion' => $ubicacion['direccion'] ?? '',
+            'lat' => $ubicacion['lat'] ?? 0,
+            'lng' => $ubicacion['lng'] ?? 0,
+            'nivel' => agrochamba_detect_location_level($ubicacion),
+        );
+    }
+
+    // No es un departamento válido, buscar como provincia
+    foreach ($locations as $dep) {
+        foreach ($dep['provincias'] as $prov) {
+            if (agrochamba_normalize_text($prov['provincia']) === $nombre_normalizado) {
+                // ¡Es una provincia! Corregir la ubicación
+                return array(
+                    'departamento' => $dep['departamento'],
+                    'provincia' => $prov['provincia'],
+                    'distrito' => '',
+                    'direccion' => $ubicacion['direccion'] ?? '',
+                    'lat' => $ubicacion['lat'] ?? 0,
+                    'lng' => $ubicacion['lng'] ?? 0,
+                    'nivel' => 'PROVINCIA',
+                );
+            }
+        }
+    }
+
+    // Buscar como distrito
+    foreach ($locations as $dep) {
+        foreach ($dep['provincias'] as $prov) {
+            foreach ($prov['distritos'] as $dist) {
+                if (agrochamba_normalize_text($dist) === $nombre_normalizado) {
+                    // ¡Es un distrito! Resolver la jerarquía completa
+                    return array(
+                        'departamento' => $dep['departamento'],
+                        'provincia' => $prov['provincia'],
+                        'distrito' => $dist,
+                        'direccion' => $ubicacion['direccion'] ?? '',
+                        'lat' => $ubicacion['lat'] ?? 0,
+                        'lng' => $ubicacion['lng'] ?? 0,
+                        'nivel' => 'DISTRITO',
+                    );
+                }
+            }
+        }
+    }
+
+    // No se pudo resolver, devolver como está
+    return $ubicacion;
+}
+
+/**
+ * Detecta el nivel de especificidad de una ubicación
+ */
+function agrochamba_detect_location_level($ubicacion) {
+    $dep = $ubicacion['departamento'] ?? '';
+    $prov = $ubicacion['provincia'] ?? '';
+    $dist = $ubicacion['distrito'] ?? '';
+
+    if (empty($prov) || $prov === $dep) {
+        return 'DEPARTAMENTO';
+    } elseif (empty($dist) || $dist === $prov) {
+        return 'PROVINCIA';
+    } else {
+        return 'DISTRITO';
+    }
+}
+
+/**
+ * =============================================================================
  * FUNCIONES PARA SINCRONIZACIÓN CON TAXONOMÍA JERÁRQUICA
  * =============================================================================
  */
