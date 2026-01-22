@@ -121,23 +121,24 @@ if (!$has_filters && is_post_type_archive('trabajo') && !is_tax()) {
                         <select name="ubicacion" id="ubicacion-select" class="search-input search-select" onchange="handleUbicacionChange(this)">
                             <option value="">Todas las ubicaciones</option>
                             <?php
-                            $ubicaciones = get_terms(array(
-                                'taxonomy' => 'ubicacion',
-                                'hide_empty' => true,
-                                'number' => 50,
-                            ));
-                            
-                            if (!empty($ubicaciones) && !is_wp_error($ubicaciones)):
-                                foreach ($ubicaciones as $ubicacion):
+                            // Usar solo los 25 departamentos de Perú
+                            $departamentos = function_exists('agrochamba_get_departamentos')
+                                ? agrochamba_get_departamentos()
+                                : array();
+
+                            foreach ($departamentos as $departamento):
+                                // Buscar el término de taxonomía correspondiente
+                                $term = get_term_by('name', $departamento, 'ubicacion');
+                                $slug = $term ? $term->slug : sanitize_title($departamento);
+                                $term_link = $term ? get_term_link($term) : home_url('/ubicacion/' . $slug . '/');
                             ?>
-                                <option value="<?php echo esc_attr($ubicacion->slug); ?>" 
-                                        data-term-link="<?php echo esc_url(get_term_link($ubicacion)); ?>"
-                                        <?php selected($ubicacion_filter, $ubicacion->slug); ?>>
-                                    <?php echo esc_html($ubicacion->name); ?>
+                                <option value="<?php echo esc_attr($slug); ?>"
+                                        data-term-link="<?php echo esc_url($term_link); ?>"
+                                        <?php selected($ubicacion_filter, $slug); ?>>
+                                    <?php echo esc_html($departamento); ?>
                                 </option>
-                            <?php 
-                                endforeach;
-                            endif;
+                            <?php
+                            endforeach;
                             ?>
                         </select>
                         <svg class="dropdown-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

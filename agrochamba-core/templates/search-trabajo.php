@@ -64,22 +64,22 @@ $orderby_filter = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']
                         <select name="ubicacion" class="search-input search-select" onchange="this.form.submit()">
                             <option value="">Todas las ubicaciones</option>
                             <?php
-                            $ubicaciones = get_terms(array(
-                                'taxonomy' => 'ubicacion',
-                                'hide_empty' => true,
-                                'number' => 50,
-                            ));
-                            
-                            if (!empty($ubicaciones) && !is_wp_error($ubicaciones)):
-                                foreach ($ubicaciones as $ubicacion):
+                            // Usar solo los 25 departamentos de Perú
+                            $departamentos = function_exists('agrochamba_get_departamentos')
+                                ? agrochamba_get_departamentos()
+                                : array();
+
+                            foreach ($departamentos as $departamento):
+                                // Buscar el término de taxonomía correspondiente
+                                $term = get_term_by('name', $departamento, 'ubicacion');
+                                $slug = $term ? $term->slug : sanitize_title($departamento);
                             ?>
-                                <option value="<?php echo esc_attr($ubicacion->slug); ?>" 
-                                        <?php selected($ubicacion_filter, $ubicacion->slug); ?>>
-                                    <?php echo esc_html($ubicacion->name); ?>
+                                <option value="<?php echo esc_attr($slug); ?>"
+                                        <?php selected($ubicacion_filter, $slug); ?>>
+                                    <?php echo esc_html($departamento); ?>
                                 </option>
-                            <?php 
-                                endforeach;
-                            endif;
+                            <?php
+                            endforeach;
                             ?>
                         </select>
                         <svg class="dropdown-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
