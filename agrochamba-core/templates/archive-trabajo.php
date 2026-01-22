@@ -1654,6 +1654,32 @@ if (!$has_filters && is_post_type_archive('trabajo') && !is_tax()) {
     font-weight: 400;
 }
 
+.location-tag {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    margin-left: 6px;
+    vertical-align: middle;
+}
+
+.tag-departamento {
+    background: #e3f2fd;
+    color: #1565c0;
+}
+
+.tag-provincia {
+    background: #fff3e0;
+    color: #e65100;
+}
+
+.tag-distrito {
+    background: #f3e5f5;
+    color: #7b1fa2;
+}
+
 .search-submit-btn {
     display: flex;
     align-items: center;
@@ -3216,13 +3242,13 @@ function filterLocationOptions(input, selectId) {
                 visibleCount++;
                 option.classList.add('match-child');
 
-                // Agregar hint de qué coincidió
+                // Agregar hint con etiqueta de tipo (como en la app)
                 const hint = document.createElement('span');
                 hint.className = 'match-hint';
                 if (matchFound.type === 'provincia') {
-                    hint.textContent = `(${matchFound.name})`;
+                    hint.innerHTML = `${matchFound.name} <span class="location-tag tag-provincia">Provincia</span>`;
                 } else {
-                    hint.textContent = `(${matchFound.name}, ${matchFound.provincia})`;
+                    hint.innerHTML = `${matchFound.name}, ${matchFound.provincia} <span class="location-tag tag-distrito">Distrito</span>`;
                 }
                 option.appendChild(hint);
                 return;
