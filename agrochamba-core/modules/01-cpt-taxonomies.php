@@ -410,12 +410,14 @@ if (!function_exists('agrochamba_modify_trabajo_archive_query')) {
                 $tax_query = array();
                 
                 // Solo agregar filtro de ubicación si no es la taxonomía actual
+                // include_children = true para incluir provincias y distritos del departamento
                 if (isset($_GET['ubicacion']) && !empty($_GET['ubicacion']) && $current_taxonomy !== 'ubicacion') {
                     $ubicacion_slug = sanitize_text_field($_GET['ubicacion']);
                     $tax_query[] = array(
                         'taxonomy' => 'ubicacion',
                         'field' => 'slug',
                         'terms' => $ubicacion_slug,
+                        'include_children' => true,
                     );
                 }
                 

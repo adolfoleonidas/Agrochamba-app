@@ -852,6 +852,7 @@ if (!function_exists('agrochamba_filter_jobs_by_location')) {
         }
         
         // Filtrar por DEPARTAMENTO (usa taxonomía para velocidad)
+        // include_children = true para incluir provincias y distritos de este departamento
         $departamento = $request->get_param('departamento');
         if (!empty($departamento)) {
             // Usar tax_query para departamento (más rápido)
@@ -862,6 +863,7 @@ if (!function_exists('agrochamba_filter_jobs_by_location')) {
                 'taxonomy' => 'ubicacion',
                 'field' => 'name',
                 'terms' => sanitize_text_field($departamento),
+                'include_children' => true, // Incluir provincias y distritos del departamento
             );
         }
         
