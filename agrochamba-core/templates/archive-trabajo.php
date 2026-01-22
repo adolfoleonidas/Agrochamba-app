@@ -114,36 +114,65 @@ if (!$has_filters && is_post_type_archive('trabajo') && !is_tax()) {
                     </div>
                     
                     <div class="search-input-wrapper location-wrapper">
-                        <svg class="location-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
-                            <circle cx="12" cy="10" r="3"/>
-                        </svg>
-                        <select name="ubicacion" id="ubicacion-select" class="search-input search-select" onchange="handleUbicacionChange(this)">
-                            <option value="">Todas las ubicaciones</option>
-                            <?php
-                            // Usar solo los 25 departamentos de Perú
-                            $departamentos = function_exists('agrochamba_get_departamentos')
-                                ? agrochamba_get_departamentos()
-                                : array();
+                        <input type="hidden" name="ubicacion" id="ubicacion-hidden" value="<?php echo esc_attr($ubicacion_filter); ?>">
+                        <?php
+                        // Usar solo los 25 departamentos de Perú
+                        $departamentos = function_exists('agrochamba_get_departamentos')
+                            ? agrochamba_get_departamentos()
+                            : array();
 
-                            foreach ($departamentos as $departamento):
-                                // Buscar el término de taxonomía correspondiente
-                                $term = get_term_by('name', $departamento, 'ubicacion');
-                                $slug = $term ? $term->slug : sanitize_title($departamento);
-                                $term_link = $term ? get_term_link($term) : home_url('/ubicacion/' . $slug . '/');
-                            ?>
-                                <option value="<?php echo esc_attr($slug); ?>"
-                                        data-term-link="<?php echo esc_url($term_link); ?>"
-                                        <?php selected($ubicacion_filter, $slug); ?>>
-                                    <?php echo esc_html($departamento); ?>
-                                </option>
-                            <?php
-                            endforeach;
-                            ?>
-                        </select>
-                        <svg class="dropdown-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="6 9 12 15 18 9"/>
-                        </svg>
+                        // Obtener nombre del departamento seleccionado
+                        $selected_name = 'Todas las ubicaciones';
+                        foreach ($departamentos as $departamento):
+                            $term = get_term_by('name', $departamento, 'ubicacion');
+                            $slug = $term ? $term->slug : sanitize_title($departamento);
+                            if ($slug === $ubicacion_filter) {
+                                $selected_name = $departamento;
+                                break;
+                            }
+                        endforeach;
+                        ?>
+                        <div class="searchable-select" id="ubicacion-searchable">
+                            <button type="button" class="searchable-select-trigger" onclick="toggleSearchableSelect('ubicacion-searchable')">
+                                <svg class="location-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                                    <circle cx="12" cy="10" r="3"/>
+                                </svg>
+                                <span class="searchable-select-text"><?php echo esc_html($selected_name); ?></span>
+                                <svg class="dropdown-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="6 9 12 15 18 9"/>
+                                </svg>
+                            </button>
+                            <div class="searchable-select-dropdown">
+                                <div class="searchable-select-search">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="11" cy="11" r="8"/>
+                                        <path d="m21 21-4.35-4.35"/>
+                                    </svg>
+                                    <input type="text" class="searchable-select-input" placeholder="Buscar departamento..." oninput="filterSearchableOptions(this, 'ubicacion-searchable')">
+                                </div>
+                                <div class="searchable-select-options">
+                                    <div class="searchable-select-option <?php echo empty($ubicacion_filter) ? 'selected' : ''; ?>"
+                                         data-value=""
+                                         data-term-link="<?php echo esc_url(get_post_type_archive_link('trabajo')); ?>"
+                                         onclick="selectSearchableOption(this, 'ubicacion-searchable')">
+                                        Todas las ubicaciones
+                                    </div>
+                                    <?php foreach ($departamentos as $departamento):
+                                        $term = get_term_by('name', $departamento, 'ubicacion');
+                                        $slug = $term ? $term->slug : sanitize_title($departamento);
+                                        $term_link = $term ? get_term_link($term) : home_url('/ubicacion/' . $slug . '/');
+                                    ?>
+                                    <div class="searchable-select-option <?php echo ($slug === $ubicacion_filter) ? 'selected' : ''; ?>"
+                                         data-value="<?php echo esc_attr($slug); ?>"
+                                         data-term-link="<?php echo esc_url($term_link); ?>"
+                                         onclick="selectSearchableOption(this, 'ubicacion-searchable')">
+                                        <?php echo esc_html($departamento); ?>
+                                    </div>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     
                     <button type="submit" class="search-submit-btn">
@@ -1465,6 +1494,141 @@ if (!$has_filters && is_post_type_archive('trabajo') && !is_tax()) {
 
 .location-wrapper {
     position: relative;
+}
+
+/* Searchable Select Component */
+.searchable-select {
+    position: relative;
+    width: 100%;
+}
+
+.searchable-select-trigger {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 16px 20px;
+    background: #fff;
+    border: 2px solid #e0e0e0;
+    border-radius: 12px;
+    font-size: 16px;
+    color: #333;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+}
+
+.searchable-select-trigger:hover {
+    border-color: #4CAF50;
+}
+
+.searchable-select.open .searchable-select-trigger {
+    border-color: #4CAF50;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.searchable-select-trigger .location-icon {
+    color: #4CAF50;
+    flex-shrink: 0;
+}
+
+.searchable-select-text {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.searchable-select-trigger .dropdown-icon {
+    color: #999;
+    flex-shrink: 0;
+    transition: transform 0.2s;
+}
+
+.searchable-select.open .searchable-select-trigger .dropdown-icon {
+    transform: rotate(180deg);
+}
+
+.searchable-select-dropdown {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #fff;
+    border: 2px solid #4CAF50;
+    border-top: none;
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+    max-height: 320px;
+    overflow: hidden;
+}
+
+.searchable-select.open .searchable-select-dropdown {
+    display: block;
+}
+
+.searchable-select-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    border-bottom: 1px solid #e0e0e0;
+    background: #f9f9f9;
+}
+
+.searchable-select-search svg {
+    color: #999;
+    flex-shrink: 0;
+}
+
+.searchable-select-input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    font-size: 14px;
+    outline: none;
+    color: #333;
+}
+
+.searchable-select-input::placeholder {
+    color: #999;
+}
+
+.searchable-select-options {
+    max-height: 250px;
+    overflow-y: auto;
+}
+
+.searchable-select-option {
+    padding: 12px 16px;
+    cursor: pointer;
+    transition: background 0.15s;
+    font-size: 15px;
+}
+
+.searchable-select-option:hover {
+    background: #f5f5f5;
+}
+
+.searchable-select-option.selected {
+    background: #e8f5e9;
+    color: #2e7d32;
+    font-weight: 500;
+}
+
+.searchable-select-option.hidden {
+    display: none;
+}
+
+.searchable-select-no-results {
+    padding: 16px;
+    text-align: center;
+    color: #999;
+    font-size: 14px;
 }
 
 .search-submit-btn {
@@ -2921,6 +3085,134 @@ if (!$has_filters && is_post_type_archive('trabajo') && !is_tax()) {
 </style>
 
 <script>
+// ==========================================
+// Searchable Select Component
+// ==========================================
+function toggleSearchableSelect(selectId) {
+    const select = document.getElementById(selectId);
+    const isOpen = select.classList.contains('open');
+
+    // Cerrar todos los otros selects abiertos
+    document.querySelectorAll('.searchable-select.open').forEach(s => {
+        if (s.id !== selectId) {
+            s.classList.remove('open');
+        }
+    });
+
+    // Toggle el select actual
+    select.classList.toggle('open');
+
+    // Si se abre, enfocar el input de búsqueda
+    if (!isOpen) {
+        const input = select.querySelector('.searchable-select-input');
+        if (input) {
+            setTimeout(() => input.focus(), 100);
+        }
+    }
+}
+
+function filterSearchableOptions(input, selectId) {
+    const select = document.getElementById(selectId);
+    const filter = input.value.toLowerCase().trim();
+    const options = select.querySelectorAll('.searchable-select-option');
+    let visibleCount = 0;
+
+    options.forEach(option => {
+        const text = option.textContent.toLowerCase();
+        if (text.includes(filter)) {
+            option.classList.remove('hidden');
+            visibleCount++;
+        } else {
+            option.classList.add('hidden');
+        }
+    });
+
+    // Mostrar mensaje de "sin resultados" si no hay opciones visibles
+    let noResults = select.querySelector('.searchable-select-no-results');
+    if (visibleCount === 0) {
+        if (!noResults) {
+            noResults = document.createElement('div');
+            noResults.className = 'searchable-select-no-results';
+            noResults.textContent = 'No se encontraron departamentos';
+            select.querySelector('.searchable-select-options').appendChild(noResults);
+        }
+        noResults.style.display = 'block';
+    } else if (noResults) {
+        noResults.style.display = 'none';
+    }
+}
+
+function selectSearchableOption(option, selectId) {
+    const select = document.getElementById(selectId);
+    const value = option.getAttribute('data-value');
+    const termLink = option.getAttribute('data-term-link');
+    const text = option.textContent.trim();
+
+    // Actualizar el input hidden
+    const hiddenInput = document.getElementById('ubicacion-hidden');
+    if (hiddenInput) {
+        hiddenInput.value = value;
+    }
+
+    // Actualizar el texto visible
+    const trigger = select.querySelector('.searchable-select-text');
+    if (trigger) {
+        trigger.textContent = text;
+    }
+
+    // Marcar como seleccionado
+    select.querySelectorAll('.searchable-select-option').forEach(opt => {
+        opt.classList.remove('selected');
+    });
+    option.classList.add('selected');
+
+    // Cerrar el dropdown
+    select.classList.remove('open');
+
+    // Limpiar el filtro
+    const input = select.querySelector('.searchable-select-input');
+    if (input) {
+        input.value = '';
+        filterSearchableOptions(input, selectId);
+    }
+
+    // Navegar a la ubicación (mismo comportamiento que handleUbicacionChange)
+    if (termLink) {
+        const searchInput = document.getElementById('search-input-field');
+        const searchValue = searchInput ? searchInput.value.trim() : '';
+
+        if (searchValue) {
+            const url = new URL(termLink, window.location.origin);
+            url.searchParams.set('s', searchValue);
+            window.location.href = url.toString();
+        } else {
+            window.location.href = termLink;
+        }
+    }
+}
+
+// Cerrar el select al hacer clic fuera
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.searchable-select')) {
+        document.querySelectorAll('.searchable-select.open').forEach(select => {
+            select.classList.remove('open');
+        });
+    }
+});
+
+// Cerrar el select con Escape
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        document.querySelectorAll('.searchable-select.open').forEach(select => {
+            select.classList.remove('open');
+        });
+    }
+});
+
+// ==========================================
+// Funciones originales
+// ==========================================
+
 // Función para manejar el cambio de ubicación
 function handleUbicacionChange(select) {
     const selectedOption = select.options[select.selectedIndex];
