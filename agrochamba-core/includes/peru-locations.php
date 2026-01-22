@@ -797,11 +797,13 @@ function agrochamba_extract_location_from_text($text) {
  * Casos que maneja:
  * - "Chincha" como departamento → corrige a provincia Chincha de Ica
  * - Nombres de distritos como departamento → resuelve la jerarquía completa
+ * - Ubicaciones ambiguas (ej: "Anta" existe en Ancash y Cusco) → usa contexto para decidir
  *
  * @param array $ubicacion Array con departamento, provincia, distrito
+ * @param string $context Contexto adicional (título + contenido) para desambiguar
  * @return array Ubicación corregida con nivel adecuado
  */
-function agrochamba_auto_resolve_location($ubicacion) {
+function agrochamba_auto_resolve_location($ubicacion, $context = '') {
     if (!is_array($ubicacion) || empty($ubicacion['departamento'])) {
         return $ubicacion;
     }
@@ -810,6 +812,7 @@ function agrochamba_auto_resolve_location($ubicacion) {
     $departamentos = agrochamba_get_departamentos();
     $nombre = trim($ubicacion['departamento']);
     $nombre_normalizado = agrochamba_normalize_text($nombre);
+    $context_normalized = agrochamba_normalize_text($context);
 
     // Verificar si el "departamento" es realmente un departamento válido
     $es_departamento_valido = false;
@@ -834,19 +837,19 @@ function agrochamba_auto_resolve_location($ubicacion) {
         );
     }
 
-    // No es un departamento válido, buscar como provincia
+    // Recolectar TODAS las coincidencias posibles (provincias y distritos)
+    $candidates = array();
+
+    // Buscar como provincia
     foreach ($locations as $dep) {
         foreach ($dep['provincias'] as $prov) {
             if (agrochamba_normalize_text($prov['provincia']) === $nombre_normalizado) {
-                // ¡Es una provincia! Corregir la ubicación
-                return array(
+                $candidates[] = array(
                     'departamento' => $dep['departamento'],
                     'provincia' => $prov['provincia'],
                     'distrito' => '',
-                    'direccion' => $ubicacion['direccion'] ?? '',
-                    'lat' => $ubicacion['lat'] ?? 0,
-                    'lng' => $ubicacion['lng'] ?? 0,
                     'nivel' => 'PROVINCIA',
+                    'score' => 10, // Provincias tienen prioridad sobre distritos
                 );
             }
         }
@@ -857,23 +860,71 @@ function agrochamba_auto_resolve_location($ubicacion) {
         foreach ($dep['provincias'] as $prov) {
             foreach ($prov['distritos'] as $dist) {
                 if (agrochamba_normalize_text($dist) === $nombre_normalizado) {
-                    // ¡Es un distrito! Resolver la jerarquía completa
-                    return array(
+                    $candidates[] = array(
                         'departamento' => $dep['departamento'],
                         'provincia' => $prov['provincia'],
                         'distrito' => $dist,
-                        'direccion' => $ubicacion['direccion'] ?? '',
-                        'lat' => $ubicacion['lat'] ?? 0,
-                        'lng' => $ubicacion['lng'] ?? 0,
                         'nivel' => 'DISTRITO',
+                        'score' => 5,
                     );
                 }
             }
         }
     }
 
-    // No se pudo resolver, devolver como está
-    return $ubicacion;
+    // Si no hay candidatos, devolver como está
+    if (empty($candidates)) {
+        return $ubicacion;
+    }
+
+    // Si solo hay un candidato, usarlo
+    if (count($candidates) === 1) {
+        $best = $candidates[0];
+        return array(
+            'departamento' => $best['departamento'],
+            'provincia' => $best['provincia'],
+            'distrito' => $best['distrito'],
+            'direccion' => $ubicacion['direccion'] ?? '',
+            'lat' => $ubicacion['lat'] ?? 0,
+            'lng' => $ubicacion['lng'] ?? 0,
+            'nivel' => $best['nivel'],
+        );
+    }
+
+    // HAY MÚLTIPLES CANDIDATOS - usar contexto para desambiguar
+    if (!empty($context_normalized)) {
+        foreach ($candidates as &$candidate) {
+            $dep_normalized = agrochamba_normalize_text($candidate['departamento']);
+            // Si el contexto menciona el departamento, aumentar score significativamente
+            if (strpos($context_normalized, $dep_normalized) !== false) {
+                $candidate['score'] += 100;
+            }
+            // Si el contexto menciona la provincia, aumentar score
+            if (!empty($candidate['provincia'])) {
+                $prov_normalized = agrochamba_normalize_text($candidate['provincia']);
+                if (strpos($context_normalized, $prov_normalized) !== false) {
+                    $candidate['score'] += 50;
+                }
+            }
+        }
+        unset($candidate);
+    }
+
+    // Ordenar por score (mayor primero)
+    usort($candidates, function($a, $b) {
+        return $b['score'] - $a['score'];
+    });
+
+    $best = $candidates[0];
+    return array(
+        'departamento' => $best['departamento'],
+        'provincia' => $best['provincia'],
+        'distrito' => $best['distrito'],
+        'direccion' => $ubicacion['direccion'] ?? '',
+        'lat' => $ubicacion['lat'] ?? 0,
+        'lng' => $ubicacion['lng'] ?? 0,
+        'nivel' => $best['nivel'],
+    );
 }
 
 /**

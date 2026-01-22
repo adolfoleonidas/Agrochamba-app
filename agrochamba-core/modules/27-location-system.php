@@ -638,9 +638,11 @@ if (!function_exists('agrochamba_ensure_ubicacion_in_rest_response')) {
         }
 
         // AUTO-RESOLVER: Corregir ubicaciones mal clasificadas (ej: "Chincha" como departamento)
+        // Usar título + contenido como contexto para desambiguar ubicaciones
         if (!empty($ubicacion_completa) && is_array($ubicacion_completa) && function_exists('agrochamba_auto_resolve_location')) {
             $ubicacion_original = $ubicacion_completa;
-            $ubicacion_completa = agrochamba_auto_resolve_location($ubicacion_completa);
+            $context = $post->post_title . ' ' . wp_strip_all_tags($post->post_content);
+            $ubicacion_completa = agrochamba_auto_resolve_location($ubicacion_completa, $context);
 
             // Verificar si hubo corrección
             if ($ubicacion_completa !== $ubicacion_original) {
@@ -1238,9 +1240,11 @@ if (!function_exists('agrochamba_migrate_locations')) {
             }
 
             // Caso 2: Tiene ubicación pero puede estar mal clasificada
+            // Usar contexto del trabajo para desambiguar (ej: "Anta" existe en Ancash y Cusco)
             if (function_exists('agrochamba_auto_resolve_location') && !empty($ubicacion_completa)) {
                 $ubicacion_original = $ubicacion_completa;
-                $ubicacion_completa = agrochamba_auto_resolve_location($ubicacion_completa);
+                $context = $post->post_title . ' ' . wp_strip_all_tags($post->post_content);
+                $ubicacion_completa = agrochamba_auto_resolve_location($ubicacion_completa, $context);
 
                 // Verificar si hubo corrección
                 if ($ubicacion_completa !== $ubicacion_original) {
