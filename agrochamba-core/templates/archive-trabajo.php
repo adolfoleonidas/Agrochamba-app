@@ -121,6 +121,11 @@ if (!$has_filters && is_post_type_archive('trabajo') && !is_tax()) {
                             ? agrochamba_get_departamentos()
                             : array();
 
+                        // Obtener datos completos para búsqueda (departamentos con sus provincias y distritos)
+                        $locations_for_search = function_exists('agrochamba_get_locations_for_js')
+                            ? agrochamba_get_locations_for_js()
+                            : array();
+
                         // Obtener nombre del departamento seleccionado
                         $selected_name = 'Todas las ubicaciones';
                         foreach ($departamentos as $departamento):
@@ -132,7 +137,7 @@ if (!$has_filters && is_post_type_archive('trabajo') && !is_tax()) {
                             }
                         endforeach;
                         ?>
-                        <div class="searchable-select" id="ubicacion-searchable">
+                        <div class="searchable-select" id="ubicacion-searchable" data-locations='<?php echo json_encode($locations_for_search, JSON_UNESCAPED_UNICODE); ?>'>
                             <button type="button" class="searchable-select-trigger" onclick="toggleSearchableSelect('ubicacion-searchable')">
                                 <svg class="location-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
@@ -149,11 +154,12 @@ if (!$has_filters && is_post_type_archive('trabajo') && !is_tax()) {
                                         <circle cx="11" cy="11" r="8"/>
                                         <path d="m21 21-4.35-4.35"/>
                                     </svg>
-                                    <input type="text" class="searchable-select-input" placeholder="Buscar departamento..." oninput="filterSearchableOptions(this, 'ubicacion-searchable')">
+                                    <input type="text" class="searchable-select-input" placeholder="Buscar ubicación..." oninput="filterLocationOptions(this, 'ubicacion-searchable')">
                                 </div>
                                 <div class="searchable-select-options">
                                     <div class="searchable-select-option <?php echo empty($ubicacion_filter) ? 'selected' : ''; ?>"
                                          data-value=""
+                                         data-departamento=""
                                          data-term-link="<?php echo esc_url(get_post_type_archive_link('trabajo')); ?>"
                                          onclick="selectSearchableOption(this, 'ubicacion-searchable')">
                                         Todas las ubicaciones
@@ -165,6 +171,7 @@ if (!$has_filters && is_post_type_archive('trabajo') && !is_tax()) {
                                     ?>
                                     <div class="searchable-select-option <?php echo ($slug === $ubicacion_filter) ? 'selected' : ''; ?>"
                                          data-value="<?php echo esc_attr($slug); ?>"
+                                         data-departamento="<?php echo esc_attr($departamento); ?>"
                                          data-term-link="<?php echo esc_url($term_link); ?>"
                                          onclick="selectSearchableOption(this, 'ubicacion-searchable')">
                                         <?php echo esc_html($departamento); ?>
@@ -1629,6 +1636,22 @@ if (!$has_filters && is_post_type_archive('trabajo') && !is_tax()) {
     text-align: center;
     color: #999;
     font-size: 14px;
+}
+
+.searchable-select-option.match-child {
+    background: #fff8e1;
+}
+
+.searchable-select-option.match-child:hover {
+    background: #ffecb3;
+}
+
+.match-hint {
+    display: block;
+    font-size: 12px;
+    color: #666;
+    margin-top: 2px;
+    font-weight: 400;
 }
 
 .search-submit-btn {
@@ -3102,38 +3125,121 @@ function toggleSearchableSelect(selectId) {
     // Toggle el select actual
     select.classList.toggle('open');
 
-    // Si se abre, enfocar el input de búsqueda
+    // Si se abre, enfocar el input de búsqueda y limpiar highlights
     if (!isOpen) {
         const input = select.querySelector('.searchable-select-input');
         if (input) {
             setTimeout(() => input.focus(), 100);
         }
+        // Limpiar cualquier highlight anterior
+        select.querySelectorAll('.searchable-select-option').forEach(opt => {
+            opt.classList.remove('match-child');
+            const hint = opt.querySelector('.match-hint');
+            if (hint) hint.remove();
+        });
     }
 }
 
-function filterSearchableOptions(input, selectId) {
+// Normalizar texto para búsqueda (remover acentos)
+function normalizeText(text) {
+    return text.toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim();
+}
+
+// Buscar en departamentos, provincias y distritos
+function filterLocationOptions(input, selectId) {
     const select = document.getElementById(selectId);
-    const filter = input.value.toLowerCase().trim();
+    const filter = normalizeText(input.value);
     const options = select.querySelectorAll('.searchable-select-option');
+    const locationsData = JSON.parse(select.getAttribute('data-locations') || '{}');
     let visibleCount = 0;
 
     options.forEach(option => {
-        const text = option.textContent.toLowerCase();
-        if (text.includes(filter)) {
-            option.classList.remove('hidden');
+        const departamento = option.getAttribute('data-departamento');
+        const optionText = normalizeText(option.textContent);
+
+        // Limpiar estado anterior
+        option.classList.remove('hidden', 'match-child');
+        const oldHint = option.querySelector('.match-hint');
+        if (oldHint) oldHint.remove();
+
+        // Si no hay filtro, mostrar todo
+        if (!filter) {
             visibleCount++;
-        } else {
-            option.classList.add('hidden');
+            return;
         }
+
+        // Opción "Todas las ubicaciones" - siempre visible si el filtro está vacío
+        if (!departamento) {
+            if (filter) {
+                option.classList.add('hidden');
+            } else {
+                visibleCount++;
+            }
+            return;
+        }
+
+        // Buscar coincidencia directa en el departamento
+        if (optionText.includes(filter)) {
+            visibleCount++;
+            return;
+        }
+
+        // Buscar en provincias y distritos de este departamento
+        const provincias = locationsData[departamento];
+        if (provincias) {
+            let matchFound = null;
+
+            // Buscar en provincias
+            for (const provincia in provincias) {
+                if (normalizeText(provincia).includes(filter)) {
+                    matchFound = { type: 'provincia', name: provincia };
+                    break;
+                }
+
+                // Buscar en distritos
+                const distritos = provincias[provincia];
+                if (Array.isArray(distritos)) {
+                    for (const distrito of distritos) {
+                        if (normalizeText(distrito).includes(filter)) {
+                            matchFound = { type: 'distrito', name: distrito, provincia: provincia };
+                            break;
+                        }
+                    }
+                }
+                if (matchFound) break;
+            }
+
+            if (matchFound) {
+                visibleCount++;
+                option.classList.add('match-child');
+
+                // Agregar hint de qué coincidió
+                const hint = document.createElement('span');
+                hint.className = 'match-hint';
+                if (matchFound.type === 'provincia') {
+                    hint.textContent = `(${matchFound.name})`;
+                } else {
+                    hint.textContent = `(${matchFound.name}, ${matchFound.provincia})`;
+                }
+                option.appendChild(hint);
+                return;
+            }
+        }
+
+        // No hubo coincidencia
+        option.classList.add('hidden');
     });
 
-    // Mostrar mensaje de "sin resultados" si no hay opciones visibles
+    // Mostrar mensaje de "sin resultados"
     let noResults = select.querySelector('.searchable-select-no-results');
     if (visibleCount === 0) {
         if (!noResults) {
             noResults = document.createElement('div');
             noResults.className = 'searchable-select-no-results';
-            noResults.textContent = 'No se encontraron departamentos';
+            noResults.textContent = 'No se encontraron ubicaciones';
             select.querySelector('.searchable-select-options').appendChild(noResults);
         }
         noResults.style.display = 'block';
@@ -3146,7 +3252,9 @@ function selectSearchableOption(option, selectId) {
     const select = document.getElementById(selectId);
     const value = option.getAttribute('data-value');
     const termLink = option.getAttribute('data-term-link');
-    const text = option.textContent.trim();
+    const departamento = option.getAttribute('data-departamento');
+    // Usar el nombre del departamento o "Todas las ubicaciones"
+    const text = departamento || 'Todas las ubicaciones';
 
     // Actualizar el input hidden
     const hiddenInput = document.getElementById('ubicacion-hidden');
@@ -3160,9 +3268,11 @@ function selectSearchableOption(option, selectId) {
         trigger.textContent = text;
     }
 
-    // Marcar como seleccionado
+    // Limpiar hints y estados de todas las opciones
     select.querySelectorAll('.searchable-select-option').forEach(opt => {
-        opt.classList.remove('selected');
+        opt.classList.remove('selected', 'match-child', 'hidden');
+        const hint = opt.querySelector('.match-hint');
+        if (hint) hint.remove();
     });
     option.classList.add('selected');
 
@@ -3173,7 +3283,6 @@ function selectSearchableOption(option, selectId) {
     const input = select.querySelector('.searchable-select-input');
     if (input) {
         input.value = '';
-        filterSearchableOptions(input, selectId);
     }
 
     // Navegar a la ubicación (mismo comportamiento que handleUbicacionChange)
