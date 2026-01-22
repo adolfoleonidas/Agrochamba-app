@@ -72,6 +72,7 @@ import agrochamba.com.ui.common.LocationSearchField
 import agrochamba.com.ui.company.CreateSedeDialog
 import agrochamba.com.utils.textToHtml
 import coil.compose.AsyncImage
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -123,6 +124,15 @@ fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel 
     LaunchedEffect(Unit) {
         // Asegurar que el estado se reinicialice cuando se entra a la pantalla
         publishToFacebook = false
+
+        // Sincronizar sedes con el backend al cargar la pantalla
+        // Esto asegura que siempre tengamos las sedes más recientes
+        val token = AuthManager.token
+        val companyId = AuthManager.userCompanyId
+        if (token != null && companyId != null) {
+            android.util.Log.d("CreateJobScreen", "Sincronizando sedes con backend...")
+            locationRepository.syncSedesFromBackend(token, companyId)
+        }
     }
     
     // Reiniciar el estado cuando se crea un trabajo exitosamente
@@ -814,22 +824,59 @@ fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel 
         )
     }
     
+    // Estado para guardar sede en backend
+    var isSavingSede by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
+
     // Diálogo para crear sede inline (sin perder el estado del formulario)
+    // IMPORTANTE: La sede se sincroniza con el backend para persistencia
     if (showCreateSedeDialog) {
         CreateSedeDialog(
+            isSaving = isSavingSede,
             onConfirm = { nombre, ubicacion, esPrincipal ->
-                val nuevaSede = SedeEmpresa(
-                    id = java.util.UUID.randomUUID().toString(),
-                    nombre = nombre,
-                    ubicacion = ubicacion,
-                    esPrincipal = esPrincipal,
-                    activa = true
-                )
-                locationRepository.addSede(nuevaSede)
-                showCreateSedeDialog = false
-                // Auto-seleccionar la sede recién creada
-                selectedUbicacionCompleta = ubicacion
-                android.util.Log.d("CreateJobScreen", "Sede creada inline: $nombre - Ubicación aplicada")
+                val token = AuthManager.token
+                val companyId = AuthManager.userCompanyId
+
+                if (token != null && companyId != null) {
+                    // Crear sede y sincronizar con backend
+                    isSavingSede = true
+                    coroutineScope.launch {
+                        val nuevaSede = SedeEmpresa(
+                            id = java.util.UUID.randomUUID().toString(),
+                            nombre = nombre,
+                            ubicacion = ubicacion,
+                            esPrincipal = esPrincipal,
+                            activa = true
+                        )
+
+                        // Sincronizar con backend (la función ya maneja errores y guarda localmente como fallback)
+                        val sedeCreada = locationRepository.createSedeInBackend(
+                            token = token,
+                            companyId = companyId,
+                            sede = nuevaSede
+                        )
+
+                        isSavingSede = false
+                        showCreateSedeDialog = false
+
+                        // Auto-seleccionar la sede recién creada
+                        selectedUbicacionCompleta = sedeCreada?.ubicacion ?: ubicacion
+                        android.util.Log.d("CreateJobScreen", "Sede creada y sincronizada con backend: $nombre")
+                    }
+                } else {
+                    // Sin autenticación, guardar solo localmente
+                    val nuevaSede = SedeEmpresa(
+                        id = java.util.UUID.randomUUID().toString(),
+                        nombre = nombre,
+                        ubicacion = ubicacion,
+                        esPrincipal = esPrincipal,
+                        activa = true
+                    )
+                    locationRepository.addSede(nuevaSede)
+                    showCreateSedeDialog = false
+                    selectedUbicacionCompleta = ubicacion
+                    android.util.Log.w("CreateJobScreen", "Sede creada solo localmente (sin auth): $nombre")
+                }
             },
             onDismiss = { showCreateSedeDialog = false }
         )

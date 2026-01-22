@@ -256,24 +256,62 @@ fun SmartLocationSelector(
         }
     }
     
+    // Estado para guardar sede en backend
+    var isSavingSede by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
+
     // Diálogo para guardar como sede (solo si la ubicación es válida)
-    if (showSaveAsSedeDialog && pendingLocationToSave != null && 
-        pendingLocationToSave!!.departamento.isNotBlank() && 
+    // IMPORTANTE: La sede se sincroniza con el backend para persistencia
+    if (showSaveAsSedeDialog && pendingLocationToSave != null &&
+        pendingLocationToSave!!.departamento.isNotBlank() &&
         pendingLocationToSave!!.distrito.isNotBlank()) {
         SaveAsSedeDialog(
             ubicacion = pendingLocationToSave!!,
+            isSaving = isSavingSede,
             onConfirm = { nombre, esPrincipal ->
-                val nuevaSede = SedeEmpresa(
-                    id = java.util.UUID.randomUUID().toString(),
-                    nombre = nombre,
-                    ubicacion = pendingLocationToSave!!,
-                    esPrincipal = esPrincipal,
-                    activa = true
-                )
-                locationRepository.addSede(nuevaSede)
-                onSedeCreated?.invoke(nuevaSede)
-                showSaveAsSedeDialog = false
-                pendingLocationToSave = null
+                val token = agrochamba.com.data.AuthManager.token
+                val companyId = agrochamba.com.data.AuthManager.userCompanyId
+
+                if (token != null && companyId != null) {
+                    // Crear sede y sincronizar con backend
+                    isSavingSede = true
+                    coroutineScope.launch {
+                        val nuevaSede = SedeEmpresa(
+                            id = java.util.UUID.randomUUID().toString(),
+                            nombre = nombre,
+                            ubicacion = pendingLocationToSave!!,
+                            esPrincipal = esPrincipal,
+                            activa = true
+                        )
+
+                        // Sincronizar con backend
+                        val sedeCreada = locationRepository.createSedeInBackend(
+                            token = token,
+                            companyId = companyId,
+                            sede = nuevaSede
+                        )
+
+                        isSavingSede = false
+                        onSedeCreated?.invoke(sedeCreada ?: nuevaSede)
+                        showSaveAsSedeDialog = false
+                        pendingLocationToSave = null
+                        android.util.Log.d("SmartLocationSelector", "Sede guardada y sincronizada con backend: $nombre")
+                    }
+                } else {
+                    // Sin autenticación, guardar solo localmente
+                    val nuevaSede = SedeEmpresa(
+                        id = java.util.UUID.randomUUID().toString(),
+                        nombre = nombre,
+                        ubicacion = pendingLocationToSave!!,
+                        esPrincipal = esPrincipal,
+                        activa = true
+                    )
+                    locationRepository.addSede(nuevaSede)
+                    onSedeCreated?.invoke(nuevaSede)
+                    showSaveAsSedeDialog = false
+                    pendingLocationToSave = null
+                    android.util.Log.w("SmartLocationSelector", "Sede guardada solo localmente (sin auth): $nombre")
+                }
             },
             onDismiss = {
                 showSaveAsSedeDialog = false
@@ -1195,6 +1233,7 @@ fun SelectedLocationChip(
 @Composable
 private fun SaveAsSedeDialog(
     ubicacion: UbicacionCompleta,
+    isSaving: Boolean = false,
     onConfirm: (nombre: String, esPrincipal: Boolean) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -1332,11 +1371,12 @@ private fun SaveAsSedeDialog(
                 ) {
                     androidx.compose.material3.OutlinedButton(
                         onClick = onDismiss,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        enabled = !isSaving
                     ) {
                         Text("Omitir")
                     }
-                    
+
                     androidx.compose.material3.Button(
                         onClick = {
                             if (nombre.isBlank()) {
@@ -1345,15 +1385,26 @@ private fun SaveAsSedeDialog(
                                 onConfirm(nombre.trim(), esPrincipal)
                             }
                         },
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        enabled = !isSaving
                     ) {
-                        Icon(
-                            Icons.Default.Check,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Text("Guardar")
+                        if (isSaving) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text("Guardando...")
+                        } else {
+                            Icon(
+                                Icons.Default.Check,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text("Guardar")
+                        }
                     }
                 }
             }

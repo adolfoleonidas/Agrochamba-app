@@ -57,69 +57,76 @@ $orderby_filter = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']
                     </div>
                     
                     <div class="search-input-wrapper location-wrapper">
-                        <input type="hidden" name="ubicacion" id="ubicacion-hidden-search" value="<?php echo esc_attr($ubicacion_filter); ?>">
+                        <input type="hidden" name="ubicacion" id="ubicacion-hidden" value="<?php echo esc_attr($ubicacion_filter); ?>">
                         <?php
-                        // Usar solo los 25 departamentos de Perú
-                        $departamentos = function_exists('agrochamba_get_departamentos')
-                            ? agrochamba_get_departamentos()
+                        // Obtener datos completos de ubicaciones del Perú
+                        $locations_data = function_exists('agrochamba_get_peru_locations')
+                            ? agrochamba_get_peru_locations()
                             : array();
 
-                        // Obtener datos completos para búsqueda
-                        $locations_for_search = function_exists('agrochamba_get_locations_for_js')
-                            ? agrochamba_get_locations_for_js()
-                            : array();
+                        // Departamentos populares (los más buscados)
+                        $popular_departments = array('Lima', 'Ica', 'La Libertad', 'Piura', 'Arequipa', 'Lambayeque');
 
-                        // Obtener nombre del departamento seleccionado
-                        $selected_name = 'Todas las ubicaciones';
-                        foreach ($departamentos as $departamento):
-                            $term = get_term_by('name', $departamento, 'ubicacion');
-                            $slug = $term ? $term->slug : sanitize_title($departamento);
-                            if ($slug === $ubicacion_filter) {
-                                $selected_name = $departamento;
-                                break;
+                        // Obtener información de la ubicación seleccionada
+                        $selected_display = '';
+                        $selected_type = '';
+                        if (!empty($ubicacion_filter)) {
+                            // Buscar el departamento por slug
+                            foreach ($locations_data as $dep) {
+                                $dep_slug = sanitize_title($dep['departamento']);
+                                if ($dep_slug === $ubicacion_filter) {
+                                    $selected_display = $dep['departamento'];
+                                    $selected_type = 'departamento';
+                                    break;
+                                }
                             }
-                        endforeach;
+                        }
                         ?>
-                        <div class="searchable-select" id="ubicacion-searchable-search" data-locations='<?php echo json_encode($locations_for_search, JSON_UNESCAPED_UNICODE); ?>'>
-                            <button type="button" class="searchable-select-trigger" onclick="toggleSearchableSelect('ubicacion-searchable-search')">
+                        <div class="location-search-container" id="location-search">
+                            <div class="location-search-input-wrapper" onclick="openLocationSearch()">
                                 <svg class="location-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
                                     <circle cx="12" cy="10" r="3"/>
                                 </svg>
-                                <span class="searchable-select-text"><?php echo esc_html($selected_name); ?></span>
+                                <span class="location-search-display" id="location-display">
+                                    <?php echo !empty($selected_display) ? esc_html($selected_display) : '¿Dónde buscas trabajo?'; ?>
+                                </span>
+                                <?php if (!empty($ubicacion_filter)): ?>
+                                <button type="button" class="location-clear-btn" onclick="clearLocationFilter(event)">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="18" y1="6" x2="6" y2="18"/>
+                                        <line x1="6" y1="6" x2="18" y2="18"/>
+                                    </svg>
+                                </button>
+                                <?php else: ?>
                                 <svg class="dropdown-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <polyline points="6 9 12 15 18 9"/>
                                 </svg>
-                            </button>
-                            <div class="searchable-select-dropdown">
-                                <div class="searchable-select-search">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <circle cx="11" cy="11" r="8"/>
-                                        <path d="m21 21-4.35-4.35"/>
-                                    </svg>
-                                    <input type="text" class="searchable-select-input" placeholder="Buscar ubicación..." oninput="filterLocationOptions(this, 'ubicacion-searchable-search')">
+                                <?php endif; ?>
+                            </div>
+
+                            <div class="location-search-dropdown" id="location-dropdown">
+                                <div class="location-search-header">
+                                    <input type="text"
+                                           class="location-search-field"
+                                           id="location-search-input"
+                                           placeholder="Buscar departamento, provincia o distrito..."
+                                           oninput="searchLocations(this.value)"
+                                           autocomplete="off">
                                 </div>
-                                <div class="searchable-select-options">
-                                    <div class="searchable-select-option <?php echo empty($ubicacion_filter) ? 'selected' : ''; ?>"
-                                         data-value=""
-                                         data-departamento=""
-                                         onclick="selectSearchableOptionSearch(this, 'ubicacion-searchable-search')">
-                                        Todas las ubicaciones
-                                    </div>
-                                    <?php foreach ($departamentos as $departamento):
-                                        $term = get_term_by('name', $departamento, 'ubicacion');
-                                        $slug = $term ? $term->slug : sanitize_title($departamento);
-                                    ?>
-                                    <div class="searchable-select-option <?php echo ($slug === $ubicacion_filter) ? 'selected' : ''; ?>"
-                                         data-value="<?php echo esc_attr($slug); ?>"
-                                         data-departamento="<?php echo esc_attr($departamento); ?>"
-                                         onclick="selectSearchableOptionSearch(this, 'ubicacion-searchable-search')">
-                                        <?php echo esc_html($departamento); ?>
-                                    </div>
-                                    <?php endforeach; ?>
+
+                                <div class="location-search-results" id="location-results">
+                                    <!-- Resultados se cargan dinámicamente -->
                                 </div>
                             </div>
                         </div>
+
+                        <script>
+                        // Datos de ubicaciones del Perú
+                        const peruLocations = <?php echo json_encode($locations_data, JSON_UNESCAPED_UNICODE); ?>;
+                        const popularDepartments = <?php echo json_encode($popular_departments); ?>;
+                        const archiveUrl = '<?php echo esc_url(get_post_type_archive_link('trabajo')); ?>';
+                        </script>
                     </div>
                     
                     <button type="submit" class="search-submit-btn">
@@ -205,8 +212,18 @@ $orderby_filter = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']
                     $ubicaciones = wp_get_post_terms($trabajo_id, 'ubicacion', array('fields' => 'names'));
                     $cultivos = wp_get_post_terms($trabajo_id, 'cultivo', array('fields' => 'names'));
                     $empresas = wp_get_post_terms($trabajo_id, 'empresa', array('fields' => 'names'));
-                    
-                    $ubicacion = !empty($ubicaciones) ? $ubicaciones[0] : '';
+
+                    // Obtener ubicación - TAXONOMÍA COMO FUENTE ÚNICA
+                    $ubicacion_data = function_exists('agrochamba_get_job_location')
+                        ? agrochamba_get_job_location($trabajo_id)
+                        : null;
+
+                    $ubicacion = '';
+                    if ($ubicacion_data && !empty($ubicacion_data['departamento'])) {
+                        $ubicacion = $ubicacion_data['departamento'];
+                    } elseif (!empty($ubicaciones)) {
+                        $ubicacion = $ubicaciones[0];
+                    }
                     $cultivo = !empty($cultivos) ? $cultivos[0] : '';
                     $empresa = !empty($empresas) ? $empresas[0] : '';
                     
@@ -742,13 +759,13 @@ $orderby_filter = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']
     position: relative;
 }
 
-/* Searchable Select Component */
-.searchable-select {
+/* Location Search Component - Estilo App */
+.location-search-container {
     position: relative;
     width: 100%;
 }
 
-.searchable-select-trigger {
+.location-search-input-wrapper {
     display: flex;
     align-items: center;
     gap: 12px;
@@ -757,46 +774,68 @@ $orderby_filter = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']
     background: #fff;
     border: 2px solid #e0e0e0;
     border-radius: 12px;
-    font-size: 16px;
-    color: #333;
     cursor: pointer;
     transition: all 0.2s;
-    text-align: left;
 }
 
-.searchable-select-trigger:hover {
+.location-search-input-wrapper:hover {
     border-color: #4CAF50;
 }
 
-.searchable-select.open .searchable-select-trigger {
+.location-search-container.open .location-search-input-wrapper {
     border-color: #4CAF50;
     border-bottom-left-radius: 0;
     border-bottom-right-radius: 0;
 }
 
-.searchable-select-trigger .location-icon {
+.location-search-input-wrapper .location-icon {
     color: #4CAF50;
     flex-shrink: 0;
 }
 
-.searchable-select-text {
+.location-search-display {
     flex: 1;
+    font-size: 16px;
+    color: #333;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.searchable-select-trigger .dropdown-icon {
+.location-search-display:empty::before,
+.location-search-input-wrapper:not(.has-value) .location-search-display {
+    color: #999;
+}
+
+.location-clear-btn {
+    background: none;
+    border: none;
+    padding: 4px;
+    cursor: pointer;
+    color: #999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.2s;
+}
+
+.location-clear-btn:hover {
+    background: #f0f0f0;
+    color: #333;
+}
+
+.location-search-input-wrapper .dropdown-icon {
     color: #999;
     flex-shrink: 0;
     transition: transform 0.2s;
 }
 
-.searchable-select.open .searchable-select-trigger .dropdown-icon {
+.location-search-container.open .dropdown-icon {
     transform: rotate(180deg);
 }
 
-.searchable-select-dropdown {
+.location-search-dropdown {
     display: none;
     position: absolute;
     top: 100%;
@@ -809,99 +848,116 @@ $orderby_filter = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']
     border-bottom-right-radius: 12px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
     z-index: 1000;
-    max-height: 320px;
+    max-height: 400px;
     overflow: hidden;
 }
 
-.searchable-select.open .searchable-select-dropdown {
+.location-search-container.open .location-search-dropdown {
     display: block;
 }
 
-.searchable-select-search {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+.location-search-header {
     padding: 12px 16px;
     border-bottom: 1px solid #e0e0e0;
     background: #f9f9f9;
 }
 
-.searchable-select-search svg {
-    color: #999;
-    flex-shrink: 0;
-}
-
-.searchable-select-input {
-    flex: 1;
-    border: none;
-    background: transparent;
+.location-search-field {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
     font-size: 14px;
     outline: none;
-    color: #333;
+    transition: border-color 0.2s;
 }
 
-.searchable-select-input::placeholder {
+.location-search-field:focus {
+    border-color: #4CAF50;
+}
+
+.location-search-field::placeholder {
     color: #999;
 }
 
-.searchable-select-options {
-    max-height: 250px;
+.location-search-results {
+    max-height: 320px;
     overflow-y: auto;
 }
 
-.searchable-select-option {
+/* Sección de resultados */
+.location-section {
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.location-section:last-child {
+    border-bottom: none;
+}
+
+.location-section-title {
+    padding: 10px 16px 6px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: #888;
+    background: #fafafa;
+    letter-spacing: 0.5px;
+}
+
+/* Item de ubicación */
+.location-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
     padding: 12px 16px;
     cursor: pointer;
     transition: background 0.15s;
-    font-size: 15px;
 }
 
-.searchable-select-option:hover {
+.location-item:hover {
     background: #f5f5f5;
 }
 
-.searchable-select-option.selected {
+.location-item.selected {
     background: #e8f5e9;
-    color: #2e7d32;
-    font-weight: 500;
 }
 
-.searchable-select-option.hidden {
-    display: none;
-}
-
-.searchable-select-no-results {
-    padding: 16px;
+.location-item-icon {
+    font-size: 20px;
+    line-height: 1;
+    flex-shrink: 0;
+    width: 28px;
     text-align: center;
-    color: #999;
-    font-size: 14px;
 }
 
-.searchable-select-option.match-child {
-    background: #fff8e1;
+.location-item-content {
+    flex: 1;
+    min-width: 0;
 }
 
-.searchable-select-option.match-child:hover {
-    background: #ffecb3;
+.location-item-title {
+    font-size: 15px;
+    font-weight: 500;
+    color: #333;
+    margin-bottom: 2px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
-.match-hint {
-    display: block;
-    font-size: 12px;
+.location-item-subtitle {
+    font-size: 13px;
     color: #666;
-    margin-top: 2px;
-    font-weight: 400;
 }
 
-.location-tag {
+/* Tags de tipo */
+.location-type-tag {
     display: inline-block;
     padding: 2px 6px;
     border-radius: 4px;
     font-size: 10px;
     font-weight: 600;
     text-transform: uppercase;
-    margin-left: 6px;
-    vertical-align: middle;
 }
 
 .tag-departamento {
@@ -917,6 +973,32 @@ $orderby_filter = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']
 .tag-distrito {
     background: #f3e5f5;
     color: #7b1fa2;
+}
+
+/* Item especial "Todo el Perú" */
+.location-item.all-peru {
+    background: linear-gradient(135deg, #e8f5e9 0%, #fff 100%);
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.location-item.all-peru:hover {
+    background: linear-gradient(135deg, #c8e6c9 0%, #f5f5f5 100%);
+}
+
+/* Sin resultados */
+.location-no-results {
+    padding: 24px 16px;
+    text-align: center;
+    color: #999;
+}
+
+.location-no-results-icon {
+    font-size: 32px;
+    margin-bottom: 8px;
+}
+
+.location-no-results-text {
+    font-size: 14px;
 }
 
 .search-submit-btn {
@@ -1780,36 +1862,8 @@ $orderby_filter = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']
 
 <script>
 // ==========================================
-// Searchable Select Component
+// Location Search Component - Estilo App
 // ==========================================
-function toggleSearchableSelect(selectId) {
-    const select = document.getElementById(selectId);
-    const isOpen = select.classList.contains('open');
-
-    // Cerrar todos los otros selects abiertos
-    document.querySelectorAll('.searchable-select.open').forEach(s => {
-        if (s.id !== selectId) {
-            s.classList.remove('open');
-        }
-    });
-
-    // Toggle el select actual
-    select.classList.toggle('open');
-
-    // Si se abre, enfocar el input de búsqueda y limpiar highlights
-    if (!isOpen) {
-        const input = select.querySelector('.searchable-select-input');
-        if (input) {
-            setTimeout(() => input.focus(), 100);
-        }
-        // Limpiar cualquier highlight anterior
-        select.querySelectorAll('.searchable-select-option').forEach(opt => {
-            opt.classList.remove('match-child');
-            const hint = opt.querySelector('.match-hint');
-            if (hint) hint.remove();
-        });
-    }
-}
 
 // Normalizar texto para búsqueda (remover acentos)
 function normalizeText(text) {
@@ -1819,160 +1873,296 @@ function normalizeText(text) {
         .trim();
 }
 
-// Buscar en departamentos, provincias y distritos
-function filterLocationOptions(input, selectId) {
-    const select = document.getElementById(selectId);
-    const filter = normalizeText(input.value);
-    const options = select.querySelectorAll('.searchable-select-option');
-    const locationsData = JSON.parse(select.getAttribute('data-locations') || '{}');
-    let visibleCount = 0;
+// Abrir el buscador de ubicaciones
+function openLocationSearch() {
+    const container = document.getElementById('location-search');
+    const dropdown = document.getElementById('location-dropdown');
+    const input = document.getElementById('location-search-input');
 
-    options.forEach(option => {
-        const departamento = option.getAttribute('data-departamento');
-        const optionText = normalizeText(option.textContent);
+    container.classList.add('open');
 
-        // Limpiar estado anterior
-        option.classList.remove('hidden', 'match-child');
-        const oldHint = option.querySelector('.match-hint');
-        if (oldHint) oldHint.remove();
+    // Enfocar el input
+    setTimeout(() => {
+        input.focus();
+    }, 100);
 
-        // Si no hay filtro, mostrar todo
-        if (!filter) {
-            visibleCount++;
-            return;
+    // Mostrar departamentos populares por defecto
+    showPopularDepartments();
+}
+
+// Cerrar el buscador de ubicaciones
+function closeLocationSearch() {
+    const container = document.getElementById('location-search');
+    const input = document.getElementById('location-search-input');
+
+    container.classList.remove('open');
+    input.value = '';
+}
+
+// Mostrar departamentos populares
+function showPopularDepartments() {
+    const results = document.getElementById('location-results');
+
+    let html = '';
+
+    // Opción "Todo el Perú"
+    html += `
+        <div class="location-item all-peru" onclick="selectLocation('all', '', '', '', 'Todo el Perú')">
+            <span class="location-item-icon">🇵🇪</span>
+            <div class="location-item-content">
+                <div class="location-item-title">Todo el Perú</div>
+                <div class="location-item-subtitle">Ver todas las ubicaciones</div>
+            </div>
+        </div>
+    `;
+
+    // Sección de departamentos populares
+    html += `<div class="location-section">
+        <div class="location-section-title">📈 Departamentos populares</div>`;
+
+    popularDepartments.forEach(depName => {
+        html += `
+            <div class="location-item" onclick="selectLocation('departamento', '${depName}', '', '', '${depName}')">
+                <span class="location-item-icon">📍</span>
+                <div class="location-item-content">
+                    <div class="location-item-title">
+                        ${depName}
+                        <span class="location-type-tag tag-departamento">Departamento</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    html += `</div>`;
+
+    // Todos los departamentos
+    html += `<div class="location-section">
+        <div class="location-section-title">🗺️ Todos los departamentos</div>`;
+
+    peruLocations.forEach(loc => {
+        const depName = loc.departamento;
+        if (!popularDepartments.includes(depName)) {
+            html += `
+                <div class="location-item" onclick="selectLocation('departamento', '${depName}', '', '', '${depName}')">
+                    <span class="location-item-icon">📍</span>
+                    <div class="location-item-content">
+                        <div class="location-item-title">
+                            ${depName}
+                            <span class="location-type-tag tag-departamento">Departamento</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+    });
+
+    html += `</div>`;
+
+    results.innerHTML = html;
+}
+
+// Buscar ubicaciones
+function searchLocations(query) {
+    const results = document.getElementById('location-results');
+    const normalizedQuery = normalizeText(query);
+
+    // Si no hay búsqueda, mostrar departamentos populares
+    if (!normalizedQuery) {
+        showPopularDepartments();
+        return;
+    }
+
+    let matches = [];
+
+    // Buscar en todos los niveles
+    peruLocations.forEach(loc => {
+        const depName = loc.departamento;
+        const depNormalized = normalizeText(depName);
+
+        // Buscar en departamento
+        if (depNormalized.includes(normalizedQuery)) {
+            matches.push({
+                type: 'departamento',
+                name: depName,
+                departamento: depName,
+                provincia: '',
+                distrito: '',
+                display: depName,
+                subtitle: '',
+                score: depNormalized === normalizedQuery ? 100 : 50
+            });
         }
 
-        // Opción "Todas las ubicaciones"
-        if (!departamento) {
-            if (filter) {
-                option.classList.add('hidden');
-            } else {
-                visibleCount++;
-            }
-            return;
-        }
+        // Buscar en provincias
+        if (loc.provincias) {
+            loc.provincias.forEach(prov => {
+                const provName = prov.provincia;
+                const provNormalized = normalizeText(provName);
 
-        // Buscar coincidencia directa en el departamento
-        if (optionText.includes(filter)) {
-            visibleCount++;
-            return;
-        }
-
-        // Buscar en provincias y distritos de este departamento
-        const provincias = locationsData[departamento];
-        if (provincias) {
-            let matchFound = null;
-
-            for (const provincia in provincias) {
-                if (normalizeText(provincia).includes(filter)) {
-                    matchFound = { type: 'provincia', name: provincia };
-                    break;
+                if (provNormalized.includes(normalizedQuery)) {
+                    matches.push({
+                        type: 'provincia',
+                        name: provName,
+                        departamento: depName,
+                        provincia: provName,
+                        distrito: '',
+                        display: provName,
+                        subtitle: depName,
+                        score: provNormalized === normalizedQuery ? 90 : 40
+                    });
                 }
 
-                const distritos = provincias[provincia];
-                if (Array.isArray(distritos)) {
-                    for (const distrito of distritos) {
-                        if (normalizeText(distrito).includes(filter)) {
-                            matchFound = { type: 'distrito', name: distrito, provincia: provincia };
-                            break;
+                // Buscar en distritos
+                if (prov.distritos) {
+                    prov.distritos.forEach(dist => {
+                        const distNormalized = normalizeText(dist);
+
+                        if (distNormalized.includes(normalizedQuery)) {
+                            matches.push({
+                                type: 'distrito',
+                                name: dist,
+                                departamento: depName,
+                                provincia: provName,
+                                distrito: dist,
+                                display: dist,
+                                subtitle: `${provName}, ${depName}`,
+                                score: distNormalized === normalizedQuery ? 80 : 30
+                            });
                         }
-                    }
+                    });
                 }
-                if (matchFound) break;
-            }
-
-            if (matchFound) {
-                visibleCount++;
-                option.classList.add('match-child');
-
-                // Agregar hint con etiqueta de tipo (como en la app)
-                const hint = document.createElement('span');
-                hint.className = 'match-hint';
-                if (matchFound.type === 'provincia') {
-                    hint.innerHTML = `${matchFound.name} <span class="location-tag tag-provincia">Provincia</span>`;
-                } else {
-                    hint.innerHTML = `${matchFound.name}, ${matchFound.provincia} <span class="location-tag tag-distrito">Distrito</span>`;
-                }
-                option.appendChild(hint);
-                return;
-            }
+            });
         }
-
-        option.classList.add('hidden');
     });
 
-    // Mostrar mensaje de "sin resultados"
-    let noResults = select.querySelector('.searchable-select-no-results');
-    if (visibleCount === 0) {
-        if (!noResults) {
-            noResults = document.createElement('div');
-            noResults.className = 'searchable-select-no-results';
-            noResults.textContent = 'No se encontraron ubicaciones';
-            select.querySelector('.searchable-select-options').appendChild(noResults);
+    // Ordenar por score
+    matches.sort((a, b) => b.score - a.score);
+
+    // Limitar resultados
+    matches = matches.slice(0, 20);
+
+    // Mostrar resultados
+    if (matches.length === 0) {
+        results.innerHTML = `
+            <div class="location-no-results">
+                <div class="location-no-results-icon">🔍</div>
+                <div class="location-no-results-text">No se encontraron ubicaciones para "${query}"</div>
+            </div>
+        `;
+        return;
+    }
+
+    let html = `<div class="location-section">
+        <div class="location-section-title">🔍 Resultados de búsqueda</div>`;
+
+    matches.forEach(match => {
+        const icon = match.type === 'departamento' ? '📍' : (match.type === 'provincia' ? '🏘️' : '📌');
+        const tagClass = match.type === 'departamento' ? 'tag-departamento' : (match.type === 'provincia' ? 'tag-provincia' : 'tag-distrito');
+        const tagText = match.type.charAt(0).toUpperCase() + match.type.slice(1);
+
+        html += `
+            <div class="location-item" onclick="selectLocation('${match.type}', '${match.departamento}', '${match.provincia}', '${match.distrito}', '${match.display}')">
+                <span class="location-item-icon">${icon}</span>
+                <div class="location-item-content">
+                    <div class="location-item-title">
+                        ${match.display}
+                        <span class="location-type-tag ${tagClass}">${tagText}</span>
+                    </div>
+                    ${match.subtitle ? `<div class="location-item-subtitle">${match.subtitle}</div>` : ''}
+                </div>
+            </div>
+        `;
+    });
+
+    html += `</div>`;
+    results.innerHTML = html;
+}
+
+// Seleccionar ubicación
+function selectLocation(type, departamento, provincia, distrito, displayLabel) {
+    const hiddenInput = document.getElementById('ubicacion-hidden');
+    const displayEl = document.getElementById('location-display');
+
+    // Si es "Todo el Perú", limpiar filtro
+    if (type === 'all') {
+        hiddenInput.value = '';
+        displayEl.textContent = '¿Dónde buscas trabajo?';
+        closeLocationSearch();
+
+        // Navegar a la página principal de trabajos
+        const searchInput = document.getElementById('search-input-field');
+        const searchValue = searchInput ? searchInput.value.trim() : '';
+
+        if (searchValue) {
+            const url = new URL(archiveUrl, window.location.origin);
+            url.searchParams.set('s', searchValue);
+            window.location.href = url.toString();
+        } else {
+            window.location.href = archiveUrl;
         }
-        noResults.style.display = 'block';
-    } else if (noResults) {
-        noResults.style.display = 'none';
+        return;
+    }
+
+    // Siempre filtrar por departamento (include_children se encarga de incluir provincias y distritos)
+    const depSlug = departamento.toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, '-');
+
+    hiddenInput.value = depSlug;
+    displayEl.textContent = displayLabel;
+    closeLocationSearch();
+
+    // Construir URL de taxonomía
+    const termLink = `/ubicacion/${depSlug}/`;
+    const searchInput = document.getElementById('search-input-field');
+    const searchValue = searchInput ? searchInput.value.trim() : '';
+
+    if (searchValue) {
+        const url = new URL(termLink, window.location.origin);
+        url.searchParams.set('s', searchValue);
+        window.location.href = url.toString();
+    } else {
+        window.location.href = termLink;
     }
 }
 
-function selectSearchableOptionSearch(option, selectId) {
-    const select = document.getElementById(selectId);
-    const value = option.getAttribute('data-value');
-    const departamento = option.getAttribute('data-departamento');
-    const text = departamento || 'Todas las ubicaciones';
+// Limpiar filtro de ubicación
+function clearLocationFilter(event) {
+    event.stopPropagation();
 
-    // Actualizar el input hidden
-    const hiddenInput = document.getElementById('ubicacion-hidden-search');
-    if (hiddenInput) {
-        hiddenInput.value = value;
-    }
+    const hiddenInput = document.getElementById('ubicacion-hidden');
+    const displayEl = document.getElementById('location-display');
 
-    // Actualizar el texto visible
-    const trigger = select.querySelector('.searchable-select-text');
-    if (trigger) {
-        trigger.textContent = text;
-    }
+    hiddenInput.value = '';
+    displayEl.textContent = '¿Dónde buscas trabajo?';
 
-    // Limpiar hints y estados de todas las opciones
-    select.querySelectorAll('.searchable-select-option').forEach(opt => {
-        opt.classList.remove('selected', 'match-child', 'hidden');
-        const hint = opt.querySelector('.match-hint');
-        if (hint) hint.remove();
-    });
-    option.classList.add('selected');
+    // Navegar a la página principal de trabajos
+    const searchInput = document.getElementById('search-input-field');
+    const searchValue = searchInput ? searchInput.value.trim() : '';
 
-    // Cerrar el dropdown
-    select.classList.remove('open');
-
-    // Limpiar el filtro
-    const input = select.querySelector('.searchable-select-input');
-    if (input) {
-        input.value = '';
-    }
-
-    // Enviar el formulario
-    const form = select.closest('form');
-    if (form) {
-        form.submit();
+    if (searchValue) {
+        const url = new URL(archiveUrl, window.location.origin);
+        url.searchParams.set('s', searchValue);
+        window.location.href = url.toString();
+    } else {
+        window.location.href = archiveUrl;
     }
 }
 
-// Cerrar el select al hacer clic fuera
+// Cerrar el buscador al hacer clic fuera
 document.addEventListener('click', function(e) {
-    if (!e.target.closest('.searchable-select')) {
-        document.querySelectorAll('.searchable-select.open').forEach(select => {
-            select.classList.remove('open');
-        });
+    const container = document.getElementById('location-search');
+    if (container && !e.target.closest('.location-search-container')) {
+        closeLocationSearch();
     }
 });
 
-// Cerrar el select con Escape
+// Cerrar con Escape
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
-        document.querySelectorAll('.searchable-select.open').forEach(select => {
-            select.classList.remove('open');
-        });
+        closeLocationSearch();
     }
 });
 

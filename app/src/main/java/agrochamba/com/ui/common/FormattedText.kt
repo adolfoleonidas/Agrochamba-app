@@ -37,8 +37,26 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /**
+ * Elimina tags HTML de forma rápida sin usar regex (para placeholder).
+ * Usada cuando el texto procesado aún no está listo.
+ */
+private fun removeHtmlTagsFast(html: String): String {
+    val sb = StringBuilder(html.length)
+    var inTag = false
+    for (c in html) {
+        when {
+            c == '<' -> inTag = true
+            c == '>' -> inTag = false
+            !inTag -> sb.append(c)
+        }
+    }
+    return sb.toString().trim()
+}
+
+/**
  * Componente que renderiza texto con formato HTML/Markdown de forma visual
  * Detecta automáticamente teléfonos, emails y URLs y los hace clickeables
+ * OPTIMIZADO: Procesa el texto en background para evitar ANR
  */
 @Composable
 fun FormattedText(
@@ -50,13 +68,29 @@ fun FormattedText(
     val defaultColor = style.color ?: colorScheme.onSurface
     val context = LocalContext.current
     val primaryColor = colorScheme.primary
-    
+
     val density = LocalDensity.current
     val iconSize = with(density) { 18.dp.toSp() }
-    
-    val annotatedStringWithIcons = remember(text, defaultColor, primaryColor, iconSize) {
+
+    // Estado para el texto procesado en background
+    var annotatedStringWithIcons by remember { mutableStateOf<AnnotatedString?>(null) }
+
+    // Procesar texto en background para evitar ANR
+    androidx.compose.runtime.LaunchedEffect(text, defaultColor, primaryColor, iconSize) {
+        annotatedStringWithIcons = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            buildAnnotatedString {
+                parseFormattedText(text, style, defaultColor, primaryColor)
+            }
+        }
+    }
+
+    // Mostrar texto simple mientras se procesa, o el texto formateado cuando esté listo
+    val displayText = annotatedStringWithIcons ?: remember(text) {
+        // Mostrar texto plano mientras se procesa (sin regex para evitar ANR)
         buildAnnotatedString {
-            parseFormattedText(text, style, defaultColor, primaryColor)
+            val plainText = removeHtmlTagsFast(text.take(500))
+            append(plainText)
+            if (text.length > 500) append("...")
         }
     }
     
@@ -96,13 +130,13 @@ fun FormattedText(
     var textLayoutResult by remember { mutableStateOf<androidx.compose.ui.text.TextLayoutResult?>(null) }
     
     Text(
-        text = annotatedStringWithIcons,
+        text = displayText,
         style = style.copy(lineHeight = style.lineHeight ?: 24.sp),
-        modifier = modifier.pointerInput(Unit) {
+        modifier = modifier.pointerInput(displayText) {
             detectTapGestures { tapOffset ->
                 textLayoutResult?.let { layout ->
                     val offset = layout.getOffsetForPosition(tapOffset)
-                    handleTextClick(offset, annotatedStringWithIcons, context)
+                    handleTextClick(offset, displayText, context)
                 }
             }
         },
@@ -318,108 +352,163 @@ private fun cleanBrokenMarkers(text: String): String {
 /**
  * Convierte HTML básico a Markdown para visualización
  */
+/**
+ * Convierte HTML a Markdown para mostrar en FormattedText.
+ * OPTIMIZADO: Sin regex con DOT_MATCHES_ALL - usa métodos de String.
+ */
 private fun String.htmlToMarkdownForDisplay(): String {
-    var markdown = this
-    
-    // PRIMERO: Eliminar elementos problemáticos que pueden dejar iconos o espacios
-    // Estos elementos se eliminan completamente con su contenido
-    val problematicTags = listOf(
-        "object", "embed", "iframe", "applet", "param",
-        "script", "style", "noscript"
-    )
-    
-    problematicTags.forEach { tag ->
-        // Eliminar tags de apertura y cierre con todo su contenido
-        markdown = markdown.replace(
-            Regex("<$tag[^>]*>.*?</$tag>", setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)),
-            ""
-        )
-        // Eliminar tags auto-cerrados
-        markdown = markdown.replace(
-            Regex("<$tag[^>]*/?>", RegexOption.IGNORE_CASE),
-            ""
-        )
-    }
-    
-    // Eliminar imágenes que pueden dejar espacios o iconos
-    markdown = markdown.replace(
-        Regex("<img[^>]*>", RegexOption.IGNORE_CASE),
-        ""
-    )
-    
-    // SEGUNDO: Decodificar SOLO entidades HTML numéricas y nombradas (NO usar Html.fromHtml que elimina tags)
+    if (this.isBlank()) return ""
+
+    // Limitar tamaño para evitar ANR
+    var markdown = if (this.length > 15000) this.take(15000) else this
+
+    // Eliminar tags problemáticos SIN REGEX (usando indexOf/substring)
+    markdown = removeTagContentFast(markdown, "script")
+    markdown = removeTagContentFast(markdown, "style")
+    markdown = removeTagContentFast(markdown, "noscript")
+    markdown = removeTagContentFast(markdown, "iframe")
+    markdown = removeTagContentFast(markdown, "object")
+    markdown = removeTagContentFast(markdown, "embed")
+    markdown = removeSelfClosingTagFast(markdown, "img")
+
+    // Decodificar entidades HTML
     markdown = decodeHtmlEntitiesOnly(markdown)
-    
-    // Convertir <strong> y <b> a **
-    markdown = Regex("<strong>(.*?)</strong>", RegexOption.DOT_MATCHES_ALL).replace(markdown) { 
-        "**${it.groupValues[1]}**"
-    }
-    markdown = Regex("<b>(.*?)</b>", RegexOption.DOT_MATCHES_ALL).replace(markdown) { 
-        "**${it.groupValues[1]}**"
-    }
-    
-    // Convertir <em> y <i> a *
-    markdown = Regex("<em>(.*?)</em>", RegexOption.DOT_MATCHES_ALL).replace(markdown) { 
-        "*${it.groupValues[1]}*"
-    }
-    markdown = Regex("<i>(.*?)</i>", RegexOption.DOT_MATCHES_ALL).replace(markdown) { 
-        "*${it.groupValues[1]}*"
-    }
-    
-    // Convertir listas numeradas (manejar tanto con saltos de línea como sin ellos)
-    markdown = Regex("<ol[^>]*>(.*?)</ol>", setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)).replace(markdown) { listMatch ->
-        var counter = 1
-        val listContent = listMatch.groupValues[1]
-        val itemsList = mutableListOf<String>()
-        Regex("<li[^>]*>(.*?)</li>", setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)).findAll(listContent).forEach { liMatch ->
-            val itemContent = liMatch.groupValues[1].trim()
-                .replace(Regex("<[^>]+>"), "") // Limpiar HTML interno
-                .replace(Regex("\\s+"), " ") // Normalizar espacios
-                .trim()
-            if (itemContent.isNotEmpty()) {
-                itemsList.add("${counter++}. $itemContent")
-            }
-        }
-        itemsList.joinToString("\n")
-    }
-    
-    // Convertir listas con viñetas (manejar tanto con saltos de línea como sin ellos)
-    markdown = Regex("<ul[^>]*>(.*?)</ul>", setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)).replace(markdown) { listMatch ->
-        val listContent = listMatch.groupValues[1]
-        val itemsList = mutableListOf<String>()
-        Regex("<li[^>]*>(.*?)</li>", setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)).findAll(listContent).forEach { liMatch ->
-            val itemContent = liMatch.groupValues[1].trim()
-                .replace(Regex("<[^>]+>"), "") // Limpiar HTML interno
-                .replace(Regex("\\s+"), " ") // Normalizar espacios
-                .trim()
-            if (itemContent.isNotEmpty()) {
-                itemsList.add("- $itemContent")
-            }
-        }
-        itemsList.joinToString("\n")
-    }
-    
-    // Convertir <p> - usar un solo salto de línea para evitar espacios excesivos
-    markdown = Regex("<p[^>]*>(.*?)</p>", RegexOption.DOT_MATCHES_ALL).replace(markdown) { 
-        val content = it.groupValues[1].trim()
-        if (content.isNotEmpty()) "$content\n" else ""
-    }
-    
-    // Convertir <br> a saltos de línea simples
-    markdown = Regex("<br\\s*/?>", RegexOption.IGNORE_CASE).replace(markdown, "\n")
-    
-    // Limpiar HTML restante pero preservar saltos de línea
-    markdown = Regex("<[^>]+>").replace(markdown, "")
-    
-    // Normalizar espacios en blanco
+
+    // Convertir tags de formato a Markdown (SIN DOT_MATCHES_ALL)
+    markdown = convertSimpleTagToMarkdown(markdown, "strong", "**")
+    markdown = convertSimpleTagToMarkdown(markdown, "b", "**")
+    markdown = convertSimpleTagToMarkdown(markdown, "em", "*")
+    markdown = convertSimpleTagToMarkdown(markdown, "i", "*")
+
+    // Convertir listas (método simplificado sin regex pesadas)
+    markdown = convertListsSimple(markdown)
+
+    // Convertir <p> y <br> usando String.replace (sin regex)
+    markdown = markdown
+        .replace("</p>", "\n", ignoreCase = true)
+        .replace("<p>", "", ignoreCase = true)
+        .replace("<br>", "\n", ignoreCase = true)
+        .replace("<br/>", "\n", ignoreCase = true)
+        .replace("<br />", "\n", ignoreCase = true)
+
+    // Eliminar tags HTML restantes
+    markdown = removeAllTagsFast(markdown)
+
+    // Normalizar espacios
     markdown = markdown.lines()
-        .map { it.trim() } // Trim cada línea
+        .map { it.trim() }
         .joinToString("\n")
-    
-    // Limpiar saltos de línea excesivos (más de 2 consecutivos a solo 1 línea vacía)
-    markdown = Regex("\\n{2,}").replace(markdown, "\n\n")
-    
+        .replace(Regex("\\n{3,}"), "\n\n") // Esta regex es simple y rápida
+
     return markdown.trim()
+}
+
+/** Elimina un tag y su contenido usando indexOf (sin regex) */
+private fun removeTagContentFast(html: String, tag: String): String {
+    if (!html.contains("<$tag", ignoreCase = true)) return html
+
+    val sb = StringBuilder(html.length)
+    var i = 0
+    val len = html.length
+    val openTag = "<$tag"
+    val closeTag = "</$tag>"
+
+    while (i < len) {
+        val start = html.indexOf(openTag, i, ignoreCase = true)
+        if (start == -1) {
+            sb.append(html, i, len)
+            break
+        }
+        sb.append(html, i, start)
+        val end = html.indexOf(closeTag, start, ignoreCase = true)
+        i = if (end != -1) end + closeTag.length else {
+            val tagEnd = html.indexOf('>', start)
+            if (tagEnd != -1) tagEnd + 1 else start + openTag.length
+        }
+    }
+    return sb.toString()
+}
+
+/** Elimina tags auto-cerrados (sin regex) */
+private fun removeSelfClosingTagFast(html: String, tag: String): String {
+    if (!html.contains("<$tag", ignoreCase = true)) return html
+
+    val sb = StringBuilder(html.length)
+    var i = 0
+    val openTag = "<$tag"
+
+    while (i < html.length) {
+        val start = html.indexOf(openTag, i, ignoreCase = true)
+        if (start == -1) {
+            sb.append(html, i, html.length)
+            break
+        }
+        sb.append(html, i, start)
+        val tagEnd = html.indexOf('>', start)
+        i = if (tagEnd != -1) tagEnd + 1 else start + openTag.length
+    }
+    return sb.toString()
+}
+
+/** Convierte un tag simple a Markdown (ej: <strong>texto</strong> → **texto**) */
+private fun convertSimpleTagToMarkdown(html: String, tag: String, marker: String): String {
+    if (!html.contains("<$tag>", ignoreCase = true)) return html
+
+    var result = html
+    var iterations = 0
+    val maxIterations = 100
+
+    while (iterations < maxIterations) {
+        val openStart = result.indexOf("<$tag>", ignoreCase = true)
+        if (openStart == -1) break
+
+        val closeTag = "</$tag>"
+        val closeStart = result.indexOf(closeTag, openStart, ignoreCase = true)
+        if (closeStart == -1) {
+            // No hay tag de cierre, solo eliminar el de apertura
+            result = result.substring(0, openStart) + result.substring(openStart + tag.length + 2)
+            iterations++
+            continue
+        }
+
+        val content = result.substring(openStart + tag.length + 2, closeStart)
+        result = result.substring(0, openStart) + marker + content + marker + result.substring(closeStart + closeTag.length)
+        iterations++
+    }
+
+    return result
+}
+
+/** Convierte listas HTML a Markdown de forma simplificada */
+private fun convertListsSimple(html: String): String {
+    var result = html
+
+    // Reemplazar <li> con viñetas (simplificado)
+    result = result
+        .replace("<li>", "\n- ", ignoreCase = true)
+        .replace("</li>", "", ignoreCase = true)
+        .replace("<ul>", "\n", ignoreCase = true)
+        .replace("</ul>", "\n", ignoreCase = true)
+        .replace("<ol>", "\n", ignoreCase = true)
+        .replace("</ol>", "\n", ignoreCase = true)
+
+    return result
+}
+
+/** Elimina todos los tags HTML (sin regex) */
+private fun removeAllTagsFast(html: String): String {
+    val sb = StringBuilder(html.length)
+    var inTag = false
+
+    for (c in html) {
+        when {
+            c == '<' -> inTag = true
+            c == '>' -> inTag = false
+            !inTag -> sb.append(c)
+        }
+    }
+
+    return sb.toString()
 }
 
 /**

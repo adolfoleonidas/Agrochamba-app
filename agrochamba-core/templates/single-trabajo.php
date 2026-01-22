@@ -81,61 +81,28 @@ $alimentacion = get_post_meta($trabajo_id, 'alimentacion', true);
 $experiencia = get_post_meta($trabajo_id, 'experiencia', true);
 $estado = get_post_meta($trabajo_id, 'estado', true) ?: 'activa';
 
-// Obtener ubicación - priorizar _ubicacion_completa con nivel
-$ubicacion_completa = get_post_meta($trabajo_id, '_ubicacion_completa', true);
+// Obtener ubicación - TAXONOMÍA COMO FUENTE ÚNICA
+// Usa la función helper que lee desde taxonomía + term_meta
+$ubicacion_data = function_exists('agrochamba_get_job_location')
+    ? agrochamba_get_job_location($trabajo_id)
+    : null;
+
 $ubicacion_display = null;
 
-if (!empty($ubicacion_completa) && !empty($ubicacion_completa['departamento'])) {
-    // Obtener el nivel de especificidad
-    $nivel = strtoupper($ubicacion_completa['nivel'] ?? '');
-    
-    // Detectar nivel si no está definido
-    if (!in_array($nivel, array('DEPARTAMENTO', 'PROVINCIA', 'DISTRITO'))) {
-        $provincia = $ubicacion_completa['provincia'] ?? '';
-        $distrito = $ubicacion_completa['distrito'] ?? '';
-        $departamento = $ubicacion_completa['departamento'];
-        
-        if (empty($provincia) || $provincia === $departamento) {
-            $nivel = 'DEPARTAMENTO';
-        } elseif (empty($distrito) || $distrito === $provincia) {
-            $nivel = 'PROVINCIA';
-        } else {
-            $nivel = 'DISTRITO';
-        }
+if ($ubicacion_data) {
+    // Formatear usando la función helper
+    $ubicacion_display = function_exists('agrochamba_format_location')
+        ? agrochamba_format_location($ubicacion_data, true) // true = incluir dirección
+        : $ubicacion_data['departamento'];
+}
+
+// Fallback a taxonomía directa si el helper no está disponible
+if (empty($ubicacion_display)) {
+    $ubicaciones = wp_get_post_terms($trabajo_id, 'ubicacion');
+    $ubicacion = !empty($ubicaciones) ? $ubicaciones[0] : null;
+    if ($ubicacion) {
+        $ubicacion_display = $ubicacion->name;
     }
-    
-    // Formatear según el nivel
-        switch ($nivel) {
-            case 'DEPARTAMENTO':
-                $ubicacion_display = $ubicacion_completa['departamento'];
-                break;
-            case 'PROVINCIA':
-                $ubicacion_display = $ubicacion_completa['provincia'] . ', ' . $ubicacion_completa['departamento'];
-                break;
-            case 'DISTRITO':
-            default:
-                $parts = array_filter(array(
-                    $ubicacion_completa['distrito'] ?? '',
-                    $ubicacion_completa['provincia'] ?? '',
-                    $ubicacion_completa['departamento']
-                ));
-                $ubicacion_display = implode(', ', $parts);
-                break;
-        }
-
-        // Agregar dirección exacta si existe
-        if (!empty($ubicacion_completa['direccion'])) {
-            $ubicacion_display = $ubicacion_completa['direccion'] . ', ' . $ubicacion_display;
-        }
-    }
-
-// Fallback a taxonomía si no hay ubicación completa
-$ubicaciones = wp_get_post_terms($trabajo_id, 'ubicacion');
-$ubicacion = !empty($ubicaciones) ? $ubicaciones[0] : null;
-
-// Si no hay ubicación formateada, usar el nombre del término
-if (empty($ubicacion_display) && $ubicacion) {
-    $ubicacion_display = $ubicacion->name;
 }
 
 // Obtener empresa (CPT)

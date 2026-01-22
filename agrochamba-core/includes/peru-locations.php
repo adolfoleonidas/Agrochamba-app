@@ -1078,6 +1078,249 @@ function agrochamba_get_or_create_location_term($departamento, $provincia = '', 
 
 /**
  * =============================================================================
+ * CREAR/OBTENER TÉRMINO CON METADATA (VERSIÓN EXTENDIDA)
+ * =============================================================================
+ *
+ * Crea o obtiene un término de ubicación y guarda metadata adicional.
+ * Esta es la función principal para el sistema de "taxonomía como fuente única".
+ *
+ * @param array $ubicacion_data Array con: departamento, provincia, distrito, lat, lng, direccion, nivel
+ * @return int|WP_Error Term ID del término más específico, o error
+ */
+function agrochamba_save_location_term($ubicacion_data) {
+    $departamento = sanitize_text_field($ubicacion_data['departamento'] ?? '');
+    $provincia = sanitize_text_field($ubicacion_data['provincia'] ?? '');
+    $distrito = sanitize_text_field($ubicacion_data['distrito'] ?? '');
+    $direccion = sanitize_text_field($ubicacion_data['direccion'] ?? '');
+    $lat = floatval($ubicacion_data['lat'] ?? 0);
+    $lng = floatval($ubicacion_data['lng'] ?? 0);
+    $nivel = strtoupper(sanitize_text_field($ubicacion_data['nivel'] ?? ''));
+
+    if (empty($departamento)) {
+        return new WP_Error('invalid_departamento', 'El departamento es obligatorio');
+    }
+
+    // Detectar nivel automáticamente si no viene
+    if (!in_array($nivel, array('DEPARTAMENTO', 'PROVINCIA', 'DISTRITO'))) {
+        if (empty($provincia) || $provincia === $departamento) {
+            $nivel = 'DEPARTAMENTO';
+        } elseif (empty($distrito) || $distrito === $provincia) {
+            $nivel = 'PROVINCIA';
+        } else {
+            $nivel = 'DISTRITO';
+        }
+    }
+
+    // Determinar qué datos usar según el nivel
+    $term_provincia = ($nivel === 'DEPARTAMENTO') ? '' : $provincia;
+    $term_distrito = ($nivel === 'DISTRITO') ? $distrito : '';
+
+    // Crear/obtener el término usando la función existente
+    $term_id = agrochamba_get_or_create_location_term($departamento, $term_provincia, $term_distrito);
+
+    if (is_wp_error($term_id)) {
+        return $term_id;
+    }
+
+    // Guardar metadata en el término (coordenadas, dirección, nivel)
+    // Esto permite que el término sea la ÚNICA fuente de verdad
+    update_term_meta($term_id, '_ubicacion_lat', $lat);
+    update_term_meta($term_id, '_ubicacion_lng', $lng);
+    update_term_meta($term_id, '_ubicacion_nivel', $nivel);
+
+    // La dirección es específica del trabajo, no del término general
+    // Por eso la guardamos como referencia pero el trabajo puede tener su propia dirección
+
+    return $term_id;
+}
+
+/**
+ * =============================================================================
+ * OBTENER UBICACIÓN COMPLETA DESDE TAXONOMÍA (HELPER PRINCIPAL)
+ * =============================================================================
+ *
+ * Obtiene todos los datos de ubicación de un trabajo leyendo SOLO desde la taxonomía.
+ * Esta función reemplaza la lectura de _ubicacion_completa meta field.
+ *
+ * @param int $post_id ID del trabajo
+ * @param string $direccion Dirección específica del trabajo (opcional, se lee de post meta)
+ * @return array|null Array con departamento, provincia, distrito, lat, lng, direccion, nivel
+ */
+function agrochamba_get_job_location($post_id) {
+    // Obtener términos de ubicación asignados al trabajo
+    $terms = wp_get_post_terms($post_id, 'ubicacion');
+
+    if (empty($terms) || is_wp_error($terms)) {
+        return null;
+    }
+
+    // Tomar el primer término (debería ser el más específico)
+    $term = $terms[0];
+    $term_id = $term->term_id;
+
+    // Obtener ancestros para reconstruir la jerarquía
+    $ancestors = get_ancestors($term_id, 'ubicacion', 'taxonomy');
+
+    // Inicializar datos
+    $departamento = '';
+    $provincia = '';
+    $distrito = '';
+
+    // Determinar la estructura según la profundidad
+    $depth = count($ancestors);
+
+    if ($depth === 0) {
+        // El término es un departamento (nivel 0)
+        $departamento = $term->name;
+        $nivel = 'DEPARTAMENTO';
+    } elseif ($depth === 1) {
+        // El término es una provincia (nivel 1)
+        $provincia = $term->name;
+        $dept_term = get_term($ancestors[0], 'ubicacion');
+        $departamento = $dept_term ? $dept_term->name : '';
+        $nivel = 'PROVINCIA';
+    } else {
+        // El término es un distrito (nivel 2+)
+        $distrito = $term->name;
+        $prov_term = get_term($ancestors[0], 'ubicacion');
+        $provincia = $prov_term ? $prov_term->name : '';
+        $dept_term = get_term($ancestors[1], 'ubicacion');
+        $departamento = $dept_term ? $dept_term->name : '';
+        $nivel = 'DISTRITO';
+    }
+
+    // Obtener coordenadas del término
+    $lat = floatval(get_term_meta($term_id, '_ubicacion_lat', true));
+    $lng = floatval(get_term_meta($term_id, '_ubicacion_lng', true));
+
+    // La dirección es específica del trabajo, se guarda en post meta
+    $direccion = get_post_meta($post_id, '_ubicacion_direccion', true);
+
+    return array(
+        'departamento' => $departamento,
+        'provincia'    => $provincia,
+        'distrito'     => $distrito,
+        'direccion'    => $direccion ?: '',
+        'lat'          => $lat,
+        'lng'          => $lng,
+        'nivel'        => $nivel,
+        'term_id'      => $term_id,
+        'term_name'    => $term->name,
+    );
+}
+
+/**
+ * =============================================================================
+ * FORMATEAR UBICACIÓN PARA MOSTRAR
+ * =============================================================================
+ *
+ * Formatea la ubicación según el nivel de especificidad.
+ *
+ * @param array $ubicacion Array de ubicación (de agrochamba_get_job_location)
+ * @param bool $include_direccion Incluir dirección si existe
+ * @return string Ubicación formateada
+ */
+function agrochamba_format_location($ubicacion, $include_direccion = false) {
+    if (empty($ubicacion) || empty($ubicacion['departamento'])) {
+        return '';
+    }
+
+    $nivel = $ubicacion['nivel'] ?? 'DISTRITO';
+    $display = '';
+
+    switch ($nivel) {
+        case 'DEPARTAMENTO':
+            $display = $ubicacion['departamento'];
+            break;
+        case 'PROVINCIA':
+            $display = $ubicacion['provincia'] . ', ' . $ubicacion['departamento'];
+            break;
+        case 'DISTRITO':
+        default:
+            $parts = array_filter(array(
+                $ubicacion['distrito'] ?? '',
+                $ubicacion['provincia'] ?? '',
+                $ubicacion['departamento']
+            ));
+            $display = implode(', ', $parts);
+            break;
+    }
+
+    // Agregar dirección si se solicita y existe
+    if ($include_direccion && !empty($ubicacion['direccion'])) {
+        $display = $ubicacion['direccion'] . ', ' . $display;
+    }
+
+    return $display;
+}
+
+/**
+ * =============================================================================
+ * MIGRACIÓN: SINCRONIZAR TRABAJOS EXISTENTES CON TAXONOMÍA
+ * =============================================================================
+ *
+ * Migra los datos de _ubicacion_completa a term meta y asegura
+ * que todos los trabajos tengan su término de ubicación correctamente asignado.
+ *
+ * @return array Resultado de la migración
+ */
+function agrochamba_migrate_locations_to_taxonomy() {
+    $results = array(
+        'total' => 0,
+        'migrated' => 0,
+        'already_ok' => 0,
+        'errors' => array(),
+    );
+
+    // Obtener todos los trabajos
+    $trabajos = get_posts(array(
+        'post_type' => 'trabajo',
+        'posts_per_page' => -1,
+        'post_status' => array('publish', 'pending', 'draft'),
+    ));
+
+    $results['total'] = count($trabajos);
+
+    foreach ($trabajos as $trabajo) {
+        $post_id = $trabajo->ID;
+
+        // Verificar si ya tiene término de ubicación
+        $existing_terms = wp_get_post_terms($post_id, 'ubicacion');
+        $ubicacion_meta = get_post_meta($post_id, '_ubicacion_completa', true);
+
+        // Si no tiene meta ni términos, saltar
+        if (empty($ubicacion_meta) && empty($existing_terms)) {
+            continue;
+        }
+
+        // Si tiene meta, usarlo para crear/actualizar el término
+        if (!empty($ubicacion_meta) && !empty($ubicacion_meta['departamento'])) {
+            $term_id = agrochamba_save_location_term($ubicacion_meta);
+
+            if (is_wp_error($term_id)) {
+                $results['errors'][] = "Trabajo #$post_id: " . $term_id->get_error_message();
+                continue;
+            }
+
+            // Asignar el término al trabajo
+            wp_set_post_terms($post_id, array($term_id), 'ubicacion', false);
+
+            // Guardar dirección en post meta (es específica del trabajo)
+            if (!empty($ubicacion_meta['direccion'])) {
+                update_post_meta($post_id, '_ubicacion_direccion', $ubicacion_meta['direccion']);
+            }
+
+            $results['migrated']++;
+        } else {
+            $results['already_ok']++;
+        }
+    }
+
+    return $results;
+}
+
+/**
+ * =============================================================================
  * FUNCIÓN PARA POBLAR TODA LA TAXONOMÍA DE UNA VEZ
  * =============================================================================
  */

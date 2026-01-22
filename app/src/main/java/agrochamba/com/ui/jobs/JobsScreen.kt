@@ -653,7 +653,7 @@ fun JobsListScreen(
     viewModel: JobsViewModel
 ) {
     val swipeRefreshState = rememberSwipeRefreshState(isRefreshing = isRefreshing)
-    
+
     SwipeRefresh(
         state = swipeRefreshState,
         onRefresh = onRefresh
@@ -671,7 +671,8 @@ fun JobsListScreen(
                 if (index == jobs.size - 1 && uiState.canLoadMore && !uiState.isLoadingMore) {
                     LaunchedEffect(Unit) { onLoadMore() }
                 }
-                JobCard(
+                // Wrapper seguro para capturar errores en cards específicas
+                SafeJobCard(
                     job = job,
                     onClick = { onJobClicked(job) },
                     viewModel = viewModel
@@ -706,6 +707,219 @@ fun extractDepartamento(locationName: String?): String? {
     val parts = locationName.split(",").map { it.trim() }
     // El departamento siempre es el último elemento
     return parts.lastOrNull()?.takeIf { it.isNotBlank() }
+}
+
+/**
+ * Wrapper seguro para JobCard que valida datos antes de renderizar
+ * Evita que un trabajo con datos problemáticos crashee toda la app
+ */
+@Composable
+fun SafeJobCard(job: JobPost, onClick: () -> Unit, viewModel: JobsViewModel) {
+    // Validar datos antes de renderizar
+    val validationResult = remember(job.id) {
+        validateJobData(job)
+    }
+
+    // Log de debug para cada card (solo si debug está activo)
+    LaunchedEffect(job.id) {
+        if (agrochamba.com.utils.DebugManager.isEnabled) {
+            android.util.Log.d("ACH_CARD", "Renderizando Job #${job.id}: ${job.title?.rendered?.take(30)}...")
+
+            if (validationResult.issues.isNotEmpty()) {
+                android.util.Log.w("ACH_CARD", "⚠️ Job #${job.id} tiene issues: ${validationResult.issues}")
+            }
+        }
+    }
+
+    if (!validationResult.isValid) {
+        // Mostrar card de error en lugar de crashear
+        ErrorJobCard(
+            jobId = job.id,
+            jobTitle = job.title?.rendered?.take(50) ?: "Sin título",
+            errorMessage = validationResult.issues.joinToString(", "),
+            onClick = onClick
+        )
+    } else {
+        // Datos válidos, renderizar card normal
+        JobCard(
+            job = job,
+            onClick = onClick,
+            viewModel = viewModel
+        )
+    }
+}
+
+/**
+ * Resultado de validación de datos de un trabajo
+ */
+data class JobValidationResult(
+    val isValid: Boolean,
+    val issues: List<String>
+)
+
+/**
+ * Valida los datos de un trabajo para evitar crashes
+ * Detecta problemas comunes: null, vacío, caracteres especiales, datos muy largos
+ */
+fun validateJobData(job: JobPost): JobValidationResult {
+    val issues = mutableListOf<String>()
+
+    // Validar campos críticos que pueden causar crashes
+    try {
+        // Título - puede tener HTML problemático
+        val title = job.title?.rendered
+        if (title == null) {
+            issues.add("titulo_null")
+        } else if (title.length > 1000) {
+            issues.add("titulo_muy_largo(${title.length})")
+        }
+
+        // Excerpt - puede ser muy largo o tener HTML roto
+        val excerpt = job.excerpt?.rendered
+        if (excerpt != null && excerpt.length > 10000) {
+            issues.add("excerpt_muy_largo(${excerpt.length})")
+        }
+
+        // Content - puede ser enorme
+        val content = job.content?.rendered
+        if (content != null && content.length > 100000) {
+            issues.add("content_muy_largo(${content.length})")
+        }
+
+        // Meta - verificar campos numéricos que llegan como string
+        job.meta?.let { meta ->
+            // Salario - puede venir como string no numérico
+            meta.salarioMin?.let { salario ->
+                if (salario.isNotBlank() && salario.toDoubleOrNull() == null) {
+                    issues.add("salarioMin_no_numerico($salario)")
+                }
+            }
+            meta.salarioMax?.let { salario ->
+                if (salario.isNotBlank() && salario.toDoubleOrNull() == null) {
+                    issues.add("salarioMax_no_numerico($salario)")
+                }
+            }
+            meta.vacantes?.let { vacantes ->
+                if (vacantes.isNotBlank() && vacantes.toIntOrNull() == null) {
+                    issues.add("vacantes_no_numerico($vacantes)")
+                }
+            }
+        }
+
+        // Fecha - puede tener formato inválido
+        job.date?.let { date ->
+            if (date.isNotBlank()) {
+                try {
+                    // Intentar parsear la fecha
+                    java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.getDefault()).parse(date)
+                } catch (e: Exception) {
+                    try {
+                        java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).parse(date)
+                    } catch (e2: Exception) {
+                        issues.add("fecha_formato_invalido($date)")
+                    }
+                }
+            }
+        }
+
+        // Embedded terms - puede tener estructura rota
+        job.embedded?.terms?.let { termsList ->
+            termsList.forEach { terms ->
+                terms?.forEach { term ->
+                    if (term.name != null && term.name.length > 500) {
+                        issues.add("term_nombre_muy_largo(${term.taxonomy})")
+                    }
+                }
+            }
+        }
+
+    } catch (e: Exception) {
+        issues.add("error_validacion: ${e.message?.take(50)}")
+        android.util.Log.e("ACH_VALIDATION", "Error validando Job #${job.id}", e)
+    }
+
+    // Consideramos válido si no hay issues críticos
+    // Issues menores (como fecha inválida) no invalidan la card
+    val criticalIssues = issues.filter {
+        it.contains("null") || it.contains("muy_largo") || it.contains("error_validacion")
+    }
+
+    return JobValidationResult(
+        isValid = criticalIssues.isEmpty(),
+        issues = issues
+    )
+}
+
+/**
+ * Card que se muestra cuando hay un error al renderizar un trabajo
+ */
+@Composable
+fun ErrorJobCard(
+    jobId: Int,
+    jobTitle: String,
+    errorMessage: String?,
+    onClick: () -> Unit
+) {
+    Card(
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+        ),
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Default.Work,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = jobTitle.htmlToString(),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            Text(
+                text = "⚠️ Error al cargar esta oferta (ID: $jobId)",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error
+            )
+
+            if (agrochamba.com.utils.DebugManager.isEnabled && errorMessage != null) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = "Debug: ${errorMessage.take(100)}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            Text(
+                text = "Toca para intentar ver detalles",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
 }
 
 @Composable

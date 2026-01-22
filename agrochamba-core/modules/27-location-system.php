@@ -608,83 +608,34 @@ if (!function_exists('agrochamba_render_location_column')) {
 // debería aparecer en 'meta', pero a veces no se incluye correctamente
 
 if (!function_exists('agrochamba_ensure_ubicacion_in_rest_response')) {
+    /**
+     * Agrega datos de ubicación a la respuesta REST de trabajos
+     * TAXONOMÍA COMO FUENTE ÚNICA - Lee desde taxonomía, no desde meta field
+     */
     function agrochamba_ensure_ubicacion_in_rest_response($response, $post, $request) {
         $data = $response->get_data();
 
-        // Obtener _ubicacion_completa desde post meta
-        $ubicacion_completa = get_post_meta($post->ID, '_ubicacion_completa', true);
-        $needs_update = false;
+        // ==========================================
+        // TAXONOMÍA COMO FUENTE ÚNICA
+        // Usar agrochamba_get_job_location() que lee desde taxonomía
+        // ==========================================
+        $ubicacion_completa = null;
 
-        // Si no existe en meta, inicializar desde taxonomía (migración/fallback)
-        if (empty($ubicacion_completa) || !is_array($ubicacion_completa)) {
-            $ubicacion_terms = wp_get_post_terms($post->ID, 'ubicacion', array('fields' => 'names'));
-            $provincia = get_post_meta($post->ID, '_ubicacion_provincia', true);
-            $distrito = get_post_meta($post->ID, '_ubicacion_distrito', true);
-            $direccion = get_post_meta($post->ID, '_ubicacion_direccion', true);
-
-            if (!empty($ubicacion_terms)) {
-                $departamento = $ubicacion_terms[0];
-
-                $ubicacion_completa = array(
-                    'departamento' => $departamento,
-                    'provincia' => $provincia ?: '',
-                    'distrito' => $distrito ?: '',
-                    'direccion' => $direccion ?: '',
-                    'lat' => 0,
-                    'lng' => 0,
-                );
-                $needs_update = true;
-            }
+        if (function_exists('agrochamba_get_job_location')) {
+            $ubicacion_completa = agrochamba_get_job_location($post->ID);
         }
 
-        // AUTO-RESOLVER: Corregir ubicaciones mal clasificadas (ej: "Chincha" como departamento)
-        // Usar título + contenido como contexto para desambiguar ubicaciones
-        if (!empty($ubicacion_completa) && is_array($ubicacion_completa) && function_exists('agrochamba_auto_resolve_location')) {
-            $ubicacion_original = $ubicacion_completa;
-            $context = $post->post_title . ' ' . wp_strip_all_tags($post->post_content);
-            $ubicacion_completa = agrochamba_auto_resolve_location($ubicacion_completa, $context);
+        // Fallback legacy: si no hay datos en taxonomía, intentar desde meta
+        if (empty($ubicacion_completa)) {
+            $ubicacion_meta = get_post_meta($post->ID, '_ubicacion_completa', true);
+            if (!empty($ubicacion_meta) && is_array($ubicacion_meta)) {
+                $ubicacion_completa = $ubicacion_meta;
 
-            // Verificar si hubo corrección
-            if ($ubicacion_completa !== $ubicacion_original) {
-                $needs_update = true;
-            }
-        }
-
-        // Asegurar que tenga el campo nivel
-        if (!empty($ubicacion_completa) && is_array($ubicacion_completa)) {
-            if (!isset($ubicacion_completa['nivel']) || empty($ubicacion_completa['nivel'])) {
-                $dep = $ubicacion_completa['departamento'] ?? '';
-                $prov = $ubicacion_completa['provincia'] ?? '';
-                $dist = $ubicacion_completa['distrito'] ?? '';
-
-                if (empty($prov) || $prov === $dep) {
-                    $ubicacion_completa['nivel'] = 'DEPARTAMENTO';
-                } elseif (empty($dist) || $dist === $prov) {
-                    $ubicacion_completa['nivel'] = 'PROVINCIA';
-                } else {
-                    $ubicacion_completa['nivel'] = 'DISTRITO';
-                }
-                $needs_update = true;
-            }
-
-            // Guardar correcciones para futuras consultas
-            if ($needs_update) {
-                update_post_meta($post->ID, '_ubicacion_completa', $ubicacion_completa);
-
-                // También actualizar la taxonomía con el departamento correcto
-                if (!empty($ubicacion_completa['departamento'])) {
-                    $term_provincia = ($ubicacion_completa['nivel'] === 'DEPARTAMENTO') ? '' : ($ubicacion_completa['provincia'] ?? '');
-                    $term_distrito = ($ubicacion_completa['nivel'] === 'DISTRITO') ? ($ubicacion_completa['distrito'] ?? '') : '';
-
-                    if (function_exists('agrochamba_get_or_create_location_term')) {
-                        $term_id = agrochamba_get_or_create_location_term(
-                            $ubicacion_completa['departamento'],
-                            $term_provincia,
-                            $term_distrito
-                        );
-                        if (!is_wp_error($term_id)) {
-                            wp_set_post_terms($post->ID, array($term_id), 'ubicacion', false);
-                        }
+                // Migrar este trabajo al nuevo sistema
+                if (function_exists('agrochamba_save_location_term')) {
+                    $term_id = agrochamba_save_location_term($ubicacion_meta);
+                    if (!is_wp_error($term_id)) {
+                        wp_set_post_terms($post->ID, array($term_id), 'ubicacion', false);
                     }
                 }
             }
@@ -695,7 +646,7 @@ if (!function_exists('agrochamba_ensure_ubicacion_in_rest_response')) {
             $data['meta'] = array();
         }
 
-        // Agregar _ubicacion_completa al meta (incluso si es null para consistencia)
+        // Agregar _ubicacion_completa al meta para compatibilidad con la app
         $data['meta']['_ubicacion_completa'] = !empty($ubicacion_completa) ? $ubicacion_completa : null;
 
         // Agregar campo ubicacion_display para facilitar el uso en frontend
@@ -726,6 +677,8 @@ if (!function_exists('agrochamba_ensure_ubicacion_in_rest_response')) {
                 'distrito' => $dist,
                 'direccion' => $ubicacion_completa['direccion'] ?? '',
                 'nivel' => $nivel,
+                'lat' => $ubicacion_completa['lat'] ?? 0,
+                'lng' => $ubicacion_completa['lng'] ?? 0,
                 'card' => $card,
                 'full' => $full,
             );
@@ -1325,6 +1278,16 @@ add_action('rest_api_init', function() {
             return current_user_can('manage_options');
         }
     ));
+
+    // Endpoint para migrar al sistema de TAXONOMÍA COMO FUENTE ÚNICA
+    // Este endpoint sincroniza todos los trabajos existentes con la taxonomía
+    register_rest_route('agrochamba/v1', '/migrate-to-taxonomy-source', array(
+        'methods' => 'POST',
+        'callback' => 'agrochamba_migrate_to_taxonomy_source_endpoint',
+        'permission_callback' => function() {
+            return current_user_can('manage_options');
+        }
+    ));
 });
 
 if (!function_exists('agrochamba_migrate_locations_endpoint')) {
@@ -1361,9 +1324,9 @@ if (!function_exists('agrochamba_populate_locations_endpoint')) {
                 array('status' => 500)
             );
         }
-        
+
         $stats = agrochamba_populate_all_location_terms();
-        
+
         return new WP_REST_Response(array(
             'success' => true,
             'message' => 'Taxonomía de ubicaciones poblada correctamente.',
@@ -1374,6 +1337,53 @@ if (!function_exists('agrochamba_populate_locations_endpoint')) {
                 $stats['provincias'],
                 $stats['distritos'],
                 count($stats['errores'])
+            )
+        ), 200);
+    }
+}
+
+/**
+ * Endpoint para migrar al sistema de TAXONOMÍA COMO FUENTE ÚNICA
+ *
+ * Este endpoint:
+ * 1. Lee _ubicacion_completa de cada trabajo
+ * 2. Crea/obtiene el término correspondiente en la taxonomía
+ * 3. Guarda coordenadas en term_meta
+ * 4. Asigna el término al trabajo
+ * 5. Mueve la dirección a post_meta (es específica del trabajo)
+ */
+if (!function_exists('agrochamba_migrate_to_taxonomy_source_endpoint')) {
+    function agrochamba_migrate_to_taxonomy_source_endpoint($request) {
+        set_time_limit(300);
+        wp_raise_memory_limit('admin');
+
+        if (!function_exists('agrochamba_migrate_locations_to_taxonomy')) {
+            return new WP_Error(
+                'function_not_found',
+                'La función agrochamba_migrate_locations_to_taxonomy no está disponible.',
+                array('status' => 500)
+            );
+        }
+
+        $result = agrochamba_migrate_locations_to_taxonomy();
+
+        return new WP_REST_Response(array(
+            'success' => true,
+            'message' => '✅ Migración a TAXONOMÍA COMO FUENTE ÚNICA completada.',
+            'stats' => $result,
+            'summary' => sprintf(
+                '📊 Total: %d trabajos. ✅ Migrados: %d. ⏭️ Ya OK: %d. ❌ Errores: %d',
+                $result['total'],
+                $result['migrated'],
+                $result['already_ok'],
+                count($result['errors'])
+            ),
+            'errors' => $result['errors'],
+            'explanation' => array(
+                'Ahora la taxonomía ubicacion es la ÚNICA fuente de verdad',
+                'Los términos tienen coordenadas en term_meta',
+                'La dirección específica del trabajo se guarda en post_meta',
+                'Los templates leen desde taxonomía vía agrochamba_get_job_location()'
             )
         ), 200);
     }

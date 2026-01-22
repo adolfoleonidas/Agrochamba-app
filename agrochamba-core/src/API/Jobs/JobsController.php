@@ -489,6 +489,37 @@ class JobsController {
             wp_set_post_terms($post_id, array(intval($params['tipo_puesto_id'])), 'tipo_puesto', false);
         }
 
+        // ==========================================
+        // GUARDAR UBICACIÓN - TAXONOMÍA COMO FUENTE ÚNICA
+        // ==========================================
+        // La taxonomía 'ubicacion' es la ÚNICA fuente de verdad.
+        // El término guarda: jerarquía (depto > prov > dist) + coordenadas en term_meta
+        // La dirección específica del trabajo se guarda en post_meta
+        // ==========================================
+        if (isset($params['_ubicacion_completa']) && is_array($params['_ubicacion_completa'])) {
+            $ubicacion = $params['_ubicacion_completa'];
+
+            // Usar la función centralizada que guarda en taxonomía + term_meta
+            if (function_exists('agrochamba_save_location_term')) {
+                $term_id = agrochamba_save_location_term($ubicacion);
+
+                if (!is_wp_error($term_id)) {
+                    // Asignar el término al trabajo
+                    wp_set_post_terms($post_id, array($term_id), 'ubicacion', false);
+
+                    // La dirección es específica del trabajo, se guarda en post_meta
+                    $direccion = sanitize_text_field($ubicacion['direccion'] ?? '');
+                    if (!empty($direccion)) {
+                        update_post_meta($post_id, '_ubicacion_direccion', $direccion);
+                    }
+
+                    error_log("AgroChamba: Ubicación guardada en taxonomía - term_id: $term_id");
+                } else {
+                    error_log("AgroChamba: Error al guardar ubicación: " . $term_id->get_error_message());
+                }
+            }
+        }
+
             // Guardar meta fields específicos de trabajos
         $meta_fields = array(
             'salario_min', 'salario_max', 'vacantes', 'fecha_inicio', 'fecha_fin',
@@ -736,7 +767,28 @@ class JobsController {
         if (isset($params['tipo_puesto_id'])) {
             wp_set_post_terms($post_id, array(intval($params['tipo_puesto_id'])), 'tipo_puesto', false);
         }
-        
+
+        // ==========================================
+        // ACTUALIZAR UBICACIÓN - TAXONOMÍA COMO FUENTE ÚNICA
+        // ==========================================
+        if (isset($params['_ubicacion_completa']) && is_array($params['_ubicacion_completa'])) {
+            $ubicacion = $params['_ubicacion_completa'];
+
+            if (function_exists('agrochamba_save_location_term')) {
+                $term_id = agrochamba_save_location_term($ubicacion);
+
+                if (!is_wp_error($term_id)) {
+                    wp_set_post_terms($post_id, array($term_id), 'ubicacion', false);
+
+                    // La dirección es específica del trabajo
+                    $direccion = sanitize_text_field($ubicacion['direccion'] ?? '');
+                    if (!empty($direccion)) {
+                        update_post_meta($post_id, '_ubicacion_direccion', $direccion);
+                    }
+                }
+            }
+        }
+
         // Actualizar empresa según el rol del usuario
         $empresa_term_id = null;
         $is_admin = in_array('administrator', $user->roles);

@@ -70,6 +70,8 @@ import agrochamba.com.data.ModerationNotificationManager
 import agrochamba.com.data.WordPressApi
 import agrochamba.com.ui.moderation.ModerationViewModel
 import agrochamba.com.utils.htmlToString
+import agrochamba.com.utils.DebugManager
+import agrochamba.com.utils.SecretTapDetector
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import kotlinx.coroutines.launch
@@ -82,7 +84,25 @@ fun ProfileScreen(navController: NavController, viewModel: ProfileViewModel = vi
     val displayName = profile?.displayName ?: AuthManager.userDisplayName ?: "Usuario"
     val username = AuthManager.userDisplayName?.lowercase()?.replace(" ", "") ?: "usuario"
     val profilePhotoUrl = profile?.profilePhotoUrl
-    
+    val context = LocalContext.current
+
+    // Estado del modo debug
+    val isDebugEnabled by DebugManager.isEnabledFlow.collectAsState()
+
+    // Detector de tap secreto para activar modo debug (tap 5 veces en la foto)
+    val secretTapDetector = remember {
+        SecretTapDetector(
+            requiredTaps = 5,
+            onSecretActivated = {
+                // Solo permitir a admins activar el modo debug
+                if (AuthManager.isUserAdmin()) {
+                    DebugManager.toggle()
+                    DebugManager.showToggleToast(context)
+                }
+            }
+        )
+    }
+
     // Observar el contador de trabajos pendientes
     val pendingJobsCount by ModerationNotificationManager.pendingJobsCount.collectAsState()
     
@@ -133,11 +153,16 @@ fun ProfileScreen(navController: NavController, viewModel: ProfileViewModel = vi
                         .padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
+                    // Foto de perfil con tap secreto para activar debug (5 taps)
                     Box(
                         modifier = Modifier
                             .size(100.dp)
                             .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primaryContainer),
+                            .background(
+                                if (isDebugEnabled) MaterialTheme.colorScheme.errorContainer
+                                else MaterialTheme.colorScheme.primaryContainer
+                            )
+                            .clickable { secretTapDetector.onTap() },
                         contentAlignment = Alignment.Center
                     ) {
                         if (profilePhotoUrl != null) {
@@ -155,8 +180,26 @@ fun ProfileScreen(navController: NavController, viewModel: ProfileViewModel = vi
                                 Icons.Default.Person,
                                 contentDescription = null,
                                 modifier = Modifier.size(60.dp),
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                tint = if (isDebugEnabled) MaterialTheme.colorScheme.onErrorContainer
+                                       else MaterialTheme.colorScheme.onPrimaryContainer
                             )
+                        }
+                        // Indicador visual de modo debug activo
+                        if (isDebugEnabled) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .size(24.dp)
+                                    .background(MaterialTheme.colorScheme.error, CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "D",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onError,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
                     Spacer(modifier = Modifier.height(16.dp))
@@ -291,7 +334,130 @@ fun ProfileScreen(navController: NavController, viewModel: ProfileViewModel = vi
                     )
                 }
             }
+
+            // Panel de Debug (solo visible para admins cuando debug está activo)
+            if (isDebugEnabled && AuthManager.isUserAdmin()) {
+                item {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    DebugPanel(
+                        onDisableDebug = {
+                            DebugManager.disable()
+                            DebugManager.showToggleToast(context)
+                        }
+                    )
+                }
+            }
         }
+    }
+}
+
+/**
+ * Panel de Debug - Muestra información útil para debugging
+ */
+@Composable
+private fun DebugPanel(onDisableDebug: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Panel de Debug",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.error
+                )
+                TextButton(
+                    onClick = onDisableDebug,
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Desactivar")
+                }
+            }
+
+            Divider(color = MaterialTheme.colorScheme.error.copy(alpha = 0.3f))
+
+            // Información del usuario
+            DebugInfoRow("Display Name", AuthManager.userDisplayName ?: "null")
+            DebugInfoRow("Company ID", AuthManager.userCompanyId?.toString() ?: "null")
+            DebugInfoRow("Es Admin", AuthManager.isUserAdmin().toString())
+            DebugInfoRow("Es Empresa", AuthManager.isUserAnEnterprise().toString())
+            DebugInfoRow("Token", if (AuthManager.token != null) "OK (${AuthManager.token?.take(20)}...)" else "null")
+
+            Divider(color = MaterialTheme.colorScheme.error.copy(alpha = 0.3f))
+
+            // Información de crashes
+            DebugInfoRow("Crashes detectados", DebugManager.crashCount.toString())
+
+            if (DebugManager.lastCrashLog != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Último crash:",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.error
+                )
+                Text(
+                    text = DebugManager.lastCrashLog?.take(500) ?: "",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                    maxLines = 10,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                TextButton(
+                    onClick = { DebugManager.clearCrashLog() },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Limpiar logs")
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Tip: Los logs aparecen en Logcat con prefijo ACH_",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun DebugInfoRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false)
+        )
     }
 }
 
