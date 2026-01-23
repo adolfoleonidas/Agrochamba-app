@@ -100,20 +100,37 @@ fun EditJobScreen(
     var vacantes by remember { mutableStateOf(job.meta?.vacantes ?: "") }
     
     var selectedUbicacion by remember { mutableStateOf<Category?>(null) }
-    // Nueva ubicación estructurada (departamento, provincia, distrito)
-    var selectedUbicacionCompleta by remember { 
-        mutableStateOf(
-            // Cargar ubicación completa desde el job si existe
-            job.meta?.ubicacionCompleta?.let { uc ->
+
+    // Cargar ubicación existente del trabajo
+    // Prioridad: 1) meta.ubicacionCompleta, 2) término de taxonomía, 3) null
+    val initialUbicacion = remember(job.id) {
+        // 1. Intentar desde meta.ubicacionCompleta
+        job.meta?.ubicacionCompleta?.takeIf { it.departamento.isNotBlank() }?.let { uc ->
+            android.util.Log.d("EditJobScreen", "Ubicación desde meta: ${uc.departamento}")
+            UbicacionCompleta(
+                departamento = uc.departamento,
+                provincia = uc.provincia ?: "",
+                distrito = uc.distrito ?: "",
+                direccion = uc.direccion
+            )
+        } ?: run {
+            // 2. Intentar desde término de taxonomía
+            val ubicacionTerm = job.embedded?.terms?.flatten()?.find { it.taxonomy == "ubicacion" }
+            if (ubicacionTerm != null) {
+                android.util.Log.d("EditJobScreen", "Ubicación desde taxonomía: ${ubicacionTerm.name}")
                 UbicacionCompleta(
-                    departamento = uc.departamento,
-                    provincia = uc.provincia,
-                    distrito = uc.distrito,
-                    direccion = uc.direccion
+                    departamento = ubicacionTerm.name,
+                    provincia = "",
+                    distrito = ""
                 )
+            } else {
+                android.util.Log.d("EditJobScreen", "Sin ubicación para job ${job.id}")
+                null
             }
-        ) 
+        }
     }
+
+    var selectedUbicacionCompleta by remember { mutableStateOf(initialUbicacion) }
     var selectedEmpresa by remember { mutableStateOf<Category?>(null) }
     var selectedCultivo by remember { mutableStateOf<Category?>(null) }
     var selectedTipoPuesto by remember { mutableStateOf<Category?>(null) }
@@ -255,14 +272,30 @@ fun EditJobScreen(
                         android.util.Log.d("EditJobScreen", "selectedUbicacionCompleta: $selectedUbicacionCompleta")
                         android.util.Log.d("EditJobScreen", "selectedUbicacion (Category): $selectedUbicacion")
                         
-                        // Validación de ubicación: usar el nuevo sistema (UbicacionCompleta) como fuente principal
-                        // Una ubicación válida debe tener al menos el departamento seleccionado
-                        val ubicacionValida = selectedUbicacionCompleta != null && 
-                            selectedUbicacionCompleta!!.departamento.isNotBlank()
-                        
-                        if (!ubicacionValida) {
+                        // Validación de ubicación
+                        // Aceptar si: tiene selectedUbicacionCompleta, o selectedUbicacion, o ubicación original
+                        val tieneUbicacion = (selectedUbicacionCompleta != null && selectedUbicacionCompleta!!.departamento.isNotBlank()) ||
+                            selectedUbicacion != null ||
+                            initialUbicacion != null
+
+                        android.util.Log.d("EditJobScreen", "Validación ubicación: selectedUbicacionCompleta=$selectedUbicacionCompleta, selectedUbicacion=$selectedUbicacion, initialUbicacion=$initialUbicacion")
+
+                        if (!tieneUbicacion) {
                             Toast.makeText(context, "La ubicación es obligatoria", Toast.LENGTH_SHORT).show()
                             return@EditBottomActionBar
+                        }
+
+                        // Asegurar que selectedUbicacionCompleta tenga un valor para el guardado
+                        if (selectedUbicacionCompleta == null || selectedUbicacionCompleta!!.departamento.isBlank()) {
+                            selectedUbicacionCompleta = when {
+                                selectedUbicacion != null -> UbicacionCompleta(
+                                    departamento = selectedUbicacion!!.name,
+                                    provincia = "",
+                                    distrito = ""
+                                )
+                                initialUbicacion != null -> initialUbicacion
+                                else -> null
+                            }
                         }
                         
                         // Sincronizar automáticamente el Category (para compatibilidad con backend)
@@ -1425,7 +1458,7 @@ private fun EditBottomActionBar(
                 } else {
                     Icon(Icons.Default.Star, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Guardar")
+                    Text("Actualizar")
                 }
             }
         }

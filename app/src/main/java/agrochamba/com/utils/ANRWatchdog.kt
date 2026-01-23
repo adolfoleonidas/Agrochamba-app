@@ -27,7 +27,7 @@ object ANRWatchdog {
 
     private const val TAG = "ACH_ANR"
     private const val ANR_TIMEOUT_MS = 5000L // 5 segundos (igual que Android)
-    private const val CHECK_INTERVAL_MS = 1000L // Verificar cada 1 segundo
+    private const val CHECK_INTERVAL_MS = 2000L // Verificar cada 2 segundos (menos overhead)
 
     private var watchdogThread: Thread? = null
     private var isRunning = false
@@ -102,46 +102,47 @@ object ANRWatchdog {
         watchdogThread = null
     }
 
+    // Evitar reportar múltiples ANRs seguidos
+    @Volatile
+    private var lastANRReportTime = 0L
+    private const val MIN_ANR_REPORT_INTERVAL = 60000L // 1 minuto entre reportes
+
     /**
      * Reporta un ANR detectado
      */
     private fun reportANR(blockTimeMs: Long) {
-        // Obtener stack trace del hilo principal
+        // Evitar spam de reportes - máximo 1 por minuto
+        val now = System.currentTimeMillis()
+        if (now - lastANRReportTime < MIN_ANR_REPORT_INTERVAL) {
+            return
+        }
+        lastANRReportTime = now
+
+        // Obtener stack trace del hilo principal (solo las primeras 20 líneas)
         val mainThread = Looper.getMainLooper().thread
-        val stackTrace = mainThread.stackTrace
+        val stackTrace = mainThread.stackTrace.take(20).toTypedArray()
+
+        // Reportar solo las líneas relevantes de la app (no Android framework)
+        val relevantTrace = stackTrace
+            .filter { it.className.startsWith("agrochamba.") }
+            .take(5)
 
         val report = buildString {
-            appendLine("🚨 ANR DETECTADO 🚨")
-            appendLine("==========================================")
-            appendLine("Main thread bloqueado por: ${blockTimeMs}ms")
-            appendLine("Fecha: ${java.util.Date()}")
-            appendLine("")
-            appendLine("Stack trace del Main Thread:")
-            appendLine("------------------------------------------")
-            stackTrace.forEach { element ->
-                appendLine("    at $element")
+            appendLine("🚨 ANR: Main thread bloqueado por ${blockTimeMs}ms")
+            if (relevantTrace.isNotEmpty()) {
+                appendLine("Código involucrado:")
+                relevantTrace.forEach { element ->
+                    appendLine("  → ${element.className.substringAfterLast('.')}.${element.methodName}():${element.lineNumber}")
+                }
             }
-            appendLine("==========================================")
         }
 
-        // Loguear
+        // Log corto
         Log.e(TAG, report)
 
         // Guardar en DebugManager
         val anrException = ANRException("Main thread bloqueado por ${blockTimeMs}ms", stackTrace)
         DebugManager.logCrash(anrException)
-
-        // También mostrar las primeras líneas relevantes (no de Android framework)
-        val relevantTrace = stackTrace
-            .filter { it.className.startsWith("agrochamba.") }
-            .take(5)
-
-        if (relevantTrace.isNotEmpty()) {
-            Log.e(TAG, "📍 Código de la app involucrado:")
-            relevantTrace.forEach { element ->
-                Log.e(TAG, "    → ${element.className}.${element.methodName}() línea ${element.lineNumber}")
-            }
-        }
     }
 
     /**

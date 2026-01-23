@@ -136,14 +136,24 @@ fun SmartLocationSelector(
     val context = LocalContext.current
     val locationRepository = remember { LocationRepository.getInstance(context) }
 
-    // Inicializar selectedSedeId basándose en la ubicación inicial si corresponde a una sede
+    // Función para comparar ubicaciones de forma flexible (ignora case y espacios)
+    fun ubicacionesCoinciden(sede: SedeEmpresa, ubicacion: UbicacionCompleta?): Boolean {
+        if (ubicacion == null) return false
+        val deptoMatch = sede.ubicacion.departamento.trim().equals(ubicacion.departamento.trim(), ignoreCase = true)
+        val provMatch = sede.ubicacion.provincia.trim().equals(ubicacion.provincia.trim(), ignoreCase = true) ||
+            (sede.ubicacion.provincia.isBlank() && ubicacion.provincia.isBlank())
+        val distMatch = sede.ubicacion.distrito.trim().equals(ubicacion.distrito.trim(), ignoreCase = true) ||
+            (sede.ubicacion.distrito.isBlank() && ubicacion.distrito.isBlank())
+        return deptoMatch && provMatch && distMatch
+    }
+
+    // Inicializar selectedSedeId - primero buscar sede principal, luego por ubicación
     var selectedSedeId by remember(selectedLocation, sedes) {
         mutableStateOf(
-            sedes.find { sede ->
-                sede.ubicacion.departamento == selectedLocation?.departamento &&
-                sede.ubicacion.provincia == selectedLocation?.provincia &&
-                sede.ubicacion.distrito == selectedLocation?.distrito
-            }?.id
+            // Primero intentar encontrar sede que coincida con la ubicación
+            sedes.find { sede -> ubicacionesCoinciden(sede, selectedLocation) }?.id
+                // Si no hay coincidencia y hay sedes, seleccionar la principal
+                ?: sedes.find { it.esPrincipal }?.id
         )
     }
     var showSearch by remember { mutableStateOf(false) }
@@ -152,12 +162,24 @@ fun SmartLocationSelector(
     var dismissedInvitation by remember { mutableStateOf(false) }
 
     // Actualizar cuando cambie la ubicación o las sedes
+    // IMPORTANTE: También notificar al padre cuando se auto-selecciona una sede
     LaunchedEffect(selectedLocation, sedes) {
-        selectedSedeId = sedes.find { sede ->
-            sede.ubicacion.departamento == selectedLocation?.departamento &&
-            sede.ubicacion.provincia == selectedLocation?.provincia &&
-            sede.ubicacion.distrito == selectedLocation?.distrito
-        }?.id
+        val matchingSede = sedes.find { sede -> ubicacionesCoinciden(sede, selectedLocation) }
+        if (matchingSede != null) {
+            selectedSedeId = matchingSede.id
+            // Notificar al padre si la ubicación actual no coincide exactamente
+            if (selectedLocation == null || selectedLocation.departamento.isBlank()) {
+                onLocationSelected(matchingSede.ubicacion)
+            }
+        } else if (sedes.isNotEmpty()) {
+            // Si no hay coincidencia, seleccionar sede principal y notificar al padre
+            val sedePrincipal = sedes.find { it.esPrincipal } ?: sedes.first()
+            selectedSedeId = sedePrincipal.id
+            // Notificar al padre para que tenga la ubicación
+            if (selectedLocation == null || selectedLocation.departamento.isBlank()) {
+                onLocationSelected(sedePrincipal.ubicacion)
+            }
+        }
     }
     
     Column(modifier = modifier.fillMaxWidth()) {

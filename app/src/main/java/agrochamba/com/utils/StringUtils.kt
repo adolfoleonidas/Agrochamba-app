@@ -14,16 +14,35 @@ import java.util.concurrent.ConcurrentHashMap
 // =============================================================================
 
 private object HtmlCache {
-    private const val MAX_CACHE_SIZE = 200
+    private const val MAX_CACHE_SIZE = 500
+    private const val CLEANUP_THRESHOLD = 400
     val cache = ConcurrentHashMap<Int, String>()
 
     fun getOrCompute(input: String, compute: () -> String): String {
+        // No cachear strings muy largos
         if (input.length > 2000) return compute()
+
         val hash = input.hashCode()
-        return cache.getOrPut(hash) {
-            if (cache.size > MAX_CACHE_SIZE) cache.clear()
-            compute()
+
+        // Intentar obtener del cache primero
+        cache[hash]?.let { return it }
+
+        // Computar el resultado
+        val result = compute()
+
+        // Agregar al cache solo si no está muy lleno
+        // Esto evita bloquear el UI cuando se limpia el cache
+        if (cache.size < MAX_CACHE_SIZE) {
+            cache[hash] = result
+        } else if (cache.size > CLEANUP_THRESHOLD) {
+            // Limpiar en background para no bloquear UI
+            Thread {
+                val keysToRemove = cache.keys.take(100)
+                keysToRemove.forEach { cache.remove(it) }
+            }.start()
         }
+
+        return result
     }
 }
 
@@ -171,10 +190,13 @@ private fun removeAllTags(html: String): String {
  * Limpia espacios en blanco múltiples SIN REGEX.
  */
 private fun cleanWhitespace(text: String): String {
-    val sb = StringBuilder(text.length)
+    // Primero decodificar entidades HTML
+    val decoded = decodeHtmlEntities(text)
+
+    val sb = StringBuilder(decoded.length)
     var lastWasSpace = false
 
-    for (c in text) {
+    for (c in decoded) {
         if (c.isWhitespace()) {
             if (!lastWasSpace) {
                 sb.append(' ')
@@ -187,6 +209,62 @@ private fun cleanWhitespace(text: String): String {
     }
 
     return sb.toString().trim()
+}
+
+/**
+ * Decodifica entidades HTML comunes sin usar regex.
+ * Maneja tanto entidades con nombre (&amp;) como numéricas (&#8211;)
+ */
+private fun decodeHtmlEntities(text: String): String {
+    if (!text.contains('&')) return text
+
+    var result = text
+
+    // Entidades con nombre comunes
+    result = result
+        .replace("&amp;", "&")
+        .replace("&nbsp;", " ")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&apos;", "'")
+        .replace("&copy;", "©")
+        .replace("&reg;", "®")
+        .replace("&trade;", "™")
+        .replace("&euro;", "€")
+        .replace("&pound;", "£")
+        .replace("&yen;", "¥")
+        .replace("&cent;", "¢")
+        .replace("&deg;", "°")
+        .replace("&plusmn;", "±")
+        .replace("&times;", "×")
+        .replace("&divide;", "÷")
+        .replace("&frac12;", "½")
+        .replace("&frac14;", "¼")
+        .replace("&frac34;", "¾")
+
+    // Entidades numéricas comunes (guiones, comillas, etc.)
+    result = result
+        .replace("&#8211;", "–")  // en-dash
+        .replace("&#8212;", "—")  // em-dash
+        .replace("&#8216;", "'")  // left single quote
+        .replace("&#8217;", "'")  // right single quote
+        .replace("&#8218;", "‚")  // single low-9 quote
+        .replace("&#8220;", """)  // left double quote
+        .replace("&#8221;", """)  // right double quote
+        .replace("&#8222;", "„")  // double low-9 quote
+        .replace("&#8230;", "…")  // ellipsis
+        .replace("&#8226;", "•")  // bullet
+        .replace("&#8249;", "‹")  // single left angle quote
+        .replace("&#8250;", "›")  // single right angle quote
+        .replace("&#160;", " ")   // nbsp
+        .replace("&#38;", "&")    // ampersand
+        .replace("&#60;", "<")    // less than
+        .replace("&#62;", ">")    // greater than
+        .replace("&#34;", "\"")   // quote
+        .replace("&#39;", "'")    // apostrophe
+
+    return result
 }
 
 // =============================================================================
