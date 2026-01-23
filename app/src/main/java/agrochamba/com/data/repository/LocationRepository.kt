@@ -427,7 +427,8 @@ class LocationRepository(private val context: Context) {
                     "departamento" to sede.ubicacion.departamento,
                     "provincia" to sede.ubicacion.provincia,
                     "distrito" to sede.ubicacion.distrito,
-                    "direccion" to sede.ubicacion.direccion,
+                    // Enviar "" en lugar de null para que el backend borre la dirección
+                    "direccion" to (sede.ubicacion.direccion ?: ""),
                     "es_principal" to sede.esPrincipal,
                     "activa" to sede.activa,
                     "lat" to sede.ubicacion.lat,
