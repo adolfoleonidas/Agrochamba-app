@@ -525,7 +525,7 @@ private fun AnnotatedString.Builder.detectLinksAndPhones(text: String, linkColor
         if ((text.regionMatches(i, "http://", 0, 7, ignoreCase = true) ||
             text.regionMatches(i, "https://", 0, 8, ignoreCase = true) ||
             text.regionMatches(i, "www.", 0, 4, ignoreCase = true)) &&
-            (i == 0 || text[i - 1] != '🔗')) {
+            (i < 2 || !text.substring(maxOf(0, i - 2), i).contains("🔗"))) {
             val url = extractUrl(text, i)
             if (url != null) {
                 addStyle(
@@ -540,7 +540,7 @@ private fun AnnotatedString.Builder.detectLinksAndPhones(text: String, linkColor
 
         // Teléfono (si no tiene emoji ya)
         if ((text[i].isDigit() || (text[i] == '+' && i + 1 < text.length && text[i + 1].isDigit())) &&
-            (i == 0 || text[i - 1] != '📞')) {
+            (i < 2 || !text.substring(maxOf(0, i - 2), i).contains("📞"))) {
             val phone = extractPhone(text, i)
             if (phone != null) {
                 addStyle(
