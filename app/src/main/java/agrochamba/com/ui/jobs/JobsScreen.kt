@@ -339,25 +339,64 @@ fun JobsListWithSearchScreen(jobsViewModel: JobsViewModel) {
             )
             uiState.filteredJobs.isEmpty() && (uiState.searchQuery.isNotBlank() || activeFilters.isNotEmpty()) -> {
                 // Mostrar mensaje especial cuando no hay resultados con filtros activos
-                val locationDisplayName = uiState.selectedLocationFilter?.displayLabel 
+                val locationFilter = uiState.selectedLocationFilter
+                val locationDisplayName = locationFilter?.displayLabel
                     ?: uiState.selectedLocation?.name
+
+                // Generar sugerencias jerárquicas inteligentes
+                val hierarchicalSuggestions = buildList {
+                    if (locationFilter != null) {
+                        when (locationFilter.tipo) {
+                            LocationType.DISTRITO -> {
+                                // Sugerir buscar en la provincia
+                                add("Buscar en toda la provincia ${locationFilter.provincia}")
+                                // Sugerir buscar en el departamento
+                                add("Buscar en todo ${locationFilter.departamento}")
+                            }
+                            LocationType.PROVINCIA -> {
+                                // Sugerir buscar en el departamento
+                                add("Buscar en todo ${locationFilter.departamento}")
+                            }
+                            LocationType.DEPARTAMENTO -> {
+                                // Ya está en el nivel más alto de ubicación
+                            }
+                        }
+                    }
+                    // Siempre agregar opción de ver todos los trabajos
+                    add("Ver todos los trabajos")
+                }
+
                 NoResultsMessage(
                     searchQuery = uiState.searchQuery,
                     locationName = locationDisplayName,
-                    suggestions = listOf(
-                        "Ver trabajos de cosecha",
-                        "Ver todos los trabajos en ${locationDisplayName ?: "Perú"}",
-                        "Buscar en otra ubicación"
-                    ),
+                    suggestions = hierarchicalSuggestions,
                     onSuggestionClick = { suggestion ->
                         when {
-                            suggestion.contains("cosecha") -> {
-                                jobsViewModel.clearAllFilters()
-                                jobsViewModel.onFilterChange("cosecha", null, null, null, null)
+                            suggestion.startsWith("Buscar en toda la provincia") && locationFilter != null -> {
+                                // Subir a nivel PROVINCIA
+                                val provinciaFilter = SelectedLocationFilter(
+                                    departamento = locationFilter.departamento,
+                                    provincia = locationFilter.provincia,
+                                    distrito = null,
+                                    displayLabel = "${locationFilter.provincia}, ${locationFilter.departamento}",
+                                    tipo = LocationType.PROVINCIA
+                                )
+                                jobsViewModel.onLocationFilterChange(provinciaFilter)
                             }
-                            suggestion.contains("todos") -> {
-                                // Mantener ubicación pero limpiar otros filtros
-                                jobsViewModel.onFilterChange("", uiState.selectedLocation, null, null, null)
+                            suggestion.startsWith("Buscar en todo") && locationFilter != null -> {
+                                // Subir a nivel DEPARTAMENTO
+                                val deptoFilter = SelectedLocationFilter(
+                                    departamento = locationFilter.departamento,
+                                    provincia = null,
+                                    distrito = null,
+                                    displayLabel = locationFilter.departamento,
+                                    tipo = LocationType.DEPARTAMENTO
+                                )
+                                jobsViewModel.onLocationFilterChange(deptoFilter)
+                            }
+                            suggestion == "Ver todos los trabajos" -> {
+                                // Limpiar todos los filtros
+                                jobsViewModel.clearAllFilters()
                             }
                             else -> jobsViewModel.clearAllFilters()
                         }
