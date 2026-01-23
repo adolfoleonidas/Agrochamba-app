@@ -38,8 +38,16 @@ data class SedeApi(
 ) {
     /**
      * Convierte a SedeEmpresa para uso local
+     * Detecta automáticamente el nivel de ubicación basándose en los datos
      */
     fun toSedeEmpresa(): SedeEmpresa {
+        // Detectar nivel basándose en los datos disponibles
+        val nivelDetectado = when {
+            provincia.isBlank() -> LocationType.DEPARTAMENTO
+            distrito.isBlank() -> LocationType.PROVINCIA
+            else -> LocationType.DISTRITO
+        }
+
         return SedeEmpresa(
             id = id,
             nombre = nombre,
@@ -49,7 +57,8 @@ data class SedeApi(
                 distrito = distrito,
                 direccion = direccion,
                 lat = lat,
-                lng = lng
+                lng = lng,
+                nivel = nivelDetectado
             ),
             esPrincipal = esPrincipal,
             activa = activa

@@ -775,8 +775,9 @@ fun LocationSearchField(
     }
     
     // Actualizar query cuando se selecciona ubicación externamente
+    // IMPORTANTE: Mostrar la ubicación incluso si solo tiene departamento o provincia
     LaunchedEffect(selectedLocation) {
-        if (selectedLocation != null && selectedLocation.distrito.isNotBlank()) {
+        if (selectedLocation != null && selectedLocation.departamento.isNotBlank()) {
             query = selectedLocation.formatOneLine()
         }
     }

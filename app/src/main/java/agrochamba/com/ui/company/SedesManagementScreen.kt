@@ -688,6 +688,7 @@ private fun EditSedeDialog(
     var direccion by remember { mutableStateOf(sede.ubicacion.direccion ?: "") }
     var esPrincipal by remember { mutableStateOf(sede.esPrincipal) }
     var nombreError by remember { mutableStateOf<String?>(null) }
+    var ubicacionError by remember { mutableStateOf<String?>(null) }
     
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -733,12 +734,24 @@ private fun EditSedeDialog(
                         style = MaterialTheme.typography.labelLarge,
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
-                    
+
                     LocationSearchField(
                         selectedLocation = ubicacion,
-                        onLocationSelected = { ubicacion = it },
+                        onLocationSelected = {
+                            ubicacion = it
+                            ubicacionError = null
+                        },
                         placeholder = "Buscar distrito, provincia o departamento..."
                     )
+
+                    if (ubicacionError != null) {
+                        Text(
+                            text = ubicacionError!!,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
                 }
                 
                 // Dirección exacta (opcional)
@@ -786,9 +799,21 @@ private fun EditSedeDialog(
 
                     Button(
                         onClick = {
+                            var hasError = false
+
                             if (nombre.isBlank()) {
                                 nombreError = "Ingresa un nombre"
-                            } else if (ubicacion != null) {
+                                hasError = true
+                            }
+
+                            // Validar que la ubicación tenga al menos departamento
+                            val ub = ubicacion
+                            if (ub == null || ub.departamento.isBlank()) {
+                                ubicacionError = "Selecciona una ubicación válida"
+                                hasError = true
+                            }
+
+                            if (!hasError && ubicacion != null) {
                                 val ubicacionConDireccion = if (direccion.isNotBlank()) {
                                     ubicacion!!.copy(direccion = direccion.trim())
                                 } else {

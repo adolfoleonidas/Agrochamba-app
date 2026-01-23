@@ -66,18 +66,23 @@ data class UbicacionCompleta(
     /**
      * Formato para selector de sedes
      */
-    fun formatForSedeSelector(): String = when (nivel) {
-        LocationType.DEPARTAMENTO -> departamento
-        LocationType.PROVINCIA -> "$provincia, $departamento"
-        LocationType.DISTRITO -> "$distrito, $provincia"
+    fun formatForSedeSelector(): String {
+        val nivelEfectivo = getNivelEfectivo()
+        return when (nivelEfectivo) {
+            LocationType.DEPARTAMENTO -> departamento
+            LocationType.PROVINCIA -> "$provincia, $departamento"
+            LocationType.DISTRITO -> "$distrito, $provincia"
+        }
     }
     
     /**
      * Formato en una línea según el nivel de especificidad
-     * Respeta el nivel que el usuario seleccionó originalmente
+     * Usa getNivelEfectivo() para detectar automáticamente el nivel correcto
+     * basándose en los datos disponibles
      */
     fun formatOneLine(includeDireccion: Boolean = false): String {
-        val base = when (nivel) {
+        val nivelEfectivo = getNivelEfectivo()
+        val base = when (nivelEfectivo) {
             LocationType.DEPARTAMENTO -> departamento
             LocationType.PROVINCIA -> "$provincia, $departamento"
             LocationType.DISTRITO -> "$distrito, $provincia, $departamento"
