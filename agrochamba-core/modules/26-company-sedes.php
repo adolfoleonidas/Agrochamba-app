@@ -585,8 +585,9 @@ function agrochamba_update_company_sede($request)
         }
     }
 
-    if (isset($body['direccion'])) {
-        $sedes[$index]['direccion'] = sanitize_text_field($body['direccion']);
+    // Siempre actualizar dirección si está presente en el body (incluso si está vacía o null)
+    if (array_key_exists('direccion', $body)) {
+        $sedes[$index]['direccion'] = sanitize_text_field($body['direccion'] ?? '');
     }
 
     if (isset($body['es_principal'])) {
