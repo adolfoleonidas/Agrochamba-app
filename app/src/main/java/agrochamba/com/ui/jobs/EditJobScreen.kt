@@ -271,32 +271,40 @@ fun EditJobScreen(
                         android.util.Log.d("EditJobScreen", "Validando campos de TRABAJO")
                         android.util.Log.d("EditJobScreen", "selectedUbicacionCompleta: $selectedUbicacionCompleta")
                         android.util.Log.d("EditJobScreen", "selectedUbicacion (Category): $selectedUbicacion")
-                        
-                        // Validación de ubicación
-                        // Aceptar si: tiene selectedUbicacionCompleta, o selectedUbicacion, o ubicación original
-                        val tieneUbicacion = (selectedUbicacionCompleta != null && selectedUbicacionCompleta!!.departamento.isNotBlank()) ||
-                            selectedUbicacion != null ||
-                            initialUbicacion != null
+                        android.util.Log.d("EditJobScreen", "initialUbicacion (fallback): $initialUbicacion")
 
-                        android.util.Log.d("EditJobScreen", "Validación ubicación: selectedUbicacionCompleta=$selectedUbicacionCompleta, selectedUbicacion=$selectedUbicacion, initialUbicacion=$initialUbicacion")
-
-                        if (!tieneUbicacion) {
-                            Toast.makeText(context, "La ubicación es obligatoria", Toast.LENGTH_SHORT).show()
-                            return@EditBottomActionBar
-                        }
-
-                        // Asegurar que selectedUbicacionCompleta tenga un valor para el guardado
-                        if (selectedUbicacionCompleta == null || selectedUbicacionCompleta!!.departamento.isBlank()) {
-                            selectedUbicacionCompleta = when {
-                                selectedUbicacion != null -> UbicacionCompleta(
+                        // PRIMERO: Asegurar que selectedUbicacionCompleta tenga un valor válido
+                        // Usar fallback a initialUbicacion ANTES de validar
+                        val ubicacionParaGuardar = when {
+                            // 1. Si selectedUbicacionCompleta es válida, usarla
+                            selectedUbicacionCompleta != null && selectedUbicacionCompleta!!.departamento.isNotBlank() -> {
+                                selectedUbicacionCompleta
+                            }
+                            // 2. Si hay Category seleccionada, crear UbicacionCompleta desde ella
+                            selectedUbicacion != null -> {
+                                UbicacionCompleta(
                                     departamento = selectedUbicacion!!.name,
                                     provincia = "",
                                     distrito = ""
                                 )
-                                initialUbicacion != null -> initialUbicacion
-                                else -> null
                             }
+                            // 3. Fallback a la ubicación inicial del trabajo
+                            initialUbicacion != null && initialUbicacion.departamento.isNotBlank() -> {
+                                initialUbicacion
+                            }
+                            else -> null
                         }
+
+                        android.util.Log.d("EditJobScreen", "ubicacionParaGuardar (final): $ubicacionParaGuardar")
+
+                        // Validar que hay ubicación
+                        if (ubicacionParaGuardar == null) {
+                            Toast.makeText(context, "La ubicación es obligatoria", Toast.LENGTH_SHORT).show()
+                            return@EditBottomActionBar
+                        }
+
+                        // Actualizar selectedUbicacionCompleta con el valor resuelto
+                        selectedUbicacionCompleta = ubicacionParaGuardar
                         
                         // Sincronizar automáticamente el Category (para compatibilidad con backend)
                         if (selectedUbicacion == null && selectedUbicacionCompleta != null) {

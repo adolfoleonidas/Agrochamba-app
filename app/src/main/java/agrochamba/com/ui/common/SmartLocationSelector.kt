@@ -162,23 +162,25 @@ fun SmartLocationSelector(
     var dismissedInvitation by remember { mutableStateOf(false) }
 
     // Actualizar cuando cambie la ubicación o las sedes
-    // IMPORTANTE: También notificar al padre cuando se auto-selecciona una sede
+    // IMPORTANTE: Siempre mantener sincronizado el estado con el padre
     LaunchedEffect(selectedLocation, sedes) {
         val matchingSede = sedes.find { sede -> ubicacionesCoinciden(sede, selectedLocation) }
         if (matchingSede != null) {
+            // Hay una sede que coincide con la ubicación actual
             selectedSedeId = matchingSede.id
-            // Notificar al padre si la ubicación actual no coincide exactamente
-            if (selectedLocation == null || selectedLocation.departamento.isBlank()) {
-                onLocationSelected(matchingSede.ubicacion)
-            }
-        } else if (sedes.isNotEmpty()) {
-            // Si no hay coincidencia, seleccionar sede principal y notificar al padre
+            // SIEMPRE notificar al padre para mantener sincronizado el estado
+            // Esto es crítico para que EditJobScreen tenga la ubicación correcta
+            onLocationSelected(matchingSede.ubicacion)
+        } else if (sedes.isNotEmpty() && (selectedLocation == null || selectedLocation.departamento.isBlank())) {
+            // Solo auto-seleccionar sede principal si NO hay ubicación válida
+            // Esto evita sobrescribir la ubicación del trabajo cuando el usuario no ha tocado nada
             val sedePrincipal = sedes.find { it.esPrincipal } ?: sedes.first()
             selectedSedeId = sedePrincipal.id
-            // Notificar al padre para que tenga la ubicación
-            if (selectedLocation == null || selectedLocation.departamento.isBlank()) {
-                onLocationSelected(sedePrincipal.ubicacion)
-            }
+            onLocationSelected(sedePrincipal.ubicacion)
+        } else if (selectedLocation != null && selectedLocation.departamento.isNotBlank()) {
+            // Hay ubicación válida pero no coincide con ninguna sede
+            // Mantener la ubicación original sin seleccionar sede
+            selectedSedeId = null
         }
     }
     
