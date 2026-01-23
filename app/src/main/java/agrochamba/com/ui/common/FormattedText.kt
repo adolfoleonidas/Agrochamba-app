@@ -132,17 +132,34 @@ private fun htmlToSpanned(html: String): Spanned {
 
     // Pre-procesar para conservar estructura
     var processed = input
+        // Eliminar comentarios de Gutenberg (WordPress block editor)
+        .replace(Regex("<!--.*?-->"), "")
+        // Saltos de línea
         .replace("<br>", "\n", ignoreCase = true)
         .replace("<br/>", "\n", ignoreCase = true)
         .replace("<br />", "\n", ignoreCase = true)
-        .replace("</p>", "\n", ignoreCase = true)
+        // Párrafos: agregar doble salto para separar visualmente
+        .replace("</p>", "\n\n", ignoreCase = true)
+        .replace("<p>", "", ignoreCase = true)
+        .replace(Regex("<p[^>]*>"), "") // <p class="..."> etc.
+        // Divs
         .replace("</div>", "\n", ignoreCase = true)
+        .replace("<div>", "", ignoreCase = true)
+        .replace(Regex("<div[^>]*>"), "")
+        // Encabezados
+        .replace(Regex("</h[1-6]>"), "\n\n")
+        .replace(Regex("<h[1-6][^>]*>"), "\n")
+        // Listas
         .replace("<li>", "\n• ", ignoreCase = true)
         .replace("</li>", "", ignoreCase = true)
         .replace("<ul>", "", ignoreCase = true)
-        .replace("</ul>", "", ignoreCase = true)
+        .replace("</ul>", "\n", ignoreCase = true)
         .replace("<ol>", "", ignoreCase = true)
-        .replace("</ol>", "", ignoreCase = true)
+        .replace("</ol>", "\n", ignoreCase = true)
+        // Limpiar múltiples saltos de línea (máximo 2)
+        .replace(Regex("\n{3,}"), "\n\n")
+        // Limpiar espacios antes de saltos de línea
+        .replace(Regex(" +\n"), "\n")
 
     // Eliminar tags peligrosos
     processed = removeTagContent(processed, "script")
