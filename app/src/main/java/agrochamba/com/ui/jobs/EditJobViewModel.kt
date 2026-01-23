@@ -620,14 +620,18 @@ class EditJobViewModel(private val job: JobPost) : ViewModel() {
                 val title = jobData["title"] as? String
                 val content = jobData["content"] as? String
                 val ubicacionId = jobData["ubicacion_id"] as? Number
-                
+                val ubicacionCompleta = jobData["_ubicacion_completa"] as? Map<*, *>
+
                 if (title.isNullOrBlank()) {
                     throw Exception("El título es obligatorio.")
                 }
                 if (content.isNullOrBlank()) {
                     throw Exception("La descripción es obligatoria.")
                 }
-                if (ubicacionId == null) {
+                // Validar ubicación: aceptar ubicacion_id O _ubicacion_completa con departamento
+                val tieneUbicacionCompleta = ubicacionCompleta != null &&
+                    (ubicacionCompleta["departamento"] as? String)?.isNotBlank() == true
+                if (ubicacionId == null && !tieneUbicacionCompleta) {
                     throw Exception("La ubicación es obligatoria.")
                 }
 
