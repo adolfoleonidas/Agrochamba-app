@@ -31,34 +31,35 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * FormattedText - Editor profesional de texto
+ * FormattedText v2.0 - Texto profesional con detección automática de secciones
  *
- * FORMATO INLINE:
- * - *negrita* (WhatsApp) o **negrita** (Markdown)
- * - _cursiva_ (WhatsApp)
- * - ~tachado~ (WhatsApp)
- * - `código` (Markdown)
+ * SECCIONES AUTOMÁTICAS (detectadas y estilizadas):
+ * - Beneficios, Requisitos, Funciones, Responsabilidades
+ * - Horario, Salario, Ubicación, Contacto
+ * - Descripción, Experiencia, Habilidades
  *
- * ESTRUCTURA:
- * - # Título (H1)
- * - ## Subtítulo (H2)
- * - ### Encabezado (H3)
- * - > Cita/blockquote
- * - - Lista con viñetas
- * - 1. Lista numerada
+ * FORMATO:
+ * - Negrita: **texto** o <strong>
+ * - Cursiva: *texto* o <em>
+ * - Listas: • con indentación
+ * - Links: clickeables con icono
+ * - Teléfonos: clickeables con icono
  *
- * LINKS:
- * - URLs: https://... o www....
- * - Teléfonos: 9 a 15 dígitos
- * - Emails: texto@dominio.com
- *
- * HTML:
- * - <strong>, <b> → negrita
- * - <em>, <i> → cursiva
- * - <u> → subrayado
- * - <br>, </p> → saltos de línea
- * - <li> → viñetas
+ * RENDIMIENTO:
+ * - Procesamiento en background thread
+ * - Sin regex pesados en main thread
+ * - Cache de resultados
  */
+
+// Secciones comunes en ofertas de trabajo
+private val SECTION_KEYWORDS = listOf(
+    "beneficios", "requisitos", "funciones", "responsabilidades",
+    "horario", "salario", "sueldo", "remuneración", "ubicación",
+    "contacto", "descripción", "experiencia", "habilidades",
+    "competencias", "ofrecemos", "buscamos", "perfil", "condiciones",
+    "jornada", "modalidad", "contrato", "vacantes", "importante"
+)
+
 @Composable
 fun FormattedText(
     text: String,
@@ -67,15 +68,14 @@ fun FormattedText(
 ) {
     val context = LocalContext.current
     val primaryColor = MaterialTheme.colorScheme.primary
+    val sectionColor = MaterialTheme.colorScheme.primary
 
-    // Estado para el texto procesado
     var processedText by remember { mutableStateOf<AnnotatedString?>(null) }
 
-    // Procesar en background
     LaunchedEffect(text, primaryColor) {
         processedText = withContext(Dispatchers.Default) {
             try {
-                processTextSimple(text, primaryColor)
+                processText(text, primaryColor, sectionColor)
             } catch (e: Exception) {
                 android.util.Log.e("FormattedText", "Error: ${e.message}")
                 buildAnnotatedString { append(stripHtmlTags(text)) }
@@ -83,16 +83,15 @@ fun FormattedText(
         }
     }
 
-    // Mostrar texto procesado o placeholder
     val displayText = processedText ?: remember {
-        buildAnnotatedString { append("Cargando...") }
+        buildAnnotatedString { append("") }
     }
 
     var textLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
 
     Text(
         text = displayText,
-        style = style.copy(lineHeight = 24.sp),
+        style = style.copy(lineHeight = 26.sp),
         modifier = modifier.pointerInput(displayText) {
             detectTapGestures { tapOffset ->
                 textLayoutResult?.let { layout ->
@@ -106,42 +105,37 @@ fun FormattedText(
 }
 
 /**
- * Procesa el texto de forma simple y rápida
+ * Procesa el texto completo
  */
-private fun processTextSimple(text: String, linkColor: Color): AnnotatedString {
-    // Limpiar marcadores y decodificar entidades
+private fun processText(text: String, linkColor: Color, sectionColor: Color): AnnotatedString {
     val cleanedText = cleanText(text)
 
-    // Convertir HTML a Spanned si tiene tags HTML
     return if (cleanedText.contains('<')) {
-        val spanned = htmlToSpanned(cleanedText)
-        spannedToAnnotatedString(spanned, linkColor)
+        processHtmlText(cleanedText, linkColor, sectionColor)
     } else {
-        // Texto plano o markdown
         buildAnnotatedString {
-            processPlainText(cleanedText, linkColor)
+            processPlainText(cleanedText, linkColor, sectionColor)
         }
     }
 }
 
 /**
- * Convierte HTML a Spanned usando Html.fromHtml nativo
+ * Procesa texto HTML
  */
-private fun htmlToSpanned(html: String): Spanned {
+private fun processHtmlText(html: String, linkColor: Color, sectionColor: Color): AnnotatedString {
     val input = if (html.length > 20000) html.take(20000) else html
 
-    // Pre-procesar para conservar estructura
-    // IMPORTANTE: Usar <br> en lugar de \n porque Html.fromHtml colapsa whitespace
+    // Pre-procesar HTML para estructura
     var processed = input
-        // Eliminar comentarios de Gutenberg (WordPress block editor)
+        // Eliminar comentarios de Gutenberg
         .replace(Regex("<!--.*?-->"), "")
-        // Normalizar br tags
+        // Normalizar br
         .replace("<br/>", "<br>", ignoreCase = true)
         .replace("<br />", "<br>", ignoreCase = true)
-        // Párrafos: agregar doble br para separar visualmente
+        // Párrafos con doble salto
         .replace("</p>", "<br><br>", ignoreCase = true)
         .replace("<p>", "", ignoreCase = true)
-        .replace(Regex("<p[^>]*>"), "") // <p class="..."> etc.
+        .replace(Regex("<p[^>]*>"), "")
         // Divs
         .replace("</div>", "<br>", ignoreCase = true)
         .replace("<div>", "", ignoreCase = true)
@@ -149,164 +143,294 @@ private fun htmlToSpanned(html: String): Spanned {
         // Encabezados
         .replace(Regex("</h[1-6]>"), "<br><br>")
         .replace(Regex("<h[1-6][^>]*>"), "<br>")
-        // Listas - cada item en nueva línea
-        .replace("<li>", "<br>• ", ignoreCase = true)
-        .replace("</li>", "", ignoreCase = true)
-        .replace("<ul>", "", ignoreCase = true)
+        // Listas - formato mejorado
+        .replace("<ul>", "<br>", ignoreCase = true)
         .replace("</ul>", "<br>", ignoreCase = true)
-        .replace("<ol>", "", ignoreCase = true)
+        .replace("<ol>", "<br>", ignoreCase = true)
         .replace("</ol>", "<br>", ignoreCase = true)
-        // Limpiar múltiples br (máximo 2)
+        .replace("<li>", "<br>    • ", ignoreCase = true)
+        .replace("</li>", "", ignoreCase = true)
+        // Limpiar múltiples br
         .replace(Regex("(<br>){3,}"), "<br><br>")
-        // Limpiar br al inicio
         .replace(Regex("^(<br>)+"), "")
-        // Limpiar espacios antes de br
+        .replace(Regex("(<br>)+$"), "")
         .replace(Regex(" +<br>"), "<br>")
 
     // Eliminar tags peligrosos
     processed = removeTagContent(processed, "script")
     processed = removeTagContent(processed, "style")
 
-    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+    // Convertir HTML a Spanned
+    val spanned = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
         Html.fromHtml(processed, Html.FROM_HTML_MODE_LEGACY)
     } else {
         @Suppress("DEPRECATION")
         Html.fromHtml(processed)
     }
+
+    // Limpiar caracteres especiales
+    val text = spanned.toString()
+        .replace("\u00A0", " ")
+        .replace("\u200B", "")
+        .replace("\uFFFC", "")
+        .replace("\uFFFD", "")
+        .replace("\u200C", "")
+        .replace("\u200D", "")
+        .replace("\u2028", "\n")
+        .replace("\u2029", "\n\n")
+        .trim()
+
+    return buildAnnotatedString {
+        // Procesar línea por línea para detectar secciones
+        val lines = text.split('\n')
+        var isFirstLine = true
+
+        lines.forEachIndexed { index, line ->
+            if (line.isBlank()) {
+                if (!isFirstLine) append('\n')
+                return@forEachIndexed
+            }
+
+            if (!isFirstLine) append('\n')
+            isFirstLine = false
+
+            val trimmedLine = line.trim()
+
+            // Detectar si es una sección
+            if (isSectionHeader(trimmedLine)) {
+                // Sección con estilo especial
+                withStyle(SpanStyle(
+                    fontWeight = FontWeight.Bold,
+                    color = sectionColor,
+                    fontSize = 15.sp
+                )) {
+                    append(formatSectionHeader(trimmedLine))
+                }
+            } else if (trimmedLine.startsWith("•") || trimmedLine.startsWith("-") || trimmedLine.startsWith("*")) {
+                // Item de lista con indentación
+                append("    ")
+                withStyle(SpanStyle(color = sectionColor)) {
+                    append("• ")
+                }
+                appendStyledText(trimmedLine.removePrefix("•").removePrefix("-").removePrefix("*").trim(), spanned, linkColor)
+            } else if (trimmedLine.matches(Regex("^\\d+\\.\\s.*"))) {
+                // Lista numerada
+                val num = trimmedLine.takeWhile { it.isDigit() || it == '.' }
+                append("    ")
+                withStyle(SpanStyle(color = sectionColor, fontWeight = FontWeight.Medium)) {
+                    append("$num ")
+                }
+                appendStyledText(trimmedLine.removePrefix(num).trim(), spanned, linkColor)
+            } else {
+                // Texto normal
+                appendStyledText(trimmedLine, spanned, linkColor)
+            }
+        }
+
+        // Detectar links y teléfonos
+        detectLinksAndPhones(toString(), linkColor)
+    }
 }
 
 /**
- * Convierte Spanned a AnnotatedString conservando estilos
+ * Añade texto con estilos del Spanned original
  */
-private fun spannedToAnnotatedString(spanned: Spanned, linkColor: Color): AnnotatedString {
-    val text = spanned.toString()
-        .replace("\u00A0", " ")      // Non-breaking space
-        .replace("\u200B", "")       // Zero-width space
-        .replace("\uFFFC", "")       // Object replacement character (OBJ)
-        .replace("\uFFFD", "")       // Replacement character
-        .replace("\u200C", "")       // Zero-width non-joiner
-        .replace("\u200D", "")       // Zero-width joiner
-        .replace("\u2028", "\n")     // Line separator
-        .replace("\u2029", "\n\n")   // Paragraph separator
+private fun AnnotatedString.Builder.appendStyledText(text: String, spanned: Spanned, linkColor: Color) {
+    val startIndex = length
+    append(text)
+    val endIndex = length
 
-    return buildAnnotatedString {
-        append(text)
+    // Buscar estilos en el spanned original que apliquen a este texto
+    val spannedText = spanned.toString()
+    val textStart = spannedText.indexOf(text)
+    if (textStart >= 0) {
+        val textEnd = textStart + text.length
 
-        // Aplicar estilos de negrita/cursiva
-        spanned.getSpans(0, spanned.length, StyleSpan::class.java).forEach { span ->
-            val start = spanned.getSpanStart(span)
-            val end = spanned.getSpanEnd(span)
-            if (start >= 0 && end <= text.length && start < end) {
+        spanned.getSpans(textStart, textEnd, StyleSpan::class.java).forEach { span ->
+            val spanStart = maxOf(0, spanned.getSpanStart(span) - textStart)
+            val spanEnd = minOf(text.length, spanned.getSpanEnd(span) - textStart)
+            if (spanStart < spanEnd && spanStart >= 0 && spanEnd <= text.length) {
                 when (span.style) {
-                    Typeface.BOLD -> addStyle(SpanStyle(fontWeight = FontWeight.Bold), start, end)
-                    Typeface.ITALIC -> addStyle(SpanStyle(fontStyle = FontStyle.Italic), start, end)
+                    Typeface.BOLD -> addStyle(
+                        SpanStyle(fontWeight = FontWeight.Bold),
+                        startIndex + spanStart,
+                        startIndex + spanEnd
+                    )
+                    Typeface.ITALIC -> addStyle(
+                        SpanStyle(fontStyle = FontStyle.Italic),
+                        startIndex + spanStart,
+                        startIndex + spanEnd
+                    )
                     Typeface.BOLD_ITALIC -> addStyle(
                         SpanStyle(fontWeight = FontWeight.Bold, fontStyle = FontStyle.Italic),
-                        start, end
+                        startIndex + spanStart,
+                        startIndex + spanEnd
                     )
                 }
             }
         }
 
-        // Aplicar subrayado
-        spanned.getSpans(0, spanned.length, UnderlineSpan::class.java).forEach { span ->
-            val start = spanned.getSpanStart(span)
-            val end = spanned.getSpanEnd(span)
-            if (start >= 0 && end <= text.length && start < end) {
-                addStyle(SpanStyle(textDecoration = TextDecoration.Underline), start, end)
+        spanned.getSpans(textStart, textEnd, UnderlineSpan::class.java).forEach { span ->
+            val spanStart = maxOf(0, spanned.getSpanStart(span) - textStart)
+            val spanEnd = minOf(text.length, spanned.getSpanEnd(span) - textStart)
+            if (spanStart < spanEnd && spanStart >= 0 && spanEnd <= text.length) {
+                addStyle(
+                    SpanStyle(textDecoration = TextDecoration.Underline),
+                    startIndex + spanStart,
+                    startIndex + spanEnd
+                )
             }
         }
-
-        // Detectar y marcar teléfonos y URLs
-        detectPhonesAndUrls(text, linkColor)
     }
 }
 
 /**
- * Procesa texto plano (markdown simple)
+ * Detecta si una línea es un encabezado de sección
  */
-private fun AnnotatedString.Builder.processPlainText(text: String, linkColor: Color) {
+private fun isSectionHeader(line: String): Boolean {
+    val lowerLine = line.lowercase().trim()
+        .removeSuffix(":")
+        .removeSuffix("-")
+        .trim()
+
+    // Verificar si coincide con alguna keyword de sección
+    if (SECTION_KEYWORDS.any { lowerLine == it || lowerLine.startsWith("$it ") || lowerLine.endsWith(" $it") }) {
+        return true
+    }
+
+    // Detectar patrones comunes de secciones
+    // Ej: "📋 Requisitos", "✅ Beneficios", "🕐 Horario"
+    val withoutEmoji = lowerLine.replace(Regex("[\\p{So}\\p{Sk}]"), "").trim()
+    if (SECTION_KEYWORDS.any { withoutEmoji == it || withoutEmoji.startsWith("$it ") }) {
+        return true
+    }
+
+    // Línea corta que termina en ":" probablemente es sección
+    if (line.length < 40 && line.trimEnd().endsWith(":")) {
+        return true
+    }
+
+    return false
+}
+
+/**
+ * Formatea el encabezado de sección
+ */
+private fun formatSectionHeader(line: String): String {
+    var result = line.trim()
+
+    // Agregar emoji si no tiene
+    val lowerLine = result.lowercase()
+    val hasEmoji = result.any { Character.getType(it) == Character.OTHER_SYMBOL.toInt() }
+
+    if (!hasEmoji) {
+        val emoji = when {
+            lowerLine.contains("beneficio") || lowerLine.contains("ofrecemos") -> "✨ "
+            lowerLine.contains("requisito") || lowerLine.contains("buscamos") -> "📋 "
+            lowerLine.contains("funcion") || lowerLine.contains("responsabilidad") -> "💼 "
+            lowerLine.contains("horario") || lowerLine.contains("jornada") -> "🕐 "
+            lowerLine.contains("salario") || lowerLine.contains("sueldo") || lowerLine.contains("remuneración") -> "💰 "
+            lowerLine.contains("ubicación") || lowerLine.contains("lugar") -> "📍 "
+            lowerLine.contains("contacto") -> "📞 "
+            lowerLine.contains("experiencia") -> "⭐ "
+            lowerLine.contains("habilidad") || lowerLine.contains("competencia") -> "🎯 "
+            lowerLine.contains("importante") -> "⚠️ "
+            lowerLine.contains("perfil") -> "👤 "
+            lowerLine.contains("contrato") || lowerLine.contains("modalidad") -> "📄 "
+            else -> "▸ "
+        }
+        result = emoji + result
+    }
+
+    // Asegurar que termina en ":"
+    if (!result.endsWith(":") && !result.endsWith("-")) {
+        result = "$result:"
+    }
+
+    return result
+}
+
+/**
+ * Procesa texto plano (sin HTML)
+ */
+private fun AnnotatedString.Builder.processPlainText(text: String, linkColor: Color, sectionColor: Color) {
     val lines = text.split('\n')
+    var isFirstLine = true
 
-    lines.forEachIndexed { index, line ->
-        processLine(line.trim(), linkColor)
-        if (index < lines.size - 1) append('\n')
+    lines.forEachIndexed { index, rawLine ->
+        val line = rawLine.trim()
+
+        if (line.isBlank()) {
+            if (!isFirstLine) append('\n')
+            return@forEachIndexed
+        }
+
+        if (!isFirstLine) append('\n')
+        isFirstLine = false
+
+        when {
+            // Encabezados Markdown
+            line.startsWith("### ") -> {
+                withStyle(SpanStyle(fontWeight = FontWeight.Bold, fontSize = 15.sp, color = sectionColor)) {
+                    append(line.substring(4))
+                }
+            }
+            line.startsWith("## ") -> {
+                withStyle(SpanStyle(fontWeight = FontWeight.Bold, fontSize = 16.sp, color = sectionColor)) {
+                    append(line.substring(3))
+                }
+            }
+            line.startsWith("# ") -> {
+                withStyle(SpanStyle(fontWeight = FontWeight.Bold, fontSize = 18.sp, color = sectionColor)) {
+                    append(line.substring(2))
+                }
+            }
+            // Sección detectada
+            isSectionHeader(line) -> {
+                withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = sectionColor, fontSize = 15.sp)) {
+                    append(formatSectionHeader(line))
+                }
+            }
+            // Lista con viñeta
+            line.startsWith("- ") || line.startsWith("* ") -> {
+                append("    ")
+                withStyle(SpanStyle(color = sectionColor)) { append("• ") }
+                processInlineFormatting(line.substring(2), linkColor)
+            }
+            // Lista numerada
+            line.matches(Regex("^\\d+\\.\\s.*")) -> {
+                val num = line.takeWhile { it.isDigit() || it == '.' || it == ' ' }
+                append("    ")
+                withStyle(SpanStyle(color = sectionColor, fontWeight = FontWeight.Medium)) {
+                    append(num)
+                }
+                processInlineFormatting(line.substring(num.length), linkColor)
+            }
+            // Cita
+            line.startsWith("> ") -> {
+                withStyle(SpanStyle(fontStyle = FontStyle.Italic, color = Color.Gray)) {
+                    append("│ ")
+                    processInlineFormatting(line.substring(2), linkColor)
+                }
+            }
+            // Línea normal
+            else -> processInlineFormatting(line, linkColor)
+        }
     }
 }
 
 /**
- * Procesa una línea de texto con formato de bloque
- */
-private fun AnnotatedString.Builder.processLine(line: String, linkColor: Color) {
-    // ### Encabezado H3
-    if (line.startsWith("### ")) {
-        withStyle(SpanStyle(fontWeight = FontWeight.Bold, fontSize = 16.sp)) {
-            processInlineFormatting(line.substring(4), linkColor)
-        }
-        return
-    }
-
-    // ## Subtítulo H2
-    if (line.startsWith("## ")) {
-        withStyle(SpanStyle(fontWeight = FontWeight.Bold, fontSize = 18.sp)) {
-            processInlineFormatting(line.substring(3), linkColor)
-        }
-        return
-    }
-
-    // # Título H1
-    if (line.startsWith("# ")) {
-        withStyle(SpanStyle(fontWeight = FontWeight.Bold, fontSize = 20.sp)) {
-            processInlineFormatting(line.substring(2), linkColor)
-        }
-        return
-    }
-
-    // > Cita/blockquote
-    if (line.startsWith("> ")) {
-        withStyle(SpanStyle(fontStyle = FontStyle.Italic, color = Color.Gray)) {
-            append("│ ")
-            processInlineFormatting(line.substring(2), linkColor)
-        }
-        return
-    }
-
-    // Lista con viñeta (- o *)
-    if (line.startsWith("- ") || (line.startsWith("* ") && !line.startsWith("**"))) {
-        append("  • ")
-        processInlineFormatting(line.substring(2), linkColor)
-        return
-    }
-
-    // Lista numerada (1. 2. etc)
-    val numMatch = line.takeWhile { it.isDigit() }
-    if (numMatch.isNotEmpty() && line.getOrNull(numMatch.length) == '.') {
-        append("  $numMatch. ")
-        processInlineFormatting(line.substring(numMatch.length + 1).trimStart(), linkColor)
-        return
-    }
-
-    // Línea normal
-    processInlineFormatting(line, linkColor)
-}
-
-/**
- * Procesa formato inline estilo WhatsApp + Markdown
- * - *negrita* (WhatsApp) o **negrita** (Markdown)
- * - _cursiva_ (WhatsApp)
- * - ~tachado~ (WhatsApp)
- * - URLs clickeables
- * - Teléfonos clickeables
+ * Procesa formato inline (negrita, cursiva, links, teléfonos)
  */
 private fun AnnotatedString.Builder.processInlineFormatting(text: String, linkColor: Color) {
     var i = 0
     val len = text.length
 
     while (i < len) {
-        // **negrita** (Markdown estándar)
+        // **negrita**
         if (i + 1 < len && text[i] == '*' && text[i + 1] == '*') {
-            val end = findClosing(text, i + 2, "**")
-            if (end != -1 && end > i + 2) {
+            val end = text.indexOf("**", i + 2)
+            if (end > i + 2) {
                 withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
                     append(text.substring(i + 2, end))
                 }
@@ -315,22 +439,10 @@ private fun AnnotatedString.Builder.processInlineFormatting(text: String, linkCo
             }
         }
 
-        // *negrita* (WhatsApp style) - solo si hay contenido y está rodeado de espacios/inicio/fin
-        if (text[i] == '*' && (i == 0 || text[i - 1].isWhitespace() || text[i - 1] in ".,;:!?")) {
-            val end = findWhatsAppClosing(text, i + 1, '*')
-            if (end != -1 && end > i + 1) {
-                withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
-                    append(text.substring(i + 1, end))
-                }
-                i = end + 1
-                continue
-            }
-        }
-
-        // _cursiva_ (WhatsApp style)
-        if (text[i] == '_' && (i == 0 || text[i - 1].isWhitespace() || text[i - 1] in ".,;:!?")) {
-            val end = findWhatsAppClosing(text, i + 1, '_')
-            if (end != -1 && end > i + 1) {
+        // *cursiva* (solo si está rodeado correctamente)
+        if (text[i] == '*' && (i == 0 || text[i - 1].isWhitespace())) {
+            val end = findClosingMarker(text, i + 1, '*')
+            if (end > i + 1) {
                 withStyle(SpanStyle(fontStyle = FontStyle.Italic)) {
                     append(text.substring(i + 1, end))
                 }
@@ -339,11 +451,11 @@ private fun AnnotatedString.Builder.processInlineFormatting(text: String, linkCo
             }
         }
 
-        // ~tachado~ (WhatsApp style)
-        if (text[i] == '~' && (i == 0 || text[i - 1].isWhitespace() || text[i - 1] in ".,;:!?")) {
-            val end = findWhatsAppClosing(text, i + 1, '~')
-            if (end != -1 && end > i + 1) {
-                withStyle(SpanStyle(textDecoration = TextDecoration.LineThrough)) {
+        // _cursiva_
+        if (text[i] == '_' && (i == 0 || text[i - 1].isWhitespace())) {
+            val end = findClosingMarker(text, i + 1, '_')
+            if (end > i + 1) {
+                withStyle(SpanStyle(fontStyle = FontStyle.Italic)) {
                     append(text.substring(i + 1, end))
                 }
                 i = end + 1
@@ -351,22 +463,7 @@ private fun AnnotatedString.Builder.processInlineFormatting(text: String, linkCo
             }
         }
 
-        // `código` (Markdown)
-        if (text[i] == '`') {
-            val end = text.indexOf('`', i + 1)
-            if (end != -1 && end > i + 1) {
-                withStyle(SpanStyle(
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                    background = Color(0xFFE8E8E8)
-                )) {
-                    append(text.substring(i + 1, end))
-                }
-                i = end + 1
-                continue
-            }
-        }
-
-        // URL (http:// o https:// o www.)
+        // URL
         if (text.regionMatches(i, "http://", 0, 7, ignoreCase = true) ||
             text.regionMatches(i, "https://", 0, 8, ignoreCase = true) ||
             text.regionMatches(i, "www.", 0, 4, ignoreCase = true)) {
@@ -374,7 +471,7 @@ private fun AnnotatedString.Builder.processInlineFormatting(text: String, linkCo
             if (url != null) {
                 val startPos = length
                 withStyle(SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline)) {
-                    append(url.first)
+                    append("🔗 ${url.first}")
                 }
                 addStringAnnotation("URL", url.second, startPos, length)
                 i = url.third
@@ -388,7 +485,7 @@ private fun AnnotatedString.Builder.processInlineFormatting(text: String, linkCo
             if (phone != null) {
                 val startPos = length
                 withStyle(SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline)) {
-                    append(phone.first)
+                    append("📞 ${phone.first}")
                 }
                 addStringAnnotation("PHONE", phone.second, startPos, length)
                 i = phone.third
@@ -396,66 +493,39 @@ private fun AnnotatedString.Builder.processInlineFormatting(text: String, linkCo
             }
         }
 
-        // Caracter normal
+        // Email
+        if (text[i] == '@' || (i > 0 && text[i - 1].isLetterOrDigit() && text.indexOf('@', i) in (i + 1)..(i + 30))) {
+            // Intentar extraer email comenzando antes del @
+            val emailStart = (i - 20).coerceAtLeast(0)
+            val potentialEmail = text.substring(emailStart, minOf(text.length, i + 50))
+            val emailMatch = Regex("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}").find(potentialEmail)
+            if (emailMatch != null) {
+                val globalStart = emailStart + emailMatch.range.first
+                if (globalStart == i || (globalStart < i && globalStart + emailMatch.value.length > i)) {
+                    // Ya pasamos el inicio del email
+                    append(text[i])
+                    i++
+                    continue
+                }
+            }
+        }
+
         append(text[i])
         i++
     }
 }
 
 /**
- * Busca el cierre de formato WhatsApp (ej: * para *negrita*)
- * El cierre debe estar seguido de espacio, puntuación o fin de texto
+ * Detecta links y teléfonos en texto ya procesado
  */
-private fun findWhatsAppClosing(text: String, start: Int, marker: Char): Int {
-    var i = start
-    while (i < text.length) {
-        if (text[i] == marker) {
-            // Verificar que el cierre sea válido (seguido de espacio, puntuación o fin)
-            val nextChar = text.getOrNull(i + 1)
-            if (nextChar == null || nextChar.isWhitespace() || nextChar in ".,;:!?)-") {
-                return i
-            }
-        }
-        i++
-    }
-    return -1
-}
-
-/**
- * Extrae una URL del texto
- */
-private fun extractUrl(text: String, start: Int): Triple<String, String, Int>? {
-    var i = start
-    val sb = StringBuilder()
-
-    // Leer hasta encontrar espacio o caracter no válido para URL
-    while (i < text.length) {
-        val c = text[i]
-        if (c.isWhitespace() || c in "<>\"'") break
-        sb.append(c)
-        i++
-    }
-
-    val url = sb.toString().trimEnd('.', ',', ';', ':', '!', '?', ')')
-
-    // Validar que sea una URL válida (mínimo dominio.ext)
-    if (url.length > 5 && (url.contains("://") || url.startsWith("www."))) {
-        val fullUrl = if (url.startsWith("www.")) "https://$url" else url
-        return Triple(url, fullUrl, start + url.length)
-    }
-    return null
-}
-
-/**
- * Detecta teléfonos y URLs en texto ya procesado (para HTML)
- */
-private fun AnnotatedString.Builder.detectPhonesAndUrls(text: String, linkColor: Color) {
+private fun AnnotatedString.Builder.detectLinksAndPhones(text: String, linkColor: Color) {
     var i = 0
     while (i < text.length) {
-        // Detectar URL
-        if (text.regionMatches(i, "http://", 0, 7, ignoreCase = true) ||
+        // URL (si no tiene emoji ya)
+        if ((text.regionMatches(i, "http://", 0, 7, ignoreCase = true) ||
             text.regionMatches(i, "https://", 0, 8, ignoreCase = true) ||
-            text.regionMatches(i, "www.", 0, 4, ignoreCase = true)) {
+            text.regionMatches(i, "www.", 0, 4, ignoreCase = true)) &&
+            (i == 0 || text[i - 1] != '🔗')) {
             val url = extractUrl(text, i)
             if (url != null) {
                 addStyle(
@@ -468,8 +538,9 @@ private fun AnnotatedString.Builder.detectPhonesAndUrls(text: String, linkColor:
             }
         }
 
-        // Detectar teléfono
-        if (text[i].isDigit() || (text[i] == '+' && i + 1 < text.length && text[i + 1].isDigit())) {
+        // Teléfono (si no tiene emoji ya)
+        if ((text[i].isDigit() || (text[i] == '+' && i + 1 < text.length && text[i + 1].isDigit())) &&
+            (i == 0 || text[i - 1] != '📞')) {
             val phone = extractPhone(text, i)
             if (phone != null) {
                 addStyle(
@@ -481,13 +552,58 @@ private fun AnnotatedString.Builder.detectPhonesAndUrls(text: String, linkColor:
                 continue
             }
         }
+
+        // Email
+        val remainingText = text.substring(i)
+        val emailMatch = Regex("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}").find(remainingText)
+        if (emailMatch != null) {
+            addStyle(
+                SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline),
+                i, i + emailMatch.value.length
+            )
+            addStringAnnotation("EMAIL", emailMatch.value, i, i + emailMatch.value.length)
+            i += emailMatch.value.length
+            continue
+        }
+
         i++
     }
 }
 
-/**
- * Extrae un teléfono: (displayText, cleanNumber, endIndex)
- */
+private fun findClosingMarker(text: String, start: Int, marker: Char): Int {
+    var i = start
+    while (i < text.length) {
+        if (text[i] == marker) {
+            val nextChar = text.getOrNull(i + 1)
+            if (nextChar == null || nextChar.isWhitespace() || nextChar in ".,;:!?)-") {
+                return i
+            }
+        }
+        i++
+    }
+    return -1
+}
+
+private fun extractUrl(text: String, start: Int): Triple<String, String, Int>? {
+    var i = start
+    val sb = StringBuilder()
+
+    while (i < text.length) {
+        val c = text[i]
+        if (c.isWhitespace() || c in "<>\"'") break
+        sb.append(c)
+        i++
+    }
+
+    val url = sb.toString().trimEnd('.', ',', ';', ':', '!', '?', ')')
+
+    if (url.length > 5 && (url.contains("://") || url.startsWith("www."))) {
+        val fullUrl = if (url.startsWith("www.")) "https://$url" else url
+        return Triple(url, fullUrl, start + url.length)
+    }
+    return null
+}
+
 private fun extractPhone(text: String, start: Int): Triple<String, String, Int>? {
     val display = StringBuilder()
     val clean = StringBuilder()
@@ -521,18 +637,6 @@ private fun extractPhone(text: String, start: Int): Triple<String, String, Int>?
     } else null
 }
 
-private fun findClosing(text: String, start: Int, marker: String): Int {
-    var i = start
-    while (i <= text.length - marker.length) {
-        if (text.substring(i, i + marker.length) == marker) return i
-        i++
-    }
-    return -1
-}
-
-/**
- * Limpia el texto de marcadores y decodifica entidades HTML
- */
 private fun cleanText(text: String): String {
     var result = text
 
@@ -554,7 +658,7 @@ private fun cleanText(text: String): String {
         }
     }
 
-    // Decodificar entidades HTML comunes
+    // Decodificar entidades HTML
     if (result.contains('&')) {
         result = result
             .replace("&amp;", "&")
@@ -612,23 +716,17 @@ private fun removeTagContent(html: String, tag: String): String {
     return sb.toString()
 }
 
-/**
- * Maneja clicks en teléfonos, emails, URLs
- */
 private fun handleClick(offset: Int, text: AnnotatedString, context: Context) {
-    // Teléfono - abrir dialer
     text.getStringAnnotations("PHONE", offset, offset).firstOrNull()?.let {
         context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:${it.item}")))
         return
     }
 
-    // Email
     text.getStringAnnotations("EMAIL", offset, offset).firstOrNull()?.let {
         context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:${it.item}")))
         return
     }
 
-    // URL
     text.getStringAnnotations("URL", offset, offset).firstOrNull()?.let {
         val url = if (it.item.startsWith("http")) it.item else "https://${it.item}"
         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
