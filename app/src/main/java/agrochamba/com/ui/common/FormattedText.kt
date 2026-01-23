@@ -131,35 +131,37 @@ private fun htmlToSpanned(html: String): Spanned {
     val input = if (html.length > 20000) html.take(20000) else html
 
     // Pre-procesar para conservar estructura
+    // IMPORTANTE: Usar <br> en lugar de \n porque Html.fromHtml colapsa whitespace
     var processed = input
         // Eliminar comentarios de Gutenberg (WordPress block editor)
         .replace(Regex("<!--.*?-->"), "")
-        // Saltos de línea
-        .replace("<br>", "\n", ignoreCase = true)
-        .replace("<br/>", "\n", ignoreCase = true)
-        .replace("<br />", "\n", ignoreCase = true)
-        // Párrafos: agregar doble salto para separar visualmente
-        .replace("</p>", "\n\n", ignoreCase = true)
+        // Normalizar br tags
+        .replace("<br/>", "<br>", ignoreCase = true)
+        .replace("<br />", "<br>", ignoreCase = true)
+        // Párrafos: agregar doble br para separar visualmente
+        .replace("</p>", "<br><br>", ignoreCase = true)
         .replace("<p>", "", ignoreCase = true)
         .replace(Regex("<p[^>]*>"), "") // <p class="..."> etc.
         // Divs
-        .replace("</div>", "\n", ignoreCase = true)
+        .replace("</div>", "<br>", ignoreCase = true)
         .replace("<div>", "", ignoreCase = true)
         .replace(Regex("<div[^>]*>"), "")
         // Encabezados
-        .replace(Regex("</h[1-6]>"), "\n\n")
-        .replace(Regex("<h[1-6][^>]*>"), "\n")
-        // Listas
-        .replace("<li>", "\n• ", ignoreCase = true)
+        .replace(Regex("</h[1-6]>"), "<br><br>")
+        .replace(Regex("<h[1-6][^>]*>"), "<br>")
+        // Listas - cada item en nueva línea
+        .replace("<li>", "<br>• ", ignoreCase = true)
         .replace("</li>", "", ignoreCase = true)
         .replace("<ul>", "", ignoreCase = true)
-        .replace("</ul>", "\n", ignoreCase = true)
+        .replace("</ul>", "<br>", ignoreCase = true)
         .replace("<ol>", "", ignoreCase = true)
-        .replace("</ol>", "\n", ignoreCase = true)
-        // Limpiar múltiples saltos de línea (máximo 2)
-        .replace(Regex("\n{3,}"), "\n\n")
-        // Limpiar espacios antes de saltos de línea
-        .replace(Regex(" +\n"), "\n")
+        .replace("</ol>", "<br>", ignoreCase = true)
+        // Limpiar múltiples br (máximo 2)
+        .replace(Regex("(<br>){3,}"), "<br><br>")
+        // Limpiar br al inicio
+        .replace(Regex("^(<br>)+"), "")
+        // Limpiar espacios antes de br
+        .replace(Regex(" +<br>"), "<br>")
 
     // Eliminar tags peligrosos
     processed = removeTagContent(processed, "script")
