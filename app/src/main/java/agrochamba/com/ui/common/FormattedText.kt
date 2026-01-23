@@ -178,8 +178,14 @@ private fun htmlToSpanned(html: String): Spanned {
  */
 private fun spannedToAnnotatedString(spanned: Spanned, linkColor: Color): AnnotatedString {
     val text = spanned.toString()
-        .replace("\u00A0", " ")
-        .replace("\u200B", "")
+        .replace("\u00A0", " ")      // Non-breaking space
+        .replace("\u200B", "")       // Zero-width space
+        .replace("\uFFFC", "")       // Object replacement character (OBJ)
+        .replace("\uFFFD", "")       // Replacement character
+        .replace("\u200C", "")       // Zero-width non-joiner
+        .replace("\u200D", "")       // Zero-width joiner
+        .replace("\u2028", "\n")     // Line separator
+        .replace("\u2029", "\n\n")   // Paragraph separator
 
     return buildAnnotatedString {
         append(text)
