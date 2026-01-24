@@ -176,18 +176,25 @@ fun JobsMapView(
     // Agrupar trabajos por departamento
     val jobsByDepartment = remember(jobs) {
         jobs.groupBy { job ->
-            // Intentar extraer departamento del campo ubicacion_completa o de la taxonomía
+            // Intentar extraer departamento: meta > ubicacionDisplay > taxonomía
             val ubicacionCompleta = job.meta?.ubicacionCompleta
-            if (ubicacionCompleta != null && ubicacionCompleta.departamento.isNotBlank()) {
-                ubicacionCompleta.departamento
-            } else {
-                // Fallback: extraer de la taxonomía embebida
-                job.embedded?.terms?.flatten()
-                    ?.find { term ->
-                        departamentoCoords.keys.any { dep ->
-                            term.name?.contains(dep, ignoreCase = true) == true
-                        }
-                    }?.name?.split(",")?.firstOrNull()?.trim() ?: "Otro"
+            val ubicacionDisplay = job.ubicacionDisplay
+            when {
+                ubicacionCompleta != null && ubicacionCompleta.departamento.isNotBlank() -> {
+                    ubicacionCompleta.departamento
+                }
+                !ubicacionDisplay?.departamento.isNullOrBlank() -> {
+                    ubicacionDisplay!!.departamento!!
+                }
+                else -> {
+                    // Fallback: extraer de la taxonomía embebida
+                    job.embedded?.terms?.flatten()
+                        ?.find { term ->
+                            departamentoCoords.keys.any { dep ->
+                                term.name?.contains(dep, ignoreCase = true) == true
+                            }
+                        }?.name?.split(",")?.firstOrNull()?.trim() ?: "Otro"
+                }
             }
         }.filter { it.key != "Otro" || it.value.isNotEmpty() }
     }
@@ -488,11 +495,14 @@ private fun ClusterJobCard(
             
             Spacer(modifier = Modifier.height(4.dp))
             
-            // Ubicación completa si está disponible
+            // Ubicación completa si está disponible (meta > ubicacionDisplay)
             val ubicacion = job.meta?.ubicacionCompleta
-            if (ubicacion != null && ubicacion.distrito.isNotBlank()) {
+            val ubicacionDisplay = job.ubicacionDisplay
+            val distrito = ubicacion?.distrito?.takeIf { it.isNotBlank() } ?: ubicacionDisplay?.distrito
+            val provincia = ubicacion?.provincia?.takeIf { it.isNotBlank() } ?: ubicacionDisplay?.provincia
+            if (!distrito.isNullOrBlank() && !provincia.isNullOrBlank()) {
                 Text(
-                    text = "📌 ${ubicacion.distrito}, ${ubicacion.provincia}",
+                    text = "📌 $distrito, $provincia",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

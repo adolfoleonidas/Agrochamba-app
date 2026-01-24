@@ -418,6 +418,27 @@ class JobsViewModel @Inject constructor() : androidx.lifecycle.ViewModel() {
     }
 
     private fun extractFromUbicacionTerm(job: JobPost): UbicacionCompleta? {
+        // Prioridad 1: usar ubicacionDisplay que la API agrega directamente
+        job.ubicacionDisplay?.let { display ->
+            if (!display.departamento.isNullOrBlank()) {
+                val nivel = when (display.nivel?.uppercase()) {
+                    "DISTRITO" -> LocationType.DISTRITO
+                    "PROVINCIA" -> LocationType.PROVINCIA
+                    else -> LocationType.DEPARTAMENTO
+                }
+                return UbicacionCompleta(
+                    departamento = display.departamento,
+                    provincia = display.provincia ?: "",
+                    distrito = display.distrito ?: "",
+                    direccion = display.direccion,
+                    lat = display.lat,
+                    lng = display.lng,
+                    nivel = nivel
+                )
+            }
+        }
+
+        // Prioridad 2: parsear de taxonomía embebida (fallback legacy)
         val terms = job.embedded?.terms?.flatten() ?: emptyList()
         val locationName = terms.firstOrNull { it.taxonomy == "ubicacion" }?.name ?: return null
         val parts = locationName.split(",").map { it.trim() }.filter { it.isNotBlank() }

@@ -14,7 +14,22 @@ data class JobPost(
     @Json(name = "featured_media") val featuredMedia: Int? = null,
     @Json(name = "featured_image_url") val featuredImageUrl: String? = null,
     val meta: JobMeta? = null, // Objeto que contiene todos los campos personalizados
-    @Json(name = "_embedded") val embedded: Embedded? = null
+    @Json(name = "_embedded") val embedded: Embedded? = null,
+    // Campo adicional que la API agrega con la ubicación completa formateada
+    @Json(name = "ubicacion_display") val ubicacionDisplay: UbicacionDisplay? = null
+)
+
+// Ubicación formateada que viene directamente de la API (fuera de meta)
+data class UbicacionDisplay(
+    val departamento: String? = null,
+    val provincia: String? = null,
+    val distrito: String? = null,
+    val direccion: String? = null,
+    val nivel: String? = null,
+    val lat: Double? = null,
+    val lng: Double? = null,
+    val card: String? = null,  // Solo departamento para cards
+    val full: String? = null   // Ubicación completa formateada
 )
 
 data class Title(

@@ -2,83 +2,38 @@ package agrochamba.com.ui.jobs
 
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
-import android.text.Html
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.AttachMoney
-import androidx.compose.material.icons.filled.Business
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.DirectionsBus
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Restaurant
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.Work
-import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.filled.Phone
-import androidx.compose.material.icons.filled.Public
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
-import androidx.lifecycle.viewmodel.compose.viewModel
-import agrochamba.com.data.CompanyProfileResponse
-import agrochamba.com.data.WordPressApi
-import agrochamba.com.data.UbicacionCompleta
-import agrochamba.com.data.LocationType
-import agrochamba.com.ui.common.LocationDetailView
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Divider
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.navigation.NavController
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -86,16 +41,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import agrochamba.com.data.JobPost
-import agrochamba.com.data.MediaItem
+import androidx.navigation.NavController
+import agrochamba.com.R
+import agrochamba.com.data.*
 import agrochamba.com.ui.common.FormattedText
+import agrochamba.com.ui.common.LocationDetailView
 import agrochamba.com.utils.htmlToString
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import coil.size.Size
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.res.painterResource
-import agrochamba.com.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -106,99 +60,429 @@ fun JobDetailScreen(
     navController: NavController? = null,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val scrollState = rememberScrollState()
     var fullscreenImageIndex by remember { mutableStateOf<Int?>(null) }
-    
-    // Obtener todas las URLs de imágenes disponibles (optimizadas para el slider)
+
+    // Extraer datos
+    val terms = job.embedded?.terms?.flatten() ?: emptyList()
+    val companyName = terms.find { it.taxonomy == "empresa" }?.name
+    val locationName = terms.find { it.taxonomy == "ubicacion" }?.name
+
+    // URLs de imágenes
     val allImageUrls = remember(mediaItems, job) {
         val urls = mutableListOf<String>()
-        
-        // 1. Agregar imágenes de mediaItems
-        mediaItems.forEach { media ->
-            media.getImageUrl()?.let { url ->
-                if (url !in urls) urls.add(url)
-            }
-        }
-        
-        // 2. Si no hay imágenes, intentar desde embedded
+        mediaItems.forEach { media -> media.getImageUrl()?.let { if (it !in urls) urls.add(it) } }
         if (urls.isEmpty()) {
             job.embedded?.featuredMedia?.forEach { media ->
-                media.getImageUrl()?.let { url ->
-                    if (url !in urls) urls.add(url)
-                }
+                media.getImageUrl()?.let { if (it !in urls) urls.add(it) }
             }
         }
-        
         urls
     }
-    
-    // Obtener todas las URLs completas para pantalla completa
+
     val allFullImageUrls = remember(mediaItems, job) {
         val urls = mutableListOf<String>()
-        
-        // 1. Agregar imágenes completas de mediaItems
-        mediaItems.forEach { media ->
-            media.getFullImageUrl()?.let { url ->
-                if (url !in urls) urls.add(url)
-            }
-        }
-        
-        // 2. Si no hay imágenes, intentar desde embedded
+        mediaItems.forEach { media -> media.getFullImageUrl()?.let { if (it !in urls) urls.add(it) } }
         if (urls.isEmpty()) {
             job.embedded?.featuredMedia?.forEach { media ->
-                media.getFullImageUrl()?.let { url ->
-                    if (url !in urls) urls.add(url)
-                }
+                media.getFullImageUrl()?.let { if (it !in urls) urls.add(it) }
             }
         }
-        
         urls
+    }
+
+    // Ubicación completa
+    val ubicacionCompleta = remember(job.meta?.ubicacionCompleta, job.ubicacionDisplay, locationName) {
+        job.meta?.ubicacionCompleta?.let { return@remember it }
+        job.ubicacionDisplay?.let { display ->
+            if (!display.departamento.isNullOrBlank()) {
+                val nivel = when (display.nivel?.uppercase()) {
+                    "DISTRITO" -> LocationType.DISTRITO
+                    "PROVINCIA" -> LocationType.PROVINCIA
+                    else -> LocationType.DEPARTAMENTO
+                }
+                return@remember UbicacionCompleta(
+                    departamento = display.departamento,
+                    provincia = display.provincia ?: "",
+                    distrito = display.distrito ?: "",
+                    direccion = display.direccion,
+                    lat = display.lat,
+                    lng = display.lng,
+                    nivel = nivel
+                )
+            }
+        }
+        if (locationName == null) return@remember null
+        val parts = locationName.split(",").map { it.trim() }
+        when (parts.size) {
+            1 -> UbicacionCompleta(departamento = parts[0], provincia = "", distrito = "", nivel = LocationType.DEPARTAMENTO)
+            2 -> UbicacionCompleta(departamento = parts[1], provincia = parts[0], distrito = "", nivel = LocationType.PROVINCIA)
+            3 -> UbicacionCompleta(departamento = parts[2], provincia = parts[1], distrito = parts[0], nivel = LocationType.DISTRITO)
+            else -> UbicacionCompleta(departamento = parts.lastOrNull() ?: "", provincia = parts.getOrNull(parts.size - 2) ?: "", distrito = parts.firstOrNull() ?: "", nivel = LocationType.DISTRITO)
+        }
+    }
+
+    // Estado de empresa
+    var companyProfile by remember { mutableStateOf<CompanyProfileResponse?>(null) }
+
+    LaunchedEffect(companyName) {
+        if (companyName != null) {
+            try {
+                companyProfile = WordPressApi.retrofitService.getCompanyProfileByName(companyName.htmlToString())
+            } catch (e: Exception) { companyProfile = null }
+        }
     }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Detalle del Trabajo") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateUp) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver atrás")
-                    }
-                }
-            )
-        }
+        containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
-        JobDetailContent(
-            job = job,
-            mediaItems = mediaItems,
-            allImageUrls = allImageUrls,
-            allFullImageUrls = allFullImageUrls,
-            onImageClick = { clickedUrl ->
-                // Encontrar el índice de la imagen clickeada
-                // Primero intentar encontrar por URL exacta o parcial
-                val index = allFullImageUrls.indexOfFirst { url ->
-                    // Comparar URLs (puede haber variaciones con parámetros o tamaños)
-                    val clickedFileName = clickedUrl.substringAfterLast("/").substringBefore("?")
-                    val urlFileName = url.substringAfterLast("/").substringBefore("?")
-                    clickedFileName == urlFileName || 
-                    url.contains(clickedFileName) || 
-                    clickedUrl.contains(urlFileName)
-                }
-                fullscreenImageIndex = if (index >= 0) index else {
-                    // Si no se encuentra, buscar en las URLs optimizadas y mapear al índice correspondiente
-                    val optimizedIndex = allImageUrls.indexOfFirst { url ->
-                        val clickedFileName = clickedUrl.substringAfterLast("/").substringBefore("?")
-                        val urlFileName = url.substringAfterLast("/").substringBefore("?")
-                        clickedFileName == urlFileName || url.contains(clickedFileName)
+        Box(modifier = modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(scrollState)
+            ) {
+                // ═══════════════════════════════════════════════════════════
+                // HERO SECTION - Imagen con overlay
+                // ═══════════════════════════════════════════════════════════
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(280.dp)
+                ) {
+                    // Imagen de fondo
+                    if (allImageUrls.isNotEmpty()) {
+                        HeroImageSlider(
+                            imageUrls = allImageUrls,
+                            onImageClick = { index -> fullscreenImageIndex = index }
+                        )
+                    } else {
+                        // Placeholder elegante
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.verticalGradient(
+                                        colors = listOf(
+                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                                            MaterialTheme.colorScheme.primaryContainer
+                                        )
+                                    )
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_launcher_foreground),
+                                contentDescription = null,
+                                modifier = Modifier.size(100.dp),
+                                tint = Color.White.copy(alpha = 0.3f)
+                            )
+                        }
                     }
-                    optimizedIndex.coerceIn(0, allFullImageUrls.size - 1)
+
+                    // Gradiente oscuro inferior para legibilidad
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(120.dp)
+                            .align(Alignment.BottomCenter)
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color.Transparent,
+                                        Color.Black.copy(alpha = 0.7f)
+                                    )
+                                )
+                            )
+                    )
+
+                    // Botón de volver
+                    IconButton(
+                        onClick = onNavigateUp,
+                        modifier = Modifier
+                            .padding(16.dp)
+                            .align(Alignment.TopStart)
+                            .background(
+                                Color.Black.copy(alpha = 0.3f),
+                                CircleShape
+                            )
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Volver",
+                            tint = Color.White
+                        )
+                    }
+
+                    // Contador de imágenes
+                    if (allImageUrls.size > 1) {
+                        Surface(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(16.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            color = Color.Black.copy(alpha = 0.5f)
+                        ) {
+                            Text(
+                                text = "${allImageUrls.size} fotos",
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                color = Color.White,
+                                style = MaterialTheme.typography.labelMedium
+                            )
+                        }
+                    }
                 }
-            },
-            navController = navController,
-            modifier = modifier.padding(innerPadding)
-        )
+
+                // ═══════════════════════════════════════════════════════════
+                // CONTENIDO PRINCIPAL
+                // ═══════════════════════════════════════════════════════════
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .offset(y = (-24).dp)
+                        .background(
+                            MaterialTheme.colorScheme.background,
+                            RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+                        )
+                        .padding(horizontal = 20.dp)
+                        .padding(top = 24.dp)
+                ) {
+                    // ─────────────────────────────────────────────────────────
+                    // TÍTULO Y EMPRESA
+                    // ─────────────────────────────────────────────────────────
+                    Text(
+                        text = job.title?.rendered?.htmlToString() ?: "Sin título",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        lineHeight = 32.sp
+                    )
+
+                    Spacer(Modifier.height(12.dp))
+
+                    // Empresa clickeable
+                    if (companyName != null) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable {
+                                    navController?.navigate("company_profile/${companyName.htmlToString()}")
+                                }
+                                .padding(vertical = 4.dp)
+                        ) {
+                            // Logo de empresa o icono
+                            val logoUrl = companyProfile?.logoUrl ?: companyProfile?.profilePhotoUrl
+                            if (logoUrl != null) {
+                                AsyncImage(
+                                    model = ImageRequest.Builder(context).data(logoUrl).build(),
+                                    contentDescription = null,
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .clip(CircleShape),
+                                    contentScale = ContentScale.Crop
+                                )
+                            } else {
+                                Box(
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .background(
+                                            MaterialTheme.colorScheme.primaryContainer,
+                                            CircleShape
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.Business,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp),
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.width(10.dp))
+                            Text(
+                                text = companyName.htmlToString(),
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Icon(
+                                Icons.Default.ChevronRight,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp),
+                                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.height(20.dp))
+
+                    // ─────────────────────────────────────────────────────────
+                    // QUICK INFO - Chips con información clave
+                    // ─────────────────────────────────────────────────────────
+                    QuickInfoSection(job = job, ubicacion = ubicacionCompleta)
+
+                    Spacer(Modifier.height(24.dp))
+
+                    // ─────────────────────────────────────────────────────────
+                    // BENEFICIOS (si existen)
+                    // ─────────────────────────────────────────────────────────
+                    val hasBenefits = job.meta?.alojamiento == true ||
+                                      job.meta?.transporte == true ||
+                                      job.meta?.alimentacion == true
+
+                    if (hasBenefits) {
+                        BenefitsSection(job = job)
+                        Spacer(Modifier.height(24.dp))
+                    }
+
+                    // ─────────────────────────────────────────────────────────
+                    // DESCRIPCIÓN DEL TRABAJO
+                    // ─────────────────────────────────────────────────────────
+                    job.content?.rendered?.let { content ->
+                        if (content.trim().isNotBlank()) {
+                            ContentSection(
+                                title = "Descripción",
+                                icon = Icons.Outlined.Description
+                            ) {
+                                FormattedText(
+                                    text = content,
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        lineHeight = 26.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                            Spacer(Modifier.height(20.dp))
+                        }
+                    }
+
+                    // ─────────────────────────────────────────────────────────
+                    // REQUISITOS
+                    // ─────────────────────────────────────────────────────────
+                    job.meta?.requisitos?.let { requisitos ->
+                        if (requisitos.isNotBlank()) {
+                            ContentSection(
+                                title = "Requisitos",
+                                icon = Icons.Outlined.Checklist
+                            ) {
+                                val items = requisitos.htmlToString()
+                                    .split("\n")
+                                    .filter { it.trim().isNotEmpty() }
+
+                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    items.forEach { item ->
+                                        RequirementRow(text = item.trim())
+                                    }
+                                }
+                            }
+                            Spacer(Modifier.height(20.dp))
+                        }
+                    }
+
+                    // ─────────────────────────────────────────────────────────
+                    // DETALLES DEL PUESTO
+                    // ─────────────────────────────────────────────────────────
+                    val hasDetails = !job.meta?.vacantes.isNullOrBlank() ||
+                                     !job.meta?.tipoContrato.isNullOrBlank() ||
+                                     !job.meta?.jornada.isNullOrBlank()
+
+                    if (hasDetails) {
+                        ContentSection(
+                            title = "Detalles del puesto",
+                            icon = Icons.Outlined.Info
+                        ) {
+                            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                                job.meta?.vacantes?.takeIf { it.isNotBlank() }?.let {
+                                    DetailItem(
+                                        icon = Icons.Outlined.Groups,
+                                        label = "Vacantes",
+                                        value = "$it disponibles"
+                                    )
+                                }
+                                job.meta?.tipoContrato?.takeIf { it.isNotBlank() }?.let {
+                                    DetailItem(
+                                        icon = Icons.Outlined.Assignment,
+                                        label = "Tipo de contrato",
+                                        value = it
+                                    )
+                                }
+                                job.meta?.jornada?.takeIf { it.isNotBlank() }?.let {
+                                    DetailItem(
+                                        icon = Icons.Outlined.Schedule,
+                                        label = "Jornada",
+                                        value = it
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(20.dp))
+                    }
+
+                    // ─────────────────────────────────────────────────────────
+                    // UBICACIÓN
+                    // ─────────────────────────────────────────────────────────
+                    ubicacionCompleta?.let { ubicacion ->
+                        if (ubicacion.departamento.isNotBlank()) {
+                            ContentSection(
+                                title = "Ubicación",
+                                icon = Icons.Outlined.LocationOn
+                            ) {
+                                LocationCard(ubicacion = ubicacion)
+                            }
+                            Spacer(Modifier.height(20.dp))
+                        }
+                    }
+
+                    // ─────────────────────────────────────────────────────────
+                    // INFORMACIÓN DE LA EMPRESA
+                    // ─────────────────────────────────────────────────────────
+                    if (companyName != null && companyProfile != null) {
+                        ContentSection(
+                            title = "Acerca de la empresa",
+                            icon = Icons.Outlined.Business
+                        ) {
+                            CompanyCard(
+                                companyProfile = companyProfile!!,
+                                companyName = companyName,
+                                navController = navController,
+                                context = context
+                            )
+                        }
+                        Spacer(Modifier.height(20.dp))
+                    }
+
+                    // Espacio inferior para el botón flotante
+                    Spacer(Modifier.height(80.dp))
+                }
+            }
+
+            // ═══════════════════════════════════════════════════════════
+            // BOTÓN DE CONTACTO FLOTANTE
+            // ═══════════════════════════════════════════════════════════
+            AnimatedVisibility(
+                visible = companyProfile?.phone != null || companyProfile?.email != null,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(20.dp)
+            ) {
+                ContactButton(
+                    phone = companyProfile?.phone,
+                    email = companyProfile?.email,
+                    context = context
+                )
+            }
+        }
     }
 
+    // Fullscreen image viewer
     if (fullscreenImageIndex != null && allFullImageUrls.isNotEmpty()) {
-        FullscreenImageSlider(
+        FullscreenImageViewer(
             imageUrls = allFullImageUrls,
             initialIndex = fullscreenImageIndex ?: 0,
             onDismiss = { fullscreenImageIndex = null }
@@ -206,433 +490,124 @@ fun JobDetailScreen(
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// COMPONENTES
+// ═══════════════════════════════════════════════════════════════════════════
+
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun JobDetailContent(
-    job: JobPost,
-    mediaItems: List<MediaItem>,
-    allImageUrls: List<String>,
-    allFullImageUrls: List<String>,
-    onImageClick: (String) -> Unit,
-    navController: NavController? = null,
-    modifier: Modifier = Modifier
+private fun HeroImageSlider(
+    imageUrls: List<String>,
+    onImageClick: (Int) -> Unit
 ) {
-    val scrollState = rememberScrollState()
+    val pagerState = rememberPagerState(pageCount = { imageUrls.size })
     val context = LocalContext.current
-    val terms = job.embedded?.terms?.flatten() ?: emptyList()
-    val companyName = terms.find { it.taxonomy == "empresa" }?.name
-    val locationName = terms.find { it.taxonomy == "ubicacion" }?.name
-    
-    // Usar ubicación completa del meta field si existe, sino parsear del nombre de taxonomía
-    val ubicacionCompleta = remember(job.meta?.ubicacionCompleta, locationName) {
-        // Prioridad 1: usar _ubicacion_completa del meta field (ya incluye nivel)
-        job.meta?.ubicacionCompleta?.let { return@remember it }
-        
-        // Prioridad 2: parsear del nombre de la taxonomía y detectar el nivel
-        if (locationName == null) return@remember null
-        
-        val parts = locationName.split(",").map { it.trim() }
-        when (parts.size) {
-            // Solo departamento: nivel = DEPARTAMENTO
-            1 -> UbicacionCompleta(
-                departamento = parts[0],
-                provincia = "", // Vacío porque el usuario no especificó
-                distrito = "",  // Vacío porque el usuario no especificó
-                nivel = LocationType.DEPARTAMENTO
-            )
-            // Provincia, Departamento: nivel = PROVINCIA
-            2 -> UbicacionCompleta(
-                departamento = parts[1],
-                provincia = parts[0],
-                distrito = "", // Vacío porque el usuario no especificó distrito
-                nivel = LocationType.PROVINCIA
-            )
-            // Distrito, Provincia, Departamento: nivel = DISTRITO
-            3 -> UbicacionCompleta(
-                departamento = parts[2],
-                provincia = parts[1],
-                distrito = parts[0],
-                nivel = LocationType.DISTRITO
-            )
-            // Más de 3 partes: asumir formato completo (distrito)
-            else -> UbicacionCompleta(
-                departamento = parts.lastOrNull() ?: "",
-                provincia = parts.getOrNull(parts.size - 2) ?: "",
-                distrito = parts.firstOrNull() ?: "",
-                nivel = LocationType.DISTRITO
-            )
-        }
-    }
-    
-    // Estado para información de la empresa
-    var companyProfile by remember { mutableStateOf<CompanyProfileResponse?>(null) }
-    var isLoadingCompany by remember { mutableStateOf(false) }
-    
-    // Cargar información de la empresa cuando hay un nombre
-    LaunchedEffect(companyName) {
-        if (companyName != null) {
-            isLoadingCompany = true
-            try {
-                companyProfile = WordPressApi.retrofitService.getCompanyProfileByName(companyName.htmlToString())
-            } catch (e: Exception) {
-                // Si falla, simplemente no mostramos la información de la empresa
-                companyProfile = null
-            } finally {
-                isLoadingCompany = false
-            }
-        }
-    }
 
-    Column(modifier = modifier.fillMaxSize().verticalScroll(scrollState)) {
-        // --- HEADER CON SLIDER DE IMÁGENES ---
-            
-        if (allImageUrls.isNotEmpty()) {
-            // SLIDER DE IMÁGENES
-            ImageSlider(
-                imageUrls = allImageUrls,
-                fullImageUrls = allFullImageUrls, // Pasar URLs completas para pantalla completa
-                onImageClick = onImageClick,
-                modifier = Modifier.fillMaxWidth()
+    Box(modifier = Modifier.fillMaxSize()) {
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxSize()
+        ) { page ->
+            AsyncImage(
+                model = ImageRequest.Builder(context)
+                    .data(imageUrls[page])
+                    .crossfade(true)
+                    .build(),
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clickable { onImageClick(page) },
+                contentScale = ContentScale.Crop
             )
-        } else {
-            // Si no hay imágenes, mostrar placeholder
-            Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(300.dp)
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
-                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        }
+
+        // Indicadores
+        if (imageUrls.size > 1) {
+            Row(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 40.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                repeat(imageUrls.size) { index ->
+                    Box(
+                        modifier = Modifier
+                            .size(if (pagerState.currentPage == index) 8.dp else 6.dp)
+                            .background(
+                                if (pagerState.currentPage == index) Color.White
+                                else Color.White.copy(alpha = 0.5f),
+                                CircleShape
                             )
-                        ),
-                        RoundedCornerShape(0.dp)
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                AgroChambaLogoPlaceholder(
-                    size = 80.dp,
-                    alpha = 0.5f
-                )
-            }
-        }
-
-        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-            Spacer(Modifier.height(20.dp))
-
-            // --- TÍTULO ---
-            Text(
-                job.title?.rendered?.htmlToString() ?: "Sin título",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-                lineHeight = MaterialTheme.typography.headlineMedium.lineHeight * 1.2
-            )
-            
-            Spacer(Modifier.height(16.dp))
-            
-            // --- EMPRESA CON ICONO ---
-            if (companyName != null) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.clickable {
-                        // Navegar al perfil de la empresa
-                        navController?.navigate("company_profile/${companyName.htmlToString()}")
-                    }
-                ) {
-                    Icon(
-                        Icons.Default.Business,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        companyName.htmlToString(),
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.primary
                     )
                 }
             }
-
-            Spacer(Modifier.height(20.dp))
-
-            // --- SALARIO (en fila simple) ---
-            job.meta?.let {
-                val salario = when {
-                    !it.salarioMin.isNullOrBlank() && !it.salarioMax.isNullOrBlank() -> "S/ ${it.salarioMin} - S/ ${it.salarioMax}"
-                    !it.salarioMin.isNullOrBlank() -> "S/ ${it.salarioMin}+"
-                    else -> null
-                }
-                if (salario != null) {
-                    SimpleInfoRow(icon = Icons.Default.AttachMoney, text = salario)
-                    Spacer(Modifier.height(16.dp))
-                }
-            }
-            
-            // --- UBICACIÓN COMPLETA (Departamento, Provincia, Distrito) ---
-            ubicacionCompleta?.let { ubicacion ->
-                if (ubicacion.departamento.isNotBlank()) {
-                    LocationDetailView(
-                        ubicacion = ubicacion,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(24.dp))
-
-            // --- DESCRIPCIÓN ---
-            job.content?.rendered?.let {
-                SimpleSectionTitle("Descripción del Trabajo")
-                Spacer(Modifier.height(14.dp))
-                if (it.trim().isNotBlank()) {
-                    FormattedText(
-                        text = it,
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                    lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * 1.6,
-                            color = MaterialTheme.colorScheme.onSurface
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(Modifier.height(28.dp))
-                }
-            }
-            
-            // --- REQUISITOS ---
-            job.meta?.requisitos?.let {
-                if(it.isNotBlank()) {
-                    SimpleSectionTitle("Requisitos")
-                    Spacer(Modifier.height(12.dp))
-                    val requisitos = it.htmlToString().split("\n").filter { line -> line.trim().isNotEmpty() }
-                    requisitos.forEach { req ->
-                        RequirementItem(text = req.trim())
-                    }
-                    Spacer(Modifier.height(32.dp))
-                }
-            }
-
-            // --- BENEFICIOS ---
-            val benefits = listOfNotNull(
-                if (job.meta?.alojamiento == true) "Alojamiento incluido" to Icons.Default.Home else null,
-                if (job.meta?.transporte == true) "Transporte" to Icons.Default.DirectionsBus else null,
-                if (job.meta?.alimentacion == true) "Alimentación" to Icons.Default.Restaurant else null
-            )
-            if (benefits.isNotEmpty()) {
-                SimpleSectionTitle("Beneficios")
-                Spacer(Modifier.height(12.dp))
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    benefits.forEach { (text, icon) ->
-                        BenefitItemSimple(text = text, icon = icon)
-                    }
-                }
-                Spacer(Modifier.height(32.dp))
-            }
-
-            // --- DETALLES ADICIONALES ---
-            job.meta?.let {
-                if (!it.vacantes.isNullOrBlank() || !it.tipoContrato.isNullOrBlank() || !it.jornada.isNullOrBlank()) {
-                    SimpleSectionTitle("Detalles del Puesto")
-                    Spacer(Modifier.height(12.dp))
-                    if (!it.vacantes.isNullOrBlank()) {
-                        SimpleDetailRow(label = "Vacantes", value = "${it.vacantes} disponibles")
-                    }
-                    if (!it.tipoContrato.isNullOrBlank()) {
-                        SimpleDetailRow(label = "Tipo de Contrato", value = it.tipoContrato)
-                    }
-                    if (!it.jornada.isNullOrBlank()) {
-                        SimpleDetailRow(label = "Jornada", value = it.jornada)
-                    }
-                    Spacer(Modifier.height(32.dp))
-                }
-            }
-
-            // --- TARJETA DE INFORMACIÓN DE LA EMPRESA ---
-            if (companyName != null && companyProfile != null) {
-                Spacer(Modifier.height(8.dp))
-                CompanyInfoCard(
-                    companyProfile = companyProfile!!,
-                    context = context,
-                    navController = navController,
-                    companyName = companyName
-                )
-                Spacer(Modifier.height(24.dp))
-            }
-
-            Spacer(Modifier.height(32.dp)) // Espacio final
         }
     }
 }
 
 @Composable
-private fun CompanyInfoCard(
-    companyProfile: CompanyProfileResponse,
-    context: android.content.Context,
-    navController: NavController?,
-    companyName: String
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        shape = RoundedCornerShape(24.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+private fun QuickInfoSection(job: JobPost, ubicacion: UbicacionCompleta?) {
+    LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // Foto de perfil centrada arriba
-            val photoUrl = companyProfile.logoUrl ?: companyProfile.profilePhotoUrl
-            photoUrl?.let { url ->
-                Card(
-                    shape = CircleShape,
-                    modifier = Modifier.size(100.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-                ) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(context).data(url).build(),
-                        contentDescription = "Logo de empresa",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                }
-            } ?: run {
-                Box(
-                    modifier = Modifier
-                        .size(100.dp)
-                        .background(
-                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
-                            CircleShape
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.Default.Business,
-                        contentDescription = null,
-                        modifier = Modifier.size(50.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
-            
-            Spacer(Modifier.height(16.dp))
-            
-            // Nombre de la empresa
-            Text(
-                text = companyProfile.companyName,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-                textAlign = TextAlign.Center
-            )
-            
-            Spacer(Modifier.height(8.dp))
-            
-            // Descripción
-            companyProfile.description?.takeIf { it.isNotBlank() }?.let { desc ->
-                Text(
-                    text = if (desc.length > 150) desc.take(150) + "..." else desc,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * 1.5
+        // Salario
+        val salario = when {
+            !job.meta?.salarioMin.isNullOrBlank() && !job.meta?.salarioMax.isNullOrBlank() ->
+                "S/ ${job.meta?.salarioMin} - ${job.meta?.salarioMax}"
+            !job.meta?.salarioMin.isNullOrBlank() -> "S/ ${job.meta?.salarioMin}+"
+            else -> null
+        }
+
+        salario?.let {
+            item {
+                InfoChip(
+                    icon = Icons.Filled.Payments,
+                    text = it,
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             }
-            
-            // Solo mostrar divider y contacto si hay información de contacto
-            val hasContactInfo = !companyProfile.address.isNullOrBlank() || 
-                                !companyProfile.phone.isNullOrBlank() || 
-                                !companyProfile.email.isNullOrBlank() || 
-                                !companyProfile.website.isNullOrBlank()
-            
-            if (hasContactInfo) {
-                Spacer(Modifier.height(20.dp))
-                Divider(
-                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
-                    thickness = 1.dp,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(Modifier.height(20.dp))
-            } else {
-                Spacer(Modifier.height(20.dp))
+        }
+
+        // Ubicación
+        ubicacion?.let {
+            val locationText = when (it.nivel) {
+                LocationType.DISTRITO -> "${it.distrito}, ${it.provincia}"
+                LocationType.PROVINCIA -> "${it.provincia}, ${it.departamento}"
+                else -> it.departamento
             }
-            
-            // Información de contacto
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // Dirección
-                companyProfile.address?.takeIf { it.isNotBlank() }?.let { address ->
-                    ContactInfoRowModern(
-                        icon = Icons.Default.LocationOn,
-                        text = address,
-                        onClick = null
-                    )
-                }
-                
-                // Teléfono
-                companyProfile.phone?.takeIf { it.isNotBlank() }?.let { phone ->
-                    ContactInfoRowModern(
-                        icon = Icons.Default.Phone,
-                        text = phone,
-                        onClick = {
-                            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))
-                            context.startActivity(intent)
-                        }
-                    )
-                }
-                
-                // Email
-                companyProfile.email?.takeIf { it.isNotBlank() }?.let { email ->
-                    ContactInfoRowModern(
-                        icon = Icons.Default.Email,
-                        text = email,
-                        onClick = {
-                            val intent = Intent(Intent.ACTION_SENDTO).apply {
-                                data = Uri.parse("mailto:$email")
-                            }
-                            context.startActivity(intent)
-                        }
-                    )
-                }
-                
-                // Sitio web
-                companyProfile.website?.takeIf { it.isNotBlank() }?.let { website ->
-                    ContactInfoRowModern(
-                        icon = Icons.Default.Language,
-                        text = website.replace(Regex("^https?://"), "").replace("/$", ""),
-                        onClick = {
-                            val url = if (website.startsWith("http")) website else "https://$website"
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                            context.startActivity(intent)
-                        }
+            if (locationText.isNotBlank()) {
+                item {
+                    InfoChip(
+                        icon = Icons.Filled.LocationOn,
+                        text = locationText,
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
                     )
                 }
             }
-            
-            // Botón para ver perfil completo
-            Spacer(Modifier.height(20.dp))
-            Button(
-                onClick = {
-                    navController?.navigate("company_profile/$companyName")
-                },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
+        }
+
+        // Tipo de contrato
+        job.meta?.tipoContrato?.takeIf { it.isNotBlank() }?.let {
+            item {
+                InfoChip(
+                    icon = Icons.Filled.WorkOutline,
+                    text = it,
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer
                 )
-            ) {
-                Text(
-                    text = "Ver Perfil Completo",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(vertical = 4.dp)
+            }
+        }
+
+        // Vacantes
+        job.meta?.vacantes?.takeIf { it.isNotBlank() }?.let {
+            item {
+                InfoChip(
+                    icon = Icons.Filled.Groups,
+                    text = "$it vacantes",
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -640,164 +615,481 @@ private fun CompanyInfoCard(
 }
 
 @Composable
-private fun ContactInfoRowModern(
+private fun InfoChip(
     icon: ImageVector,
     text: String,
-    onClick: (() -> Unit)?
+    containerColor: Color,
+    contentColor: Color
 ) {
-    val modifier = if (onClick != null) {
-        Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
-    } else {
-        Modifier.fillMaxWidth()
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = containerColor
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+                tint = contentColor
+            )
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelLarge,
+                color = contentColor,
+                fontWeight = FontWeight.Medium
+            )
+        }
     }
-    
+}
+
+@Composable
+private fun BenefitsSection(job: JobPost) {
+    Text(
+        text = "Beneficios incluidos",
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onSurface
+    )
+
+    Spacer(Modifier.height(12.dp))
+
     Row(
-        modifier = modifier,
-        verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Icon(
-            icon,
-            contentDescription = null,
-            modifier = Modifier.size(22.dp),
-            tint = MaterialTheme.colorScheme.primary
-        )
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.Normal,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f),
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-        )
+        if (job.meta?.alojamiento == true) {
+            BenefitChip(icon = Icons.Filled.Home, text = "Alojamiento")
+        }
+        if (job.meta?.transporte == true) {
+            BenefitChip(icon = Icons.Filled.DirectionsBus, text = "Transporte")
+        }
+        if (job.meta?.alimentacion == true) {
+            BenefitChip(icon = Icons.Filled.Restaurant, text = "Alimentación")
+        }
     }
 }
 
 @Composable
-private fun SimpleSectionTitle(title: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            Icons.Default.Work,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(20.dp)
+private fun BenefitChip(icon: ImageVector, text: String) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = Color(0xFF4CAF50).copy(alpha = 0.1f),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            Color(0xFF4CAF50).copy(alpha = 0.3f)
         )
-        Spacer(Modifier.width(8.dp))
-        Text(
-            title,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
-        )
-    }
-}
-
-@Composable
-private fun SimpleInfoRow(icon: ImageVector, text: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(20.dp)
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(
-            text,
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-    }
-}
-
-@Composable
-private fun RequirementItem(text: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.Top
     ) {
-        Icon(
-            Icons.Default.CheckCircle,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(22.dp)
-        )
-        Spacer(Modifier.width(12.dp))
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * 1.5,
-            fontWeight = FontWeight.Normal,
-            modifier = Modifier.weight(1f)
-        )
-    }
-}
-
-@Composable
-private fun BenefitItemSimple(text: String, icon: ImageVector) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
-                RoundedCornerShape(12.dp)
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+                tint = Color(0xFF4CAF50)
             )
-            .padding(14.dp),
-        verticalAlignment = Alignment.CenterVertically
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelMedium,
+                color = Color(0xFF2E7D32),
+                fontWeight = FontWeight.Medium
+            )
+        }
+    }
+}
+
+@Composable
+private fun ContentSection(
+    title: String,
+    icon: ImageVector,
+    content: @Composable () -> Unit
+) {
+    Column {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                modifier = Modifier.size(22.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+
+        Spacer(Modifier.height(14.dp))
+
+        content()
+    }
+}
+
+@Composable
+private fun RequirementRow(text: String) {
+    Row(
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Icon(
-            icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(24.dp)
+        Box(
+            modifier = Modifier
+                .padding(top = 8.dp)
+                .size(6.dp)
+                .background(MaterialTheme.colorScheme.primary, CircleShape)
         )
-        Spacer(Modifier.width(12.dp))
         Text(
             text = text,
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f)
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            lineHeight = 22.sp
         )
     }
 }
 
 @Composable
-private fun SimpleDetailRow(label: String, value: String) {
+private fun DetailItem(
+    icon: ImageVector,
+    label: String,
+    value: String
+) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 10.dp),
-        verticalAlignment = Alignment.Top
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        Column(modifier = Modifier.weight(1f)) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .background(
+                    MaterialTheme.colorScheme.surfaceVariant,
+                    RoundedCornerShape(10.dp)
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                modifier = Modifier.size(22.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Column {
             Text(
-                label,
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold,
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Spacer(Modifier.height(4.dp))
             Text(
-                value,
+                text = value,
                 style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Normal,
+                fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurface
             )
         }
     }
 }
 
+@Composable
+private fun LocationCard(ubicacion: UbicacionCompleta) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            // Ubicación principal
+            val mainLocation = when (ubicacion.nivel) {
+                LocationType.DISTRITO -> ubicacion.distrito
+                LocationType.PROVINCIA -> ubicacion.provincia
+                else -> ubicacion.departamento
+            }
+
+            Text(
+                text = mainLocation,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            // Ubicación completa
+            val fullLocation = listOf(
+                ubicacion.distrito.takeIf { it.isNotBlank() && ubicacion.nivel == LocationType.DISTRITO },
+                ubicacion.provincia.takeIf { it.isNotBlank() },
+                ubicacion.departamento
+            ).filterNotNull().distinct().joinToString(", ")
+
+            if (fullLocation != mainLocation) {
+                Text(
+                    text = fullLocation,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            // Dirección si existe
+            ubicacion.direccion?.takeIf { it.isNotBlank() }?.let {
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    verticalAlignment = Alignment.Top,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        Icons.Outlined.Place,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CompanyCard(
+    companyProfile: CompanyProfileResponse,
+    companyName: String,
+    navController: NavController?,
+    context: android.content.Context
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { navController?.navigate("company_profile/$companyName") },
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                // Logo
+                val logoUrl = companyProfile.logoUrl ?: companyProfile.profilePhotoUrl
+                if (logoUrl != null) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(context).data(logoUrl).build(),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(RoundedCornerShape(12.dp)),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .background(
+                                MaterialTheme.colorScheme.primaryContainer,
+                                RoundedCornerShape(12.dp)
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.Business,
+                            contentDescription = null,
+                            modifier = Modifier.size(28.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = companyProfile.companyName,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    companyProfile.description?.takeIf { it.isNotBlank() }?.let {
+                        Text(
+                            text = if (it.length > 80) it.take(80) + "..." else it,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                Icon(
+                    Icons.Default.ChevronRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            // Contacto rápido
+            val hasContact = !companyProfile.phone.isNullOrBlank() || !companyProfile.email.isNullOrBlank()
+            if (hasContact) {
+                Spacer(Modifier.height(12.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Spacer(Modifier.height(12.dp))
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    companyProfile.phone?.takeIf { it.isNotBlank() }?.let { phone ->
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable {
+                                    context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone")))
+                                }
+                                .padding(4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                Icons.Outlined.Phone,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = "Llamar",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+
+                    companyProfile.email?.takeIf { it.isNotBlank() }?.let { email ->
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable {
+                                    context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:$email")))
+                                }
+                                .padding(4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                Icons.Outlined.Email,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = "Email",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ContactButton(
+    phone: String?,
+    email: String?,
+    context: android.content.Context
+) {
+    var showOptions by remember { mutableStateOf(false) }
+
+    Button(
+        onClick = {
+            if (phone != null && email != null) {
+                showOptions = true
+            } else if (phone != null) {
+                context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone")))
+            } else if (email != null) {
+                context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:$email")))
+            }
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp)
+            .shadow(8.dp, RoundedCornerShape(16.dp)),
+        shape = RoundedCornerShape(16.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.primary
+        )
+    ) {
+        Icon(
+            Icons.Filled.Send,
+            contentDescription = null,
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = "Contactar",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold
+        )
+    }
+
+    if (showOptions) {
+        AlertDialog(
+            onDismissRequest = { showOptions = false },
+            title = { Text("Contactar") },
+            text = { Text("¿Cómo deseas contactar a la empresa?") },
+            confirmButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (phone != null) {
+                        TextButton(onClick = {
+                            context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone")))
+                            showOptions = false
+                        }) {
+                            Text("📞 Llamar")
+                        }
+                        TextButton(onClick = {
+                            val cleanPhone = phone.replace(Regex("[\\s\\-()]"), "")
+                            val whatsappNumber = if (cleanPhone.startsWith("+")) cleanPhone else "+51$cleanPhone"
+                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/${whatsappNumber.removePrefix("+")}")))
+                            showOptions = false
+                        }) {
+                            Text("💬 WhatsApp")
+                        }
+                    }
+                    if (email != null) {
+                        TextButton(onClick = {
+                            context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:$email")))
+                            showOptions = false
+                        }) {
+                            Text("📧 Email")
+                        }
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showOptions = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun FullscreenImageSlider(
+private fun FullscreenImageViewer(
     imageUrls: List<String>,
     initialIndex: Int,
     onDismiss: () -> Unit
@@ -807,7 +1099,7 @@ private fun FullscreenImageSlider(
         initialPage = initialIndex.coerceIn(0, imageUrls.size - 1)
     )
     val context = LocalContext.current
-    
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -815,192 +1107,57 @@ private fun FullscreenImageSlider(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.95f))
+                .background(Color.Black)
         ) {
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier.fillMaxSize()
             ) { page ->
-                val imageUrl = imageUrls[page]
-                var imageLoadError by remember(page) { mutableStateOf(false) }
-                
-                Box(
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data(imageUrls[page])
+                        .crossfade(true)
+                        .size(Size.ORIGINAL)
+                        .build(),
+                    contentDescription = null,
                     modifier = Modifier
                         .fillMaxSize()
                         .clickable { onDismiss() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (imageLoadError) {
-                        // Mostrar mensaje de error
-                        Text(
-                            text = "Error al cargar la imagen",
-                            color = Color.White,
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                    } else {
-                        AsyncImage(
-                            model = ImageRequest.Builder(context)
-                                .data(imageUrl)
-                                .crossfade(true)
-                                .size(Size.ORIGINAL) // Solicitar imagen original sin redimensionar
-                                .allowHardware(false) // Desactivar hardware para mejor calidad
-                                .build(),
-                            contentDescription = "Imagen ${page + 1} de ${imageUrls.size}",
-                            modifier = Modifier
-                                .fillMaxSize(),
-                            contentScale = ContentScale.Fit, // Mantener proporción completa sin recortar
-                            onError = {
-                                android.util.Log.e("FullscreenImageSlider", "Error loading image: $imageUrl")
-                                imageLoadError = true
-                            },
-                            onSuccess = {
-                                imageLoadError = false
-                            }
-                        )
-                    }
-                }
+                    contentScale = ContentScale.Fit
+                )
             }
-            
-            // Indicador de página (contador)
+
+            // Contador
             if (imageUrls.size > 1) {
-                Box(
+                Surface(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
-                        .padding(top = 32.dp)
-                        .background(
-                            Color.Black.copy(alpha = 0.6f),
-                            RoundedCornerShape(16.dp)
-                        )
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .padding(top = 48.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    color = Color.Black.copy(alpha = 0.6f)
                 ) {
                     Text(
                         text = "${pagerState.currentPage + 1} / ${imageUrls.size}",
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                         color = Color.White,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium
+                        style = MaterialTheme.typography.bodyMedium
                     )
                 }
             }
-            
-            // Botón de cerrar
+
+            // Botón cerrar
             IconButton(
                 onClick = onDismiss,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(16.dp)
-                    .background(
-                        Color.Black.copy(alpha = 0.6f),
-                        CircleShape
-                    )
+                    .background(Color.Black.copy(alpha = 0.5f), CircleShape)
             ) {
                 Icon(
-                    imageVector = Icons.Default.Close,
+                    Icons.Default.Close,
                     contentDescription = "Cerrar",
-                    tint = Color.White,
-                    modifier = Modifier.size(24.dp)
+                    tint = Color.White
                 )
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun ImageSlider(
-    imageUrls: List<String>,
-    fullImageUrls: List<String> = emptyList(),
-    onImageClick: (String) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    if (imageUrls.isEmpty()) return
-    
-    val pagerState = rememberPagerState(pageCount = { imageUrls.size }, initialPage = 0)
-    val context = LocalContext.current
-    
-    Box(modifier = modifier) {
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(300.dp)
-        ) { page ->
-            val imageUrl = imageUrls[page]
-            // Usar URL completa si está disponible, sino usar la optimizada
-            val fullImageUrl = if (fullImageUrls.isNotEmpty() && page < fullImageUrls.size) {
-                fullImageUrls[page]
-            } else {
-                imageUrl
-            }
-            var imageLoadError by remember(page) { mutableStateOf(false) }
-            
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clickable { onImageClick(fullImageUrl) }
-            ) {
-                if (imageLoadError) {
-                    // Mostrar logo de marca cuando hay error al cargar imagen
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(
-                                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
-                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                                    )
-                                )
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        AgroChambaLogoPlaceholder(
-                            size = 80.dp,
-                            alpha = 0.5f
-                        )
-                    }
-                } else {
-                    AsyncImage(
-                        model = ImageRequest.Builder(context)
-                            .data(imageUrl)
-                            .crossfade(true)
-                            .build(),
-                        contentDescription = "Imagen ${page + 1} de ${imageUrls.size}",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop,
-                        onError = {
-                            android.util.Log.e("ImageSlider", "Error loading image: $imageUrl")
-                            imageLoadError = true
-                        },
-                        onSuccess = {
-                            imageLoadError = false
-                        }
-                    )
-                }
-            }
-        }
-        
-        // Indicadores de página (dots) - solo mostrar si hay más de una imagen
-        if (imageUrls.size > 1) {
-            Row(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                repeat(imageUrls.size) { index ->
-                    val isSelected = pagerState.currentPage == index
-                    Box(
-                        modifier = Modifier
-                            .size(if (isSelected) 10.dp else 8.dp)
-                            .background(
-                                color = if (isSelected) 
-                                    Color.White 
-                                else 
-                                    Color.White.copy(alpha = 0.5f),
-                                shape = CircleShape
-                            )
-                    )
-                }
             }
         }
     }

@@ -8,6 +8,7 @@ import android.text.Html
 import android.text.Spanned
 import android.text.style.StyleSpan
 import android.text.style.UnderlineSpan
+import android.text.style.URLSpan
 import android.graphics.Typeface
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
@@ -72,6 +73,10 @@ fun FormattedText(
 
     var processedText by remember { mutableStateOf<AnnotatedString?>(null) }
 
+    // Estado para el diálogo de opciones de teléfono
+    var showPhoneDialog by remember { mutableStateOf(false) }
+    var selectedPhone by remember { mutableStateOf("") }
+
     LaunchedEffect(text, primaryColor) {
         processedText = withContext(Dispatchers.Default) {
             try {
@@ -96,12 +101,40 @@ fun FormattedText(
             detectTapGestures { tapOffset ->
                 textLayoutResult?.let { layout ->
                     val offset = layout.getOffsetForPosition(tapOffset)
-                    handleClick(offset, displayText, context)
+                    handleClickWithCallback(
+                        offset = offset,
+                        text = displayText,
+                        context = context,
+                        onPhoneClick = { phone ->
+                            selectedPhone = phone
+                            showPhoneDialog = true
+                        }
+                    )
                 }
             }
         },
         onTextLayout = { textLayoutResult = it }
     )
+
+    // Diálogo de opciones para teléfono
+    if (showPhoneDialog && selectedPhone.isNotBlank()) {
+        PhoneOptionsDialog(
+            phone = selectedPhone,
+            onDismiss = { showPhoneDialog = false },
+            onCallClick = {
+                context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$selectedPhone")))
+                showPhoneDialog = false
+            },
+            onWhatsAppClick = {
+                // Formatear número para WhatsApp (quitar espacios y guiones)
+                val cleanPhone = selectedPhone.replace(Regex("[\\s\\-()]"), "")
+                val whatsappNumber = if (cleanPhone.startsWith("+")) cleanPhone else "+51$cleanPhone"
+                val whatsappUri = Uri.parse("https://wa.me/${whatsappNumber.removePrefix("+")}")
+                context.startActivity(Intent(Intent.ACTION_VIEW, whatsappUri))
+                showPhoneDialog = false
+            }
+        )
+    }
 }
 
 /**
@@ -279,6 +312,28 @@ private fun AnnotatedString.Builder.appendStyledText(text: String, spanned: Span
                     startIndex + spanStart,
                     startIndex + spanEnd
                 )
+            }
+        }
+
+        // Procesar links HTML (<a href="...">)
+        spanned.getSpans(textStart, textEnd, URLSpan::class.java).forEach { span ->
+            val spanStart = maxOf(0, spanned.getSpanStart(span) - textStart)
+            val spanEnd = minOf(text.length, spanned.getSpanEnd(span) - textStart)
+            if (spanStart < spanEnd && spanStart >= 0 && spanEnd <= text.length) {
+                val url = span.url
+                if (!url.isNullOrBlank()) {
+                    // Agregar estilo de link
+                    addStyle(
+                        SpanStyle(
+                            color = linkColor,
+                            textDecoration = TextDecoration.Underline
+                        ),
+                        startIndex + spanStart,
+                        startIndex + spanEnd
+                    )
+                    // Agregar anotación para hacer clickeable
+                    addStringAnnotation("URL", url, startIndex + spanStart, startIndex + spanEnd)
+                }
             }
         }
     }
@@ -731,4 +786,76 @@ private fun handleClick(offset: Int, text: AnnotatedString, context: Context) {
         val url = if (it.item.startsWith("http")) it.item else "https://${it.item}"
         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
     }
+}
+
+/**
+ * Versión de handleClick con callback para teléfonos (permite mostrar diálogo)
+ */
+private fun handleClickWithCallback(
+    offset: Int,
+    text: AnnotatedString,
+    context: Context,
+    onPhoneClick: (String) -> Unit
+) {
+    // Teléfono: usar callback para mostrar diálogo
+    text.getStringAnnotations("PHONE", offset, offset).firstOrNull()?.let {
+        onPhoneClick(it.item)
+        return
+    }
+
+    // Email: abrir directamente
+    text.getStringAnnotations("EMAIL", offset, offset).firstOrNull()?.let {
+        context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:${it.item}")))
+        return
+    }
+
+    // URL: abrir directamente
+    text.getStringAnnotations("URL", offset, offset).firstOrNull()?.let {
+        val url = if (it.item.startsWith("http")) it.item else "https://${it.item}"
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+    }
+}
+
+/**
+ * Diálogo de opciones para teléfono (Llamar / WhatsApp)
+ */
+@Composable
+private fun PhoneOptionsDialog(
+    phone: String,
+    onDismiss: () -> Unit,
+    onCallClick: () -> Unit,
+    onWhatsAppClick: () -> Unit
+) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            androidx.compose.material3.Text(
+                text = phone,
+                style = androidx.compose.material3.MaterialTheme.typography.titleMedium
+            )
+        },
+        text = {
+            androidx.compose.material3.Text(
+                text = "¿Qué deseas hacer?",
+                style = androidx.compose.material3.MaterialTheme.typography.bodyMedium
+            )
+        },
+        confirmButton = {
+            // Botón WhatsApp
+            androidx.compose.material3.TextButton(onClick = onWhatsAppClick) {
+                androidx.compose.material3.Text("💬 WhatsApp")
+            }
+        },
+        dismissButton = {
+            androidx.compose.foundation.layout.Row {
+                androidx.compose.material3.TextButton(onClick = onDismiss) {
+                    androidx.compose.material3.Text("Cancelar")
+                }
+                // Botón Llamar
+                androidx.compose.material3.TextButton(onClick = onCallClick) {
+                    androidx.compose.material3.Text("📞 Llamar")
+                }
+            }
+        }
+    )
 }

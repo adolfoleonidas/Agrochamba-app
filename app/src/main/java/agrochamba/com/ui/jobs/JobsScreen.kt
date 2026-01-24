@@ -967,11 +967,13 @@ fun JobCard(job: JobPost, onClick: () -> Unit, viewModel: JobsViewModel) {
     val companyName = terms.find { it.taxonomy == "empresa" }?.name
 
     // UX: En cards mostramos SOLO el departamento
-    // PRIORIDAD: meta.ubicacionCompleta > taxonomía embebida
-    val locationName = remember(job.meta?.ubicacionCompleta, job.embedded?.terms) {
+    // PRIORIDAD: meta.ubicacionCompleta > ubicacionDisplay > taxonomía embebida
+    val locationName = remember(job.meta?.ubicacionCompleta, job.ubicacionDisplay, job.embedded?.terms) {
         // 1. Primero intentar desde meta.ubicacionCompleta (fuente principal)
         job.meta?.ubicacionCompleta?.departamento?.takeIf { it.isNotBlank() }
-            // 2. Fallback a taxonomía embebida
+            // 2. Segundo intentar desde ubicacion_display (agregado por API)
+            ?: job.ubicacionDisplay?.departamento?.takeIf { it.isNotBlank() }
+            // 3. Fallback a taxonomía embebida
             ?: terms.find { it.taxonomy == "ubicacion" }?.name?.let { extractDepartamento(it) }
     }
     val cropName = terms.find { it.taxonomy == "cultivo" }?.name
