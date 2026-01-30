@@ -288,6 +288,27 @@ interface WordPressApiService {
     ): AIOCRResponse
     
     // ==========================================
+    // ENDPOINTS DE MERCADO PAGO (PAGOS)
+    // ==========================================
+
+    @POST("agrochamba/v1/payments/create-preference")
+    suspend fun createPaymentPreference(
+        @Header("Authorization") token: String,
+        @Body data: Map<String, @JvmSuppressWildcards Any>
+    ): PaymentPreferenceResponse
+
+    @GET("agrochamba/v1/payments/status/{job_id}")
+    suspend fun getPaymentStatus(
+        @Header("Authorization") token: String,
+        @Path("job_id") jobId: Int
+    ): PaymentStatusResponse
+
+    @GET("agrochamba/v1/payments/config")
+    suspend fun getPaymentConfig(
+        @Header("Authorization") token: String
+    ): PaymentConfigResponse
+
+    // ==========================================
     // ENDPOINTS DE GESTIÓN DE PÁGINAS DE FACEBOOK
     // ==========================================
     

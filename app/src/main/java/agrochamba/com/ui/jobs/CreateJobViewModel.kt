@@ -41,7 +41,12 @@ data class CreateJobScreenState(
     val aiSuccess: String? = null,
     // Límites de uso de IA
     val aiUsesRemaining: Int = -1, // -1 = ilimitado o desconocido
-    val aiIsPremium: Boolean = false
+    val aiIsPremium: Boolean = false,
+    // Mercado Pago - Pago requerido
+    val requiresPayment: Boolean = false,
+    val paymentJobId: Int? = null,
+    val paymentAmount: Double? = null,
+    val paymentCurrency: String? = null
 )
 
 @HiltViewModel
@@ -540,7 +545,18 @@ class CreateJobViewModel @Inject constructor() : androidx.lifecycle.ViewModel() 
 
                 // Verificar respuesta
                 if (response.success) {
-                    uiState = uiState.copy(isLoading = false, postSuccess = true)
+                    if (response.requiresPayment == true && response.postId != null) {
+                        // Trabajo creado pero requiere pago → navegar a pantalla de pago
+                        uiState = uiState.copy(
+                            isLoading = false,
+                            requiresPayment = true,
+                            paymentJobId = response.postId,
+                            paymentAmount = response.paymentAmount,
+                            paymentCurrency = response.paymentCurrency
+                        )
+                    } else {
+                        uiState = uiState.copy(isLoading = false, postSuccess = true)
+                    }
                 } else {
                     throw Exception(response.message ?: "No se pudo crear el trabajo.")
                 }

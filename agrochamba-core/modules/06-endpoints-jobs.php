@@ -85,11 +85,18 @@ if (!function_exists('agrochamba_create_job')) {
         }
 
         // Preparar datos del post
-        // Los trabajos se crean como 'pending' para moderación
-        // Solo los administradores pueden publicar directamente
+        // Flujo de estado:
+        // - Admins: publican directamente ('publish')
+        // - Empresas con pago habilitado: crean como 'draft' hasta que paguen
+        // - Empresas sin pago: van a moderación ('pending')
+        $requires_payment = false;
         $post_status = 'pending';
         if (in_array('administrator', $user->roles)) {
             $post_status = 'publish'; // Los admins pueden publicar directamente
+        } elseif (function_exists('agrochamba_mp_get_access_token') && !empty(agrochamba_mp_get_access_token())) {
+            // Mercado Pago está configurado → el trabajo inicia como draft pendiente de pago
+            $post_status = 'draft';
+            $requires_payment = true;
         }
         
         // Configurar comentarios (por defecto habilitados)
@@ -436,8 +443,11 @@ if (!function_exists('agrochamba_create_job')) {
         // Mensaje según el tipo de post y rol del usuario
         $post_type_label = ($post_type === 'post') ? 'Artículo de blog' : 'Trabajo';
         $message = '';
-        
-        if ($post_status === 'pending') {
+
+        if ($requires_payment) {
+            $message = $post_type_label . ' creado. Completa el pago para enviarlo a revisión.';
+            update_post_meta($post_id, '_payment_status', 'pending');
+        } elseif ($post_status === 'pending') {
             if ($is_employer && $publish_to_facebook) {
                 $message = $post_type_label . ' creado y enviado para revisión. Será publicado en AgroChamba y Facebook una vez aprobado por un administrador.';
             } elseif ($is_employer) {
@@ -448,14 +458,21 @@ if (!function_exists('agrochamba_create_job')) {
         } else {
             $message = $post_type_label . ' creado correctamente.';
         }
-        
+
         $response_data = array(
             'success' => true,
             'message' => $message,
             'post_id' => $post_id,
             'status' => $post_status,
-            'post_type' => $post_type
+            'post_type' => $post_type,
+            'requires_payment' => $requires_payment,
         );
+
+        // Si requiere pago, incluir precio
+        if ($requires_payment && function_exists('agrochamba_mp_get_job_price')) {
+            $response_data['payment_amount'] = agrochamba_mp_get_job_price();
+            $response_data['payment_currency'] = 'PEN';
+        }
         
         // Agregar información sobre solicitud de Facebook para empresas
         if ($is_employer && $publish_to_facebook) {

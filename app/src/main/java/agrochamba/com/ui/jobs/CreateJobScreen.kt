@@ -150,6 +150,21 @@ fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel 
         }
     }
 
+    // Navegar a pantalla de pago si el trabajo requiere pago
+    LaunchedEffect(uiState.requiresPayment) {
+        if (uiState.requiresPayment && uiState.paymentJobId != null) {
+            val route = agrochamba.com.Screen.Payment.createRoute(
+                jobId = uiState.paymentJobId,
+                amount = uiState.paymentAmount ?: 0.0,
+                currency = uiState.paymentCurrency ?: "PEN"
+            )
+            navController.navigate(route) {
+                // Reemplazar la pantalla de crear trabajo para que al volver no se vea el form otra vez
+                popUpTo(agrochamba.com.Screen.CreateJob.route) { inclusive = true }
+            }
+        }
+    }
+
     // Auto-seleccionar empresa del usuario si no es admin
     LaunchedEffect(uiState.userCompanyId, uiState.empresas) {
         val isAdmin = AuthManager.isUserAdmin()

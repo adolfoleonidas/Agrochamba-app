@@ -139,6 +139,9 @@ dependencies {
 
     // Firebase eliminado - migrado completamente a WordPress
 
+    // Mercado Pago - Custom Tabs para Checkout Pro
+    implementation("androidx.browser:browser:1.8.0")
+
     // Hilt Dependency Injection
     implementation("com.google.dagger:hilt-android:2.51.1")
     kapt("com.google.dagger:hilt-android-compiler:2.51.1")

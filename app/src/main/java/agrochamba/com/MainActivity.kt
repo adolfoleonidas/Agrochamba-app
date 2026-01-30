@@ -1,5 +1,6 @@
 package agrochamba.com
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -58,6 +59,7 @@ import agrochamba.com.ui.jobs.JobsScreen
 import agrochamba.com.ui.moderation.ModerationScreen
 import agrochamba.com.ui.jobs.MyJobsScreen
 import agrochamba.com.ui.jobs.SavedScreen
+import agrochamba.com.ui.payment.PaymentScreen
 import agrochamba.com.ui.theme.AgrochambaTheme
 import agrochamba.com.ui.WebViewScreen
 
@@ -86,6 +88,16 @@ sealed class Screen(val route: String, val label: String? = null, val icon: Imag
     object Settings : Screen("settings")
     object FacebookPages : Screen("facebook_pages")
     object SedesManagement : Screen("sedes_management")
+    object Payment : Screen("payment/{jobId}/{amount}/{currency}") {
+        fun createRoute(jobId: Int, amount: Double, currency: String): String {
+            return "payment/$jobId/$amount/$currency"
+        }
+    }
+    object PaymentResult : Screen("payment_result/{status}/{jobId}") {
+        fun createRoute(status: String, jobId: Int): String {
+            return "payment_result/$status/$jobId"
+        }
+    }
 }
 
 // Bottom bar items según tipo de usuario:
@@ -97,9 +109,24 @@ val bottomBarItemsEnterpriseRight = listOf(Screen.Dates, Screen.Profile)
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    companion object {
+        // Estado compartido para deep links de pago de Mercado Pago
+        var pendingPaymentDeepLink: PaymentDeepLink? = null
+            private set
+
+        fun consumePaymentDeepLink(): PaymentDeepLink? {
+            val link = pendingPaymentDeepLink
+            pendingPaymentDeepLink = null
+            return link
+        }
+    }
+
+    data class PaymentDeepLink(val status: String, val jobId: Int)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
+
         // Handler global de excepciones para debugging
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             android.util.Log.e("CRASH_HANDLER", "💥💥💥 APP CRASH 💥💥💥")
@@ -115,17 +142,39 @@ class MainActivity : ComponentActivity() {
             // Re-throw para que el sistema maneje el crash normalmente
             throw throwable
         }
-        
+
         android.util.Log.d("MainActivity", "🚀 onCreate iniciado")
         AuthManager.init(this)
         android.util.Log.d("MainActivity", "✅ AuthManager inicializado")
         SettingsManager.init(this)
         android.util.Log.d("MainActivity", "✅ SettingsManager inicializado")
-        
+
+        // Procesar deep link de Mercado Pago si existe
+        handlePaymentDeepLink(intent)
+
         setContent {
             android.util.Log.d("MainActivity", "🎨 setContent ejecutando")
             AgrochambaTheme {
                 AppEntry()
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handlePaymentDeepLink(intent)
+    }
+
+    private fun handlePaymentDeepLink(intent: Intent?) {
+        val uri = intent?.data ?: return
+        // Formato: agrochamba://payment/{status}?job_id={id}
+        if (uri.scheme == "agrochamba" && uri.host == "payment") {
+            val pathSegments = uri.pathSegments
+            if (pathSegments.isNotEmpty()) {
+                val status = pathSegments[0] // success, failure, pending
+                val jobId = uri.getQueryParameter("job_id")?.toIntOrNull() ?: 0
+                android.util.Log.d("MainActivity", "Deep link de pago: status=$status, jobId=$jobId")
+                pendingPaymentDeepLink = PaymentDeepLink(status, jobId)
             }
         }
     }
@@ -372,6 +421,18 @@ fun MainAppScreen() {
             }
             composable(Screen.SedesManagement.route) {
                 agrochamba.com.ui.company.SedesManagementScreen(navController = navController)
+            }
+            // Pantalla de pago con Mercado Pago
+            composable(Screen.Payment.route) { backStackEntry ->
+                val jobId = backStackEntry.arguments?.getString("jobId")?.toIntOrNull() ?: 0
+                val amount = backStackEntry.arguments?.getString("amount")?.toDoubleOrNull() ?: 0.0
+                val currency = backStackEntry.arguments?.getString("currency") ?: "PEN"
+                PaymentScreen(
+                    navController = navController,
+                    jobId = jobId,
+                    amount = amount,
+                    currency = currency
+                )
             }
         }
     }
