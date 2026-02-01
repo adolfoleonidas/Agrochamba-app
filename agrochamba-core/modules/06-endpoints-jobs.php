@@ -86,30 +86,59 @@ if (!function_exists('agrochamba_create_job')) {
 
         // Preparar datos del post
         // Flujo de estado:
-        // - Admins: publican directamente ('publish'), sin gastar créditos
-        // - Empresas con créditos: se descuentan y van a moderación ('pending')
-        // - Empresas sin créditos: se rechaza con error
-        $requires_payment = false;
+        // - Admins: publican directamente ('publish'), sin créditos, tier=premium
+        // - Empresas con créditos (publish_tier=premium): descuenta créditos, prioridad alta
+        // - Empresas sin créditos (publish_tier=free): gratis 1/semana, prioridad baja
+        // - Sin créditos y sin free posts disponibles: error 402
         $post_status = 'pending';
+        $job_tier = 'free'; // free o premium
+        $publish_tier = isset($params['publish_tier']) ? sanitize_text_field($params['publish_tier']) : 'premium';
 
         if (in_array('administrator', $user->roles)) {
-            $post_status = 'publish'; // Los admins pueden publicar directamente
-        } elseif (function_exists('agrochamba_credits_has_enough')) {
-            // Sistema de créditos activo → verificar saldo
-            $credit_cost = defined('AGROCHAMBA_CREDIT_COST_PUBLISH_JOB') ? AGROCHAMBA_CREDIT_COST_PUBLISH_JOB : 5;
-            if (!agrochamba_credits_has_enough($user_id, $credit_cost)) {
-                $balance = agrochamba_credits_get_balance($user_id);
-                return new WP_Error(
-                    'insufficient_credits',
-                    sprintf('No tienes suficientes créditos. Necesitas %d para publicar. Tu saldo: %d.', $credit_cost, $balance),
-                    array(
-                        'status'   => 402,
-                        'code'     => 'insufficient_credits',
-                        'required' => $credit_cost,
-                        'balance'  => $balance,
-                    )
-                );
+            $post_status = 'publish';
+            $job_tier = 'premium';
+        } elseif ($publish_tier === 'free') {
+            // Publicación gratuita → verificar límite semanal
+            if (function_exists('agrochamba_credits_can_post_free')) {
+                $free_status = agrochamba_credits_can_post_free($user_id);
+                if (!$free_status['allowed']) {
+                    return new WP_Error(
+                        'free_limit_reached',
+                        sprintf('Ya usaste tu publicación gratuita esta semana (%d/%d). Compra créditos para publicar más.', $free_status['used'], $free_status['limit']),
+                        array(
+                            'status' => 402,
+                            'code'   => 'free_limit_reached',
+                            'used'   => $free_status['used'],
+                            'limit'  => $free_status['limit'],
+                        )
+                    );
+                }
             }
+            $job_tier = 'free';
+        } else {
+            // Publicación premium → verificar créditos
+            if (function_exists('agrochamba_credits_has_enough')) {
+                $credit_cost = defined('AGROCHAMBA_CREDIT_COST_PUBLISH_JOB') ? AGROCHAMBA_CREDIT_COST_PUBLISH_JOB : 5;
+                if (!agrochamba_credits_has_enough($user_id, $credit_cost)) {
+                    $balance = agrochamba_credits_get_balance($user_id);
+                    $free_status = function_exists('agrochamba_credits_can_post_free')
+                        ? agrochamba_credits_can_post_free($user_id)
+                        : array('allowed' => false, 'remaining' => 0);
+                    return new WP_Error(
+                        'insufficient_credits',
+                        sprintf('Necesitas %d créditos para publicar con prioridad alta. Tu saldo: %d.', $credit_cost, $balance),
+                        array(
+                            'status'         => 402,
+                            'code'           => 'insufficient_credits',
+                            'required'       => $credit_cost,
+                            'balance'        => $balance,
+                            'free_available' => $free_status['allowed'],
+                            'free_remaining' => $free_status['remaining'],
+                        )
+                    );
+                }
+            }
+            $job_tier = 'premium';
         }
         
         // Configurar comentarios (por defecto habilitados)
@@ -224,14 +253,14 @@ if (!function_exists('agrochamba_create_job')) {
         }
 
         // ==========================================
-        // DESCONTAR CRÉDITOS (después de crear el post con éxito)
+        // DESCONTAR CRÉDITOS (solo para tier premium, después de crear el post con éxito)
         // ==========================================
-        if (!in_array('administrator', $user->roles) && function_exists('agrochamba_credits_deduct')) {
+        if ($job_tier === 'premium' && !in_array('administrator', $user->roles) && function_exists('agrochamba_credits_deduct')) {
             $credit_cost = defined('AGROCHAMBA_CREDIT_COST_PUBLISH_JOB') ? AGROCHAMBA_CREDIT_COST_PUBLISH_JOB : 5;
             $deduct_result = agrochamba_credits_deduct(
                 $user_id,
                 $credit_cost,
-                'Publicar trabajo: ' . sanitize_text_field($params['title']),
+                'Publicar trabajo (premium): ' . sanitize_text_field($params['title']),
                 'job_' . $post_id
             );
             if ($deduct_result === false) {
@@ -239,6 +268,17 @@ if (!function_exists('agrochamba_create_job')) {
                 wp_delete_post($post_id, true);
                 return new WP_Error('insufficient_credits', 'Error al descontar créditos.', array('status' => 402));
             }
+        }
+
+        // ==========================================
+        // GUARDAR TIER Y PRIORIDAD DEL TRABAJO
+        // ==========================================
+        if ($post_type === 'trabajo') {
+            update_post_meta($post_id, '_job_tier', $job_tier);
+
+            // Prioridad: premium=100, free=10
+            $priority = ($job_tier === 'premium') ? 100 : 10;
+            update_post_meta($post_id, '_job_priority', $priority);
         }
 
         // ==========================================
@@ -438,7 +478,12 @@ if (!function_exists('agrochamba_create_job')) {
         $publish_to_facebook = isset($params['publish_to_facebook']) && filter_var($params['publish_to_facebook'], FILTER_VALIDATE_BOOLEAN);
         $is_administrator = in_array('administrator', $user->roles);
         $is_employer = in_array('employer', $user->roles);
-        
+
+        // Publicaciones gratuitas NO pueden publicar en Facebook
+        if ($job_tier === 'free') {
+            $publish_to_facebook = false;
+        }
+
         if ($publish_to_facebook) {
             // Guardar preferencias de Facebook en meta
             update_post_meta($post_id, 'facebook_use_link_preview', isset($params['facebook_use_link_preview']) ? filter_var($params['facebook_use_link_preview'], FILTER_VALIDATE_BOOLEAN) : false);
@@ -493,6 +538,7 @@ if (!function_exists('agrochamba_create_job')) {
             'post_id' => $post_id,
             'status' => $post_status,
             'post_type' => $post_type,
+            'job_tier' => $job_tier,
         );
 
         // Incluir saldo de créditos actualizado en la respuesta

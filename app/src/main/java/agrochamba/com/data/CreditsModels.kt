@@ -9,7 +9,15 @@ data class CreditsBalanceResponse(
     val success: Boolean,
     val balance: Int, // -1 = ilimitado (admin)
     @Json(name = "is_unlimited") val isUnlimited: Boolean = false,
-    val costs: CreditCosts? = null
+    val costs: CreditCosts? = null,
+    @Json(name = "free_post") val freePost: FreePostStatus? = null
+)
+
+data class FreePostStatus(
+    val allowed: Boolean = false,
+    val used: Int = 0,
+    val limit: Int = 1,
+    val remaining: Int = 0
 )
 
 data class CreditCosts(

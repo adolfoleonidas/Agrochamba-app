@@ -26,23 +26,26 @@ if (!defined('ABSPATH')) {
 if (!function_exists('agrochamba_smart_sort_jobs')) {
     /**
      * Calcula un score inteligente combinando múltiples factores
-     * 
-     * Score Inteligente = (Relevancia × 0.6) + (Novedad × 0.3) + (Proximidad × 0.1)
-     * 
+     *
+     * Score Inteligente = (Relevancia × 0.5) + (Novedad × 0.25) + (Prioridad × 0.15) + (Proximidad × 0.1)
+     *
+     * Prioridad: premium=100, free=10 (basado en _job_priority meta)
+     * Esto hace que los trabajos de pago aparezcan antes que los gratuitos.
+     *
      * @param int $job_id ID del trabajo
      * @param string $user_location Ubicación del usuario (slug de taxonomía)
      * @return float Score inteligente
      */
     function agrochamba_smart_sort_jobs($job_id, $user_location = '') {
-        // Factor 1: Relevancia (60% del peso)
+        // Factor 1: Relevancia (50% del peso)
         $relevance_score = floatval(get_post_meta($job_id, '_trabajo_relevance_score', true) ?: 0);
         $normalized_relevance = min(100, $relevance_score); // Normalizar a 0-100
-        
-        // Factor 2: Novedad (30% del peso)
+
+        // Factor 2: Novedad (25% del peso)
         $post_date = get_post_time('U', true, $job_id);
         $current_time = current_time('timestamp');
         $days_old = max(0, ($current_time - $post_date) / DAY_IN_SECONDS);
-        
+
         // Score de novedad: máximo para trabajos nuevos, decrece con el tiempo
         // Trabajos de 0-7 días: 100 puntos
         // Trabajos de 30 días: 50 puntos
@@ -54,8 +57,14 @@ if (!function_exists('agrochamba_smart_sort_jobs')) {
         } else {
             $novelty_score = max(10, 50 - (($days_old - 30) / 60 * 40)); // De 50 a 10
         }
-        
-        // Factor 3: Proximidad (10% del peso)
+
+        // Factor 3: Prioridad de publicación (15% del peso)
+        // premium=100, free=10, sin meta (legacy)=50
+        $job_priority = get_post_meta($job_id, '_job_priority', true);
+        $priority_score = $job_priority !== '' ? intval($job_priority) : 50;
+        $priority_score = min(100, max(0, $priority_score)); // Normalizar a 0-100
+
+        // Factor 4: Proximidad (10% del peso)
         $proximity_score = 0;
         if (!empty($user_location)) {
             $job_ubicaciones = wp_get_post_terms($job_id, 'ubicacion', array('fields' => 'slugs'));
@@ -70,9 +79,9 @@ if (!function_exists('agrochamba_smart_sort_jobs')) {
                             $job_term = get_term_by('slug', $job_ubicacion_slug, 'ubicacion');
                             if ($job_term) {
                                 // Mismo padre o relación jerárquica
-                                if ($job_term->parent == $user_term->term_id || 
+                                if ($job_term->parent == $user_term->term_id ||
                                     $user_term->parent == $job_term->term_id ||
-                                    ($job_term->parent > 0 && $user_term->parent > 0 && 
+                                    ($job_term->parent > 0 && $user_term->parent > 0 &&
                                      $job_term->parent == $user_term->parent)) {
                                     $proximity_score = 50; // Ubicación relacionada
                                     break;
@@ -83,14 +92,15 @@ if (!function_exists('agrochamba_smart_sort_jobs')) {
                 }
             }
         }
-        
+
         // Calcular score inteligente combinado
         $smart_score = (
-            ($normalized_relevance * 0.6) +
-            ($novelty_score * 0.3) +
-            ($proximity_score * 0.1)
+            ($normalized_relevance * 0.50) +
+            ($novelty_score * 0.25) +
+            ($priority_score * 0.15) +
+            ($proximity_score * 0.10)
         );
-        
+
         return round($smart_score, 2);
     }
 }

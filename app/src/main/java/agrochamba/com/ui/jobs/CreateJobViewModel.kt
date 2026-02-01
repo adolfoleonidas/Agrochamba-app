@@ -45,7 +45,13 @@ data class CreateJobScreenState(
     // Sistema de créditos
     val insufficientCredits: Boolean = false,
     val creditsBalance: Int? = null,
-    val creditsRequired: Int? = null
+    val creditsRequired: Int? = null,
+    val freePostAvailable: Boolean = false,
+    val freePostRemaining: Int = 0,
+    // Diálogo elegir tier
+    val showTierDialog: Boolean = false,
+    // Tier de publicación elegido (free o premium)
+    val publishTier: String = "premium"
 )
 
 @HiltViewModel
@@ -360,6 +366,21 @@ class CreateJobViewModel @Inject constructor() : androidx.lifecycle.ViewModel() 
         uiState = uiState.copy(aiError = null, aiSuccess = null)
     }
 
+    fun dismissTierDialog() {
+        uiState = uiState.copy(
+            showTierDialog = false,
+            insufficientCredits = false
+        )
+    }
+
+    fun selectFreeTier() {
+        uiState = uiState.copy(
+            showTierDialog = false,
+            insufficientCredits = false,
+            publishTier = "free"
+        )
+    }
+
     fun createJob(jobData: Map<String, Any?>, context: Context) {
         viewModelScope.launch {
             uiState = uiState.copy(isLoading = true, error = null, loadingMessage = "Publicando, por favor espera...")
@@ -536,6 +557,9 @@ class CreateJobViewModel @Inject constructor() : androidx.lifecycle.ViewModel() 
                     if (galleryIds.isNotEmpty()) {
                         put("gallery_ids", galleryIds)
                     }
+
+                    // Tier de publicación (free o premium)
+                    put("publish_tier", uiState.publishTier)
                 }
 
                 // Crear trabajo en WordPress
@@ -555,21 +579,41 @@ class CreateJobViewModel @Inject constructor() : androidx.lifecycle.ViewModel() 
             } catch (e: HttpException) {
                 val errorBody = try { e.response()?.errorBody()?.string() } catch (_: Exception) { null }
 
-                // Detectar error de créditos insuficientes (402)
-                if (e.code() == 402 && errorBody?.contains("insufficient_credits") == true) {
-                    // Parsear balance y required del error body
-                    val balanceMatch = Regex("\"balance\":(\\d+)").find(errorBody ?: "")
-                    val requiredMatch = Regex("\"required\":(\\d+)").find(errorBody ?: "")
-                    val balance = balanceMatch?.groupValues?.get(1)?.toIntOrNull() ?: 0
-                    val required = requiredMatch?.groupValues?.get(1)?.toIntOrNull() ?: 5
+                // Detectar errores de créditos (402)
+                if (e.code() == 402) {
+                    val body = errorBody ?: ""
 
-                    uiState = uiState.copy(
-                        isLoading = false,
-                        insufficientCredits = true,
-                        creditsBalance = balance,
-                        creditsRequired = required
-                    )
-                    return@launch
+                    if (body.contains("insufficient_credits")) {
+                        // Parsear balance, required y free_available del error body
+                        val balanceMatch = Regex("\"balance\":(\\d+)").find(body)
+                        val requiredMatch = Regex("\"required\":(\\d+)").find(body)
+                        val freeAvailableMatch = Regex("\"free_available\":(true|false)").find(body)
+                        val freeRemainingMatch = Regex("\"free_remaining\":(\\d+)").find(body)
+
+                        val balance = balanceMatch?.groupValues?.get(1)?.toIntOrNull() ?: 0
+                        val required = requiredMatch?.groupValues?.get(1)?.toIntOrNull() ?: 5
+                        val freeAvailable = freeAvailableMatch?.groupValues?.get(1) == "true"
+                        val freeRemaining = freeRemainingMatch?.groupValues?.get(1)?.toIntOrNull() ?: 0
+
+                        uiState = uiState.copy(
+                            isLoading = false,
+                            insufficientCredits = true,
+                            creditsBalance = balance,
+                            creditsRequired = required,
+                            freePostAvailable = freeAvailable,
+                            freePostRemaining = freeRemaining,
+                            showTierDialog = freeAvailable // Mostrar diálogo si puede publicar gratis
+                        )
+                        return@launch
+                    }
+
+                    if (body.contains("free_limit_reached")) {
+                        uiState = uiState.copy(
+                            isLoading = false,
+                            error = "Ya usaste tu publicación gratuita esta semana. Compra créditos para publicar más."
+                        )
+                        return@launch
+                    }
                 }
 
                 val errorMessage = try {

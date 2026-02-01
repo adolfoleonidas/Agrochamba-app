@@ -42,6 +42,7 @@ define('AGROCHAMBA_CREDIT_COST_AI_ENHANCE',  1);
 define('AGROCHAMBA_CREDIT_COST_AI_TITLE',    1);
 define('AGROCHAMBA_CREDIT_COST_AI_OCR',      2);
 define('AGROCHAMBA_CREDIT_WELCOME_BONUS',    5);
+define('AGROCHAMBA_FREE_POSTS_PER_WEEK',     1);  // Publicaciones gratis por semana
 
 // ==========================================
 // PAQUETES DE CRÉDITOS
@@ -201,6 +202,58 @@ function agrochamba_credits_log_transaction($user_id, $type, $amount, $balance, 
 }
 
 // ==========================================
+// PUBLICACIÓN GRATUITA (PLAN FREE)
+// ==========================================
+
+/**
+ * Verificar cuántas publicaciones gratis ha usado esta semana.
+ */
+function agrochamba_credits_free_posts_this_week($user_id) {
+    $week_start = date('Y-m-d 00:00:00', strtotime('monday this week'));
+
+    $args = array(
+        'post_type'      => 'trabajo',
+        'post_status'    => array('publish', 'pending', 'draft'),
+        'author'         => $user_id,
+        'date_query'     => array(
+            array(
+                'after'     => $week_start,
+                'inclusive' => true,
+            ),
+        ),
+        'meta_query'     => array(
+            array(
+                'key'   => '_job_tier',
+                'value' => 'free',
+            ),
+        ),
+        'posts_per_page' => -1,
+        'fields'         => 'ids',
+    );
+
+    $query = new WP_Query($args);
+    return $query->found_posts;
+}
+
+/**
+ * Verificar si el usuario puede publicar gratis esta semana.
+ *
+ * @return array ['allowed' => bool, 'used' => int, 'limit' => int, 'remaining' => int]
+ */
+function agrochamba_credits_can_post_free($user_id) {
+    $limit = AGROCHAMBA_FREE_POSTS_PER_WEEK;
+    $used = agrochamba_credits_free_posts_this_week($user_id);
+    $remaining = max(0, $limit - $used);
+
+    return array(
+        'allowed'   => $remaining > 0,
+        'used'      => $used,
+        'limit'     => $limit,
+        'remaining' => $remaining,
+    );
+}
+
+// ==========================================
 // BONO DE BIENVENIDA PARA NUEVAS EMPRESAS
 // ==========================================
 
@@ -273,16 +326,23 @@ add_action('rest_api_init', function () {
 function agrochamba_credits_api_balance($request) {
     $user_id = get_current_user_id();
     $is_unlimited = agrochamba_credits_is_unlimited($user_id);
+    $free_post = agrochamba_credits_can_post_free($user_id);
 
     return new WP_REST_Response(array(
-        'success'     => true,
-        'balance'     => $is_unlimited ? -1 : agrochamba_credits_get_balance($user_id),
-        'is_unlimited' => $is_unlimited,
-        'costs'       => array(
+        'success'       => true,
+        'balance'       => $is_unlimited ? -1 : agrochamba_credits_get_balance($user_id),
+        'is_unlimited'  => $is_unlimited,
+        'costs'         => array(
             'publish_job' => AGROCHAMBA_CREDIT_COST_PUBLISH_JOB,
             'ai_enhance'  => AGROCHAMBA_CREDIT_COST_AI_ENHANCE,
             'ai_title'    => AGROCHAMBA_CREDIT_COST_AI_TITLE,
             'ai_ocr'      => AGROCHAMBA_CREDIT_COST_AI_OCR,
+        ),
+        'free_post' => array(
+            'allowed'   => $free_post['allowed'],
+            'used'      => $free_post['used'],
+            'limit'     => $free_post['limit'],
+            'remaining' => $free_post['remaining'],
         ),
     ), 200);
 }
