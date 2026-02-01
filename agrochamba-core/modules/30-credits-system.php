@@ -51,6 +51,15 @@ define('AGROCHAMBA_FREE_POSTS_PER_WEEK',     1);  // Publicaciones gratis por se
 function agrochamba_credits_get_packages() {
     return array(
         array(
+            'id'          => 'pack_5',
+            'credits'     => 5,
+            'price'       => 4.90,
+            'currency'    => 'PEN',
+            'label'       => '5 créditos',
+            'description' => '1 publicación',
+            'popular'     => false,
+        ),
+        array(
             'id'          => 'pack_10',
             'credits'     => 10,
             'price'       => 9.90,
