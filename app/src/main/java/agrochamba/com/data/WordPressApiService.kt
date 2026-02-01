@@ -309,6 +309,31 @@ interface WordPressApiService {
     ): PaymentConfigResponse
 
     // ==========================================
+    // ENDPOINTS DE CRÉDITOS
+    // ==========================================
+
+    @GET("agrochamba/v1/credits/balance")
+    suspend fun getCreditsBalance(
+        @Header("Authorization") token: String
+    ): CreditsBalanceResponse
+
+    @GET("agrochamba/v1/credits/packages")
+    suspend fun getCreditPackages(
+        @Header("Authorization") token: String
+    ): CreditPackagesResponse
+
+    @POST("agrochamba/v1/credits/purchase")
+    suspend fun purchaseCredits(
+        @Header("Authorization") token: String,
+        @Body data: Map<String, @JvmSuppressWildcards Any>
+    ): CreditPurchaseResponse
+
+    @GET("agrochamba/v1/credits/history")
+    suspend fun getCreditHistory(
+        @Header("Authorization") token: String
+    ): CreditHistoryResponse
+
+    // ==========================================
     // ENDPOINTS DE GESTIÓN DE PÁGINAS DE FACEBOOK
     // ==========================================
     

@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Work
 import androidx.compose.material.icons.filled.BedroomParent
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -249,6 +250,17 @@ fun ProfileScreen(navController: NavController, viewModel: ProfileViewModel = vi
                 )
             }
             
+            // Créditos (solo para empresas/admin)
+            if (AuthManager.isUserAnEnterprise()) {
+                item {
+                    MenuItem(
+                        icon = Icons.Default.AccountBalanceWallet,
+                        title = "Mis Créditos",
+                        onClick = { navController.navigate(Screen.Credits.route) }
+                    )
+                }
+            }
+
             // Cuartos (solo para empresas/admin que no lo tienen en el bottom bar)
             if (AuthManager.isUserAnEnterprise()) {
                 item {

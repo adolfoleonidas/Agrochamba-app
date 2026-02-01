@@ -73,6 +73,7 @@ if (!AGROCHAMBA_USE_MODULE_LOADER) {
             '27-location-system.php',          // Sistema de ubicaciones nativo
             '28-job-moderation-admin.php',     // Sistema de moderación para admins
             '29-mercadopago.php',              // Integración con Mercado Pago (pagos)
+            '30-credits-system.php',           // Sistema de créditos para monetización
         );
 
         // Cargar cada módulo

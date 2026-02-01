@@ -42,11 +42,10 @@ data class CreateJobScreenState(
     // Límites de uso de IA
     val aiUsesRemaining: Int = -1, // -1 = ilimitado o desconocido
     val aiIsPremium: Boolean = false,
-    // Mercado Pago - Pago requerido
-    val requiresPayment: Boolean = false,
-    val paymentJobId: Int? = null,
-    val paymentAmount: Double? = null,
-    val paymentCurrency: String? = null
+    // Sistema de créditos
+    val insufficientCredits: Boolean = false,
+    val creditsBalance: Int? = null,
+    val creditsRequired: Int? = null
 )
 
 @HiltViewModel
@@ -545,42 +544,46 @@ class CreateJobViewModel @Inject constructor() : androidx.lifecycle.ViewModel() 
 
                 // Verificar respuesta
                 if (response.success) {
-                    if (response.requiresPayment == true && response.postId != null) {
-                        // Trabajo creado pero requiere pago → navegar a pantalla de pago
-                        uiState = uiState.copy(
-                            isLoading = false,
-                            requiresPayment = true,
-                            paymentJobId = response.postId,
-                            paymentAmount = response.paymentAmount,
-                            paymentCurrency = response.paymentCurrency
-                        )
-                    } else {
-                        uiState = uiState.copy(isLoading = false, postSuccess = true)
-                    }
+                    uiState = uiState.copy(
+                        isLoading = false,
+                        postSuccess = true,
+                        creditsBalance = response.creditsBalance
+                    )
                 } else {
                     throw Exception(response.message ?: "No se pudo crear el trabajo.")
                 }
             } catch (e: HttpException) {
+                val errorBody = try { e.response()?.errorBody()?.string() } catch (_: Exception) { null }
+
+                // Detectar error de créditos insuficientes (402)
+                if (e.code() == 402 && errorBody?.contains("insufficient_credits") == true) {
+                    // Parsear balance y required del error body
+                    val balanceMatch = Regex("\"balance\":(\\d+)").find(errorBody ?: "")
+                    val requiredMatch = Regex("\"required\":(\\d+)").find(errorBody ?: "")
+                    val balance = balanceMatch?.groupValues?.get(1)?.toIntOrNull() ?: 0
+                    val required = requiredMatch?.groupValues?.get(1)?.toIntOrNull() ?: 5
+
+                    uiState = uiState.copy(
+                        isLoading = false,
+                        insufficientCredits = true,
+                        creditsBalance = balance,
+                        creditsRequired = required
+                    )
+                    return@launch
+                }
+
                 val errorMessage = try {
-                    // Intentar leer el mensaje del cuerpo de la respuesta
-                    val errorBody = e.response()?.errorBody()?.string()
                     if (!errorBody.isNullOrBlank()) {
-                        // Intentar parsear el JSON de error de WordPress
                         val jsonStart = errorBody.indexOf("\"message\"")
                         if (jsonStart != -1) {
                             val messageStart = errorBody.indexOf("\"", jsonStart + 10) + 1
                             val messageEnd = errorBody.indexOf("\"", messageStart)
                             if (messageEnd != -1) {
                                 errorBody.substring(messageStart, messageEnd)
-                            } else {
-                                null
-                            }
-                        } else {
-                            null
-                        }
-                    } else {
-                        null
-                    } ?: when (e.code()) {
+                            } else null
+                        } else null
+                    } else null
+                    ?: when (e.code()) {
                         400 -> "Datos inválidos. Verifica la información."
                         401 -> "No estás autenticado. Inicia sesión nuevamente."
                         403 -> "No tienes permiso para crear trabajos."

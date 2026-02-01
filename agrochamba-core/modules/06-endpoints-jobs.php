@@ -86,17 +86,30 @@ if (!function_exists('agrochamba_create_job')) {
 
         // Preparar datos del post
         // Flujo de estado:
-        // - Admins: publican directamente ('publish')
-        // - Empresas con pago habilitado: crean como 'draft' hasta que paguen
-        // - Empresas sin pago: van a moderación ('pending')
+        // - Admins: publican directamente ('publish'), sin gastar créditos
+        // - Empresas con créditos: se descuentan y van a moderación ('pending')
+        // - Empresas sin créditos: se rechaza con error
         $requires_payment = false;
         $post_status = 'pending';
+
         if (in_array('administrator', $user->roles)) {
             $post_status = 'publish'; // Los admins pueden publicar directamente
-        } elseif (function_exists('agrochamba_mp_get_access_token') && !empty(agrochamba_mp_get_access_token())) {
-            // Mercado Pago está configurado → el trabajo inicia como draft pendiente de pago
-            $post_status = 'draft';
-            $requires_payment = true;
+        } elseif (function_exists('agrochamba_credits_has_enough')) {
+            // Sistema de créditos activo → verificar saldo
+            $credit_cost = defined('AGROCHAMBA_CREDIT_COST_PUBLISH_JOB') ? AGROCHAMBA_CREDIT_COST_PUBLISH_JOB : 5;
+            if (!agrochamba_credits_has_enough($user_id, $credit_cost)) {
+                $balance = agrochamba_credits_get_balance($user_id);
+                return new WP_Error(
+                    'insufficient_credits',
+                    sprintf('No tienes suficientes créditos. Necesitas %d para publicar. Tu saldo: %d.', $credit_cost, $balance),
+                    array(
+                        'status'   => 402,
+                        'code'     => 'insufficient_credits',
+                        'required' => $credit_cost,
+                        'balance'  => $balance,
+                    )
+                );
+            }
         }
         
         // Configurar comentarios (por defecto habilitados)
@@ -208,6 +221,24 @@ if (!function_exists('agrochamba_create_job')) {
                 'No se pudo crear el trabajo. Por favor, intenta nuevamente.',
                 array('status' => 500, 'code' => 'post_creation_failed')
             );
+        }
+
+        // ==========================================
+        // DESCONTAR CRÉDITOS (después de crear el post con éxito)
+        // ==========================================
+        if (!in_array('administrator', $user->roles) && function_exists('agrochamba_credits_deduct')) {
+            $credit_cost = defined('AGROCHAMBA_CREDIT_COST_PUBLISH_JOB') ? AGROCHAMBA_CREDIT_COST_PUBLISH_JOB : 5;
+            $deduct_result = agrochamba_credits_deduct(
+                $user_id,
+                $credit_cost,
+                'Publicar trabajo: ' . sanitize_text_field($params['title']),
+                'job_' . $post_id
+            );
+            if ($deduct_result === false) {
+                // No debería pasar porque ya verificamos, pero por seguridad
+                wp_delete_post($post_id, true);
+                return new WP_Error('insufficient_credits', 'Error al descontar créditos.', array('status' => 402));
+            }
         }
 
         // ==========================================
@@ -444,10 +475,7 @@ if (!function_exists('agrochamba_create_job')) {
         $post_type_label = ($post_type === 'post') ? 'Artículo de blog' : 'Trabajo';
         $message = '';
 
-        if ($requires_payment) {
-            $message = $post_type_label . ' creado. Completa el pago para enviarlo a revisión.';
-            update_post_meta($post_id, '_payment_status', 'pending');
-        } elseif ($post_status === 'pending') {
+        if ($post_status === 'pending') {
             if ($is_employer && $publish_to_facebook) {
                 $message = $post_type_label . ' creado y enviado para revisión. Será publicado en AgroChamba y Facebook una vez aprobado por un administrador.';
             } elseif ($is_employer) {
@@ -465,13 +493,13 @@ if (!function_exists('agrochamba_create_job')) {
             'post_id' => $post_id,
             'status' => $post_status,
             'post_type' => $post_type,
-            'requires_payment' => $requires_payment,
         );
 
-        // Si requiere pago, incluir precio
-        if ($requires_payment && function_exists('agrochamba_mp_get_job_price')) {
-            $response_data['payment_amount'] = agrochamba_mp_get_job_price();
-            $response_data['payment_currency'] = 'PEN';
+        // Incluir saldo de créditos actualizado en la respuesta
+        if (function_exists('agrochamba_credits_get_balance')) {
+            $response_data['credits_balance'] = agrochamba_credits_is_unlimited($user_id)
+                ? -1
+                : agrochamba_credits_get_balance($user_id);
         }
         
         // Agregar información sobre solicitud de Facebook para empresas

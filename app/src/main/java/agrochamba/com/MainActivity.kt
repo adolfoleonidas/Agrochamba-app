@@ -59,6 +59,7 @@ import agrochamba.com.ui.jobs.JobsScreen
 import agrochamba.com.ui.moderation.ModerationScreen
 import agrochamba.com.ui.jobs.MyJobsScreen
 import agrochamba.com.ui.jobs.SavedScreen
+import agrochamba.com.ui.payment.CreditsScreen
 import agrochamba.com.ui.payment.PaymentScreen
 import agrochamba.com.ui.theme.AgrochambaTheme
 import agrochamba.com.ui.WebViewScreen
@@ -88,6 +89,7 @@ sealed class Screen(val route: String, val label: String? = null, val icon: Imag
     object Settings : Screen("settings")
     object FacebookPages : Screen("facebook_pages")
     object SedesManagement : Screen("sedes_management")
+    object Credits : Screen("credits")
     object Payment : Screen("payment/{jobId}/{amount}/{currency}") {
         fun createRoute(jobId: Int, amount: Double, currency: String): String {
             return "payment/$jobId/$amount/$currency"
@@ -167,13 +169,15 @@ class MainActivity : ComponentActivity() {
 
     private fun handlePaymentDeepLink(intent: Intent?) {
         val uri = intent?.data ?: return
+        val host = uri.host ?: return
         // Formato: agrochamba://payment/{status}?job_id={id}
-        if (uri.scheme == "agrochamba" && uri.host == "payment") {
+        // Formato: agrochamba://credits/{status}?package_id={id}
+        if (uri.scheme == "agrochamba" && (host == "payment" || host == "credits")) {
             val pathSegments = uri.pathSegments
             if (pathSegments.isNotEmpty()) {
                 val status = pathSegments[0] // success, failure, pending
                 val jobId = uri.getQueryParameter("job_id")?.toIntOrNull() ?: 0
-                android.util.Log.d("MainActivity", "Deep link de pago: status=$status, jobId=$jobId")
+                android.util.Log.d("MainActivity", "Deep link: host=$host status=$status")
                 pendingPaymentDeepLink = PaymentDeepLink(status, jobId)
             }
         }
@@ -421,6 +425,10 @@ fun MainAppScreen() {
             }
             composable(Screen.SedesManagement.route) {
                 agrochamba.com.ui.company.SedesManagementScreen(navController = navController)
+            }
+            // Pantalla de créditos
+            composable(Screen.Credits.route) {
+                CreditsScreen(navController = navController)
             }
             // Pantalla de pago con Mercado Pago
             composable(Screen.Payment.route) { backStackEntry ->

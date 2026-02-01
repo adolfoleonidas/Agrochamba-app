@@ -314,7 +314,17 @@ function agrochamba_mp_process_payment($payment_id) {
     $external_reference = isset($body['external_reference']) ? $body['external_reference'] : '';
     $metadata = isset($body['metadata']) ? $body['metadata'] : array();
 
-    // Extraer job_id del external_reference (formato: job_{id}_user_{id})
+    // ==========================================
+    // DETECTAR TIPO DE COMPRA: créditos o trabajo
+    // ==========================================
+    $purchase_type = isset($metadata['type']) ? $metadata['type'] : 'job';
+
+    // Compra de créditos (formato: credits_{pack_id}_user_{id}_{timestamp})
+    if ($purchase_type === 'credits' || strpos($external_reference, 'credits_') === 0) {
+        return agrochamba_mp_process_credits_payment($payment_id, $payment_status, $body, $metadata, $external_reference);
+    }
+
+    // Compra de publicación de trabajo
     $job_id = 0;
     if (preg_match('/^job_(\d+)_user_(\d+)$/', $external_reference, $matches)) {
         $job_id = intval($matches[1]);
@@ -544,10 +554,80 @@ function agrochamba_mp_admin_page() {
 
         <h2>Deep Links configurados</h2>
         <ul>
-            <li><strong>Success:</strong> <code>agrochamba://payment/success</code></li>
-            <li><strong>Failure:</strong> <code>agrochamba://payment/failure</code></li>
-            <li><strong>Pending:</strong> <code>agrochamba://payment/pending</code></li>
+            <li><strong>Pago trabajo:</strong> <code>agrochamba://payment/{success|failure|pending}</code></li>
+            <li><strong>Compra créditos:</strong> <code>agrochamba://credits/{success|failure|pending}</code></li>
         </ul>
     </div>
     <?php
+}
+
+// ==========================================
+// 6. PROCESAR PAGO DE CRÉDITOS
+// ==========================================
+
+/**
+ * Procesa un pago de compra de créditos desde el webhook de MP.
+ */
+function agrochamba_mp_process_credits_payment($payment_id, $payment_status, $body, $metadata, $external_reference) {
+    error_log('AgroChamba MP: Procesando compra de créditos - pago ' . $payment_id . ' estado: ' . $payment_status);
+
+    // Extraer user_id y package_id
+    $user_id = isset($metadata['user_id']) ? intval($metadata['user_id']) : 0;
+    $package_id = isset($metadata['package_id']) ? $metadata['package_id'] : '';
+    $credits_to_add = isset($metadata['credits']) ? intval($metadata['credits']) : 0;
+
+    // Fallback: extraer del external_reference (credits_{pack_id}_user_{id}_{timestamp})
+    if ($user_id <= 0 && preg_match('/credits_(\w+)_user_(\d+)_/', $external_reference, $matches)) {
+        $package_id = $matches[1];
+        $user_id = intval($matches[2]);
+    }
+
+    if ($user_id <= 0) {
+        error_log('AgroChamba MP Credits: No se pudo extraer user_id del pago ' . $payment_id);
+        return false;
+    }
+
+    // Si no tenemos los créditos del metadata, buscar del paquete
+    if ($credits_to_add <= 0 && !empty($package_id) && function_exists('agrochamba_credits_get_packages')) {
+        $packages = agrochamba_credits_get_packages();
+        foreach ($packages as $pkg) {
+            if ($pkg['id'] === $package_id) {
+                $credits_to_add = $pkg['credits'];
+                break;
+            }
+        }
+    }
+
+    if ($credits_to_add <= 0) {
+        error_log('AgroChamba MP Credits: No se pudo determinar créditos para pago ' . $payment_id);
+        return false;
+    }
+
+    // Evitar procesar pagos duplicados
+    $processed = get_user_meta($user_id, '_mp_processed_payments', true);
+    if (!is_array($processed)) {
+        $processed = array();
+    }
+    if (in_array($payment_id, $processed)) {
+        error_log('AgroChamba MP Credits: Pago ' . $payment_id . ' ya procesado, ignorando');
+        return true;
+    }
+
+    // Si el pago fue aprobado, acreditar los créditos
+    if ($payment_status === 'approved' && function_exists('agrochamba_credits_add')) {
+        agrochamba_credits_add(
+            $user_id,
+            $credits_to_add,
+            'Compra de ' . $credits_to_add . ' créditos (Pago MP #' . $payment_id . ')',
+            'mp_payment_' . $payment_id
+        );
+
+        // Marcar como procesado
+        $processed[] = $payment_id;
+        update_user_meta($user_id, '_mp_processed_payments', $processed);
+
+        error_log('AgroChamba MP Credits: ' . $credits_to_add . ' créditos acreditados al usuario ' . $user_id);
+    }
+
+    return true;
 }

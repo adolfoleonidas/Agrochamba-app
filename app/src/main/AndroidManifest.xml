@@ -62,6 +62,7 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="agrochamba" android:host="payment" />
+                <data android:scheme="agrochamba" android:host="credits" />
             </intent-filter>
         </activity>
     </application>
