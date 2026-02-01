@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -44,10 +45,18 @@ fun MyJobsScreen(navController: NavController, viewModel: ProfileViewModel = vie
         viewModel.loadMyJobs()
     }
 
-    // Mostrar mensaje de éxito cuando se elimina un trabajo
-    LaunchedEffect(uiState.myJobs.size) {
-        // Si la lista se redujo, significa que se eliminó un trabajo
-        // (esto se maneja mejor con un estado específico, pero por ahora funciona)
+    // Mostrar mensajes de boost
+    LaunchedEffect(uiState.boostSuccess) {
+        uiState.boostSuccess?.let {
+            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+            viewModel.clearBoostMessages()
+        }
+    }
+    LaunchedEffect(uiState.boostError) {
+        uiState.boostError?.let {
+            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+            viewModel.clearBoostMessages()
+        }
     }
 
     val filteredJobs = if (searchQuery.isBlank()) {
@@ -172,6 +181,9 @@ fun MyJobsScreen(navController: NavController, viewModel: ProfileViewModel = vie
                                 viewModel.deleteJob(job.id)
                                 Toast.makeText(context, "Trabajo eliminado correctamente", Toast.LENGTH_SHORT).show()
                             },
+                            onBoost = {
+                                viewModel.boostJob(job.id)
+                            },
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
@@ -187,11 +199,13 @@ private fun MyJobCard(
     onView: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    onBoost: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val publicationDate = job.date?.substringBefore("T") ?: ""
     var showDeleteDialog by remember { mutableStateOf(false) }
-    
+    var showBoostDialog by remember { mutableStateOf(false) }
+
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
@@ -217,79 +231,113 @@ private fun MyJobCard(
             }
         )
     }
-    
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(100.dp), // Altura fija para mantener consistencia
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = job.title?.rendered ?: "Sin título",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Default.DateRange,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "Publicado: $publicationDate",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+
+    if (showBoostDialog) {
+        AlertDialog(
+            onDismissRequest = { showBoostDialog = false },
+            title = { Text("Destacar Anuncio") },
+            text = {
+                Text("Tu anuncio aparecerá con mayor visibilidad por 7 días.\n\nCosto: 3 créditos")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showBoostDialog = false
+                        onBoost()
+                    }
+                ) {
+                    Text("Destacar (3 cr.)")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBoostDialog = false }) {
+                    Text("Cancelar")
                 }
             }
-            Spacer(modifier = Modifier.width(8.dp))
-            // Botón Ver
-            IconButton(
-                onClick = onView,
-                modifier = Modifier.size(40.dp)
-            ) {
+        )
+    }
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = job.title?.rendered ?: "Sin título",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
-                    Icons.Default.Visibility,
-                    contentDescription = "Ver",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp)
+                    Icons.Default.DateRange,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "Publicado: $publicationDate",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            // Botón Editar
-            IconButton(
-                onClick = onEdit,
-                modifier = Modifier.size(40.dp)
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    Icons.Default.Edit,
-                    contentDescription = "Editar",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-            // Botón Eliminar
-            IconButton(
-                onClick = { showDeleteDialog = true },
-                modifier = Modifier.size(40.dp)
-            ) {
-                Icon(
-                    Icons.Default.Delete,
-                    contentDescription = "Eliminar",
-                    tint = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(24.dp)
-                )
+                // Botón Destacar
+                IconButton(
+                    onClick = { showBoostDialog = true },
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Star,
+                        contentDescription = "Destacar",
+                        tint = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                // Botón Ver
+                IconButton(
+                    onClick = onView,
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Visibility,
+                        contentDescription = "Ver",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                // Botón Editar
+                IconButton(
+                    onClick = onEdit,
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Edit,
+                        contentDescription = "Editar",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                // Botón Eliminar
+                IconButton(
+                    onClick = { showDeleteDialog = true },
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = "Eliminar",
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
             }
         }
     }

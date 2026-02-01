@@ -22,6 +22,7 @@ data class FreePostStatus(
 
 data class CreditCosts(
     @Json(name = "publish_job") val publishJob: Int = 5,
+    @Json(name = "boost_job") val boostJob: Int = 3,
     @Json(name = "ai_enhance") val aiEnhance: Int = 1,
     @Json(name = "ai_title") val aiTitle: Int = 1,
     @Json(name = "ai_ocr") val aiOcr: Int = 2
@@ -73,4 +74,16 @@ data class CreditTransaction(
     val reason: String = "",
     @Json(name = "reference_id") val referenceId: String = "",
     val date: String = ""
+)
+
+/**
+ * Respuesta al destacar (boost) un trabajo.
+ */
+data class BoostJobResponse(
+    val success: Boolean,
+    val message: String? = null,
+    @Json(name = "post_id") val postId: Int? = null,
+    @Json(name = "boost_expires") val boostExpires: Long? = null,
+    @Json(name = "boost_days") val boostDays: Int? = null,
+    @Json(name = "credits_balance") val creditsBalance: Int? = null
 )

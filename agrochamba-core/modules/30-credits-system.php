@@ -8,6 +8,7 @@
  *
  * Estructura de precios:
  *   Publicar trabajo       = 5 créditos
+ *   Destacar trabajo 7d    = 3 créditos
  *   IA - Mejorar texto     = 1 crédito
  *   IA - Generar título    = 1 crédito
  *   IA - OCR (imagen)      = 2 créditos
@@ -41,8 +42,11 @@ define('AGROCHAMBA_CREDIT_COST_PUBLISH_JOB', 5);
 define('AGROCHAMBA_CREDIT_COST_AI_ENHANCE',  1);
 define('AGROCHAMBA_CREDIT_COST_AI_TITLE',    1);
 define('AGROCHAMBA_CREDIT_COST_AI_OCR',      2);
+define('AGROCHAMBA_CREDIT_COST_BOOST',      3);
 define('AGROCHAMBA_CREDIT_WELCOME_BONUS',    5);
 define('AGROCHAMBA_FREE_POSTS_PER_WEEK',     1);  // Publicaciones gratis por semana
+define('AGROCHAMBA_BOOST_DURATION_DAYS',     7);  // Duración del boost en días
+define('AGROCHAMBA_BOOST_PRIORITY',        150);  // Prioridad de trabajos destacados
 
 // ==========================================
 // PAQUETES DE CRÉDITOS
@@ -343,6 +347,7 @@ function agrochamba_credits_api_balance($request) {
         'is_unlimited'  => $is_unlimited,
         'costs'         => array(
             'publish_job' => AGROCHAMBA_CREDIT_COST_PUBLISH_JOB,
+            'boost_job'   => AGROCHAMBA_CREDIT_COST_BOOST,
             'ai_enhance'  => AGROCHAMBA_CREDIT_COST_AI_ENHANCE,
             'ai_title'    => AGROCHAMBA_CREDIT_COST_AI_TITLE,
             'ai_ocr'      => AGROCHAMBA_CREDIT_COST_AI_OCR,
@@ -482,10 +487,11 @@ function agrochamba_credits_api_costs($request) {
     return new WP_REST_Response(array(
         'success' => true,
         'costs' => array(
-            array('action' => 'publish_job', 'label' => 'Publicar trabajo',   'credits' => AGROCHAMBA_CREDIT_COST_PUBLISH_JOB),
-            array('action' => 'ai_enhance',  'label' => 'IA - Mejorar texto', 'credits' => AGROCHAMBA_CREDIT_COST_AI_ENHANCE),
-            array('action' => 'ai_title',    'label' => 'IA - Generar titulo','credits' => AGROCHAMBA_CREDIT_COST_AI_TITLE),
-            array('action' => 'ai_ocr',      'label' => 'IA - OCR imagen',    'credits' => AGROCHAMBA_CREDIT_COST_AI_OCR),
+            array('action' => 'publish_job', 'label' => 'Publicar trabajo',        'credits' => AGROCHAMBA_CREDIT_COST_PUBLISH_JOB),
+            array('action' => 'boost_job',   'label' => 'Destacar trabajo 7 días', 'credits' => AGROCHAMBA_CREDIT_COST_BOOST),
+            array('action' => 'ai_enhance',  'label' => 'IA - Mejorar texto',      'credits' => AGROCHAMBA_CREDIT_COST_AI_ENHANCE),
+            array('action' => 'ai_title',    'label' => 'IA - Generar titulo',     'credits' => AGROCHAMBA_CREDIT_COST_AI_TITLE),
+            array('action' => 'ai_ocr',      'label' => 'IA - OCR imagen',         'credits' => AGROCHAMBA_CREDIT_COST_AI_OCR),
         ),
     ), 200);
 }

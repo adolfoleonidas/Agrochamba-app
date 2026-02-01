@@ -334,6 +334,16 @@ interface WordPressApiService {
     ): CreditHistoryResponse
 
     // ==========================================
+    // DESTACAR TRABAJO (BOOST)
+    // ==========================================
+
+    @POST("agrochamba/v1/jobs/{id}/boost")
+    suspend fun boostJob(
+        @Header("Authorization") token: String,
+        @Path("id") jobId: Int
+    ): BoostJobResponse
+
+    // ==========================================
     // ENDPOINTS DE GESTIÓN DE PÁGINAS DE FACEBOOK
     // ==========================================
     
