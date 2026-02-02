@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BedroomParent
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.Work
 import androidx.compose.material3.*
@@ -61,6 +62,7 @@ import agrochamba.com.ui.jobs.MyJobsScreen
 import agrochamba.com.ui.jobs.SavedScreen
 import agrochamba.com.ui.payment.CreditsScreen
 import agrochamba.com.ui.payment.PaymentScreen
+import agrochamba.com.ui.scanner.QrScannerScreen
 import agrochamba.com.ui.theme.AgrochambaTheme
 import agrochamba.com.ui.WebViewScreen
 
@@ -89,6 +91,7 @@ sealed class Screen(val route: String, val label: String? = null, val icon: Imag
     object Settings : Screen("settings")
     object FacebookPages : Screen("facebook_pages")
     object SedesManagement : Screen("sedes_management")
+    object QrScanner : Screen("qr_scanner")
     object Credits : Screen("credits")
     object Payment : Screen("payment/{jobId}/{amount}/{currency}") {
         fun createRoute(jobId: Int, amount: Double, currency: String): String {
@@ -103,9 +106,10 @@ sealed class Screen(val route: String, val label: String? = null, val icon: Imag
 }
 
 // Bottom bar items según tipo de usuario:
-// - Usuarios normales: 5 items (con Cuartos)
+// - Trabajadores: 4 items + QR scanner en el centro
 // - Empresas/Admin: 4 items + FAB en el centro
-val bottomBarItemsNormal = listOf(Screen.Jobs, Screen.Routes, Screen.Dates, Screen.Rooms, Screen.Profile)
+val bottomBarItemsWorkerLeft = listOf(Screen.Jobs, Screen.Routes)
+val bottomBarItemsWorkerRight = listOf(Screen.Dates, Screen.Profile)
 val bottomBarItemsEnterpriseLeft = listOf(Screen.Jobs, Screen.Routes)
 val bottomBarItemsEnterpriseRight = listOf(Screen.Dates, Screen.Profile)
 
@@ -333,13 +337,56 @@ fun MainAppScreen() {
                         )
                     }
                 } else {
-                    // USUARIOS NORMALES: 5 items (con Cuartos)
-                    bottomBarItemsNormal.forEach { screen ->
+                    // TRABAJADORES: Layout con QR Scanner en el centro
+                    // Items de la izquierda (Chambas, Rutas)
+                    bottomBarItemsWorkerLeft.forEach { screen ->
                         NavigationBarItem(
                             icon = { Icon(screen.icon!!, contentDescription = screen.label) },
                             label = { Text(screen.label!!) },
                             selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
-                            onClick = { navController.navigate(screen.route) { 
+                            onClick = { navController.navigate(screen.route) {
+                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            } }
+                        )
+                    }
+
+                    // QR Scanner en el centro
+                    NavigationBarItem(
+                        icon = {
+                            Box(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .background(
+                                        MaterialTheme.colorScheme.primary,
+                                        shape = CircleShape
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.QrCodeScanner,
+                                    contentDescription = "Escanear",
+                                    tint = MaterialTheme.colorScheme.onPrimary
+                                )
+                            }
+                        },
+                        label = { Text("Escanear") },
+                        selected = currentRoute == Screen.QrScanner.route,
+                        onClick = {
+                            navController.navigate(Screen.QrScanner.route) {
+                                launchSingleTop = true
+                            }
+                        }
+                    )
+
+                    // Items de la derecha (Fechas, Perfil)
+                    bottomBarItemsWorkerRight.forEach { screen ->
+                        NavigationBarItem(
+                            icon = { Icon(screen.icon!!, contentDescription = screen.label) },
+                            label = { Text(screen.label!!) },
+                            selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
+                            onClick = { navController.navigate(screen.route) {
                                 popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                                 launchSingleTop = true
                                 restoreState = true
@@ -355,7 +402,8 @@ fun MainAppScreen() {
             composable(Screen.Routes.route) { WebViewScreen(url = "https://agrobus.agrochamba.com/") }
             composable(Screen.Dates.route) { WebViewScreen(url = "https://agrochamba.com/wp-content/fechas.html") }
             composable(Screen.Rooms.route) { WebViewScreen(url = "https://cuartos.agrochamba.com/") }
-            composable(Screen.Profile.route) { ProfileScreen(navController) } 
+            composable(Screen.Profile.route) { ProfileScreen(navController) }
+            composable(Screen.QrScanner.route) { QrScannerScreen(navController) }
             composable(Screen.CreateJob.route) { CreateJobScreen(navController) } 
             composable(Screen.PrivacyPolicy.route) { WebViewScreen(url = "https://agrochamba.com/politica-de-privacidad/") }
             

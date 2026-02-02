@@ -261,15 +261,13 @@ fun ProfileScreen(navController: NavController, viewModel: ProfileViewModel = vi
                 }
             }
 
-            // Cuartos (solo para empresas/admin que no lo tienen en el bottom bar)
-            if (AuthManager.isUserAnEnterprise()) {
-                item {
-                    MenuItem(
-                        icon = Icons.Default.BedroomParent,
-                        title = "Cuartos",
-                        onClick = { navController.navigate(Screen.Rooms.route) }
-                    )
-                }
+            // Cuartos (visible para todos los usuarios)
+            item {
+                MenuItem(
+                    icon = Icons.Default.BedroomParent,
+                    title = "Cuartos",
+                    onClick = { navController.navigate(Screen.Rooms.route) }
+                )
             }
 
             item {

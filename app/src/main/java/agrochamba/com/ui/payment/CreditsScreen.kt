@@ -10,7 +10,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -159,6 +161,12 @@ fun CreditsScreen(
                         CostsCard(uiState.costs)
                     }
 
+                    // Plan gratuito
+                    item {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        FreePlanCard()
+                    }
+
                     // Paquetes
                     item {
                         Spacer(modifier = Modifier.height(8.dp))
@@ -277,6 +285,78 @@ fun CostRow(label: String, credits: Int) {
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary
+        )
+    }
+}
+
+@Composable
+fun FreePlanCard() {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Text(
+                text = "Plan Gratuito",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = "Incluido gratis",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            FreePlanRow(included = true, text = "3 publicaciones por semana")
+            FreePlanRow(included = true, text = "Visibilidad basica")
+            FreePlanRow(included = true, text = "Funciones basicas de IA")
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = "No incluido",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            FreePlanRow(included = false, text = "Compartir en Facebook")
+            FreePlanRow(included = false, text = "Mayor visibilidad y prioridad")
+        }
+    }
+}
+
+@Composable
+private fun FreePlanRow(included: Boolean, text: String) {
+    Row(
+        modifier = Modifier.padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = if (included) Icons.Default.Check else Icons.Default.Close,
+            contentDescription = null,
+            modifier = Modifier.size(18.dp),
+            tint = if (included) MaterialTheme.colorScheme.primary
+                   else MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.5f)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (included) MaterialTheme.colorScheme.onSecondaryContainer
+                    else MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.5f)
         )
     }
 }
