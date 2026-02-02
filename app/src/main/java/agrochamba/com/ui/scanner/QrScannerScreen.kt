@@ -10,6 +10,7 @@ import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
@@ -22,6 +23,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.FlashlightOn
+import androidx.compose.material.icons.filled.FlashlightOff
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material3.*
@@ -56,6 +59,8 @@ fun QrScannerScreen(navController: NavController) {
     var hasCameraPermission by remember { mutableStateOf(false) }
     var scanned by remember { mutableStateOf(false) }
     var scannedText by remember { mutableStateOf<String?>(null) }
+    var torchEnabled by remember { mutableStateOf(false) }
+    var cameraRef by remember { mutableStateOf<Camera?>(null) }
 
     // Funcion para procesar resultado de barcode (compartida entre camara y galeria)
     fun handleBarcodeResult(rawValue: String) {
@@ -131,11 +136,6 @@ fun QrScannerScreen(navController: NavController) {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
                     }
-                },
-                actions = {
-                    IconButton(onClick = { galleryLauncher.launch("image/*") }) {
-                        Icon(Icons.Default.PhotoLibrary, contentDescription = "Galeria")
-                    }
                 }
             )
         }
@@ -153,11 +153,70 @@ fun QrScannerScreen(navController: NavController) {
                         val rawValue = barcode.rawValue ?: return@CameraPreviewWithScanner
                         Log.d("QrScanner", "Codigo detectado: $rawValue")
                         handleBarcodeResult(rawValue)
-                    }
+                    },
+                    onCameraReady = { camera -> cameraRef = camera }
                 )
 
                 // Overlay con recuadro de escaneo
                 ScanOverlay()
+
+                // Textos y acciones debajo del recuadro
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(bottom = 48.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Bottom
+                ) {
+                    Text(
+                        text = "Enfoca el codigo QR o de barras dentro del recuadro",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 32.dp)
+                    )
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    // Boton linterna
+                    TextButton(
+                        onClick = {
+                            torchEnabled = !torchEnabled
+                            cameraRef?.cameraControl?.enableTorch(torchEnabled)
+                        }
+                    ) {
+                        Icon(
+                            imageVector = if (torchEnabled) Icons.Default.FlashlightOff else Icons.Default.FlashlightOn,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (torchEnabled) "Apagar linterna" else "Encender linterna",
+                            color = Color.White
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Boton subir imagen
+                    TextButton(
+                        onClick = { galleryLauncher.launch("image/*") }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PhotoLibrary,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Subir imagen con QR o codigo de barras",
+                            color = Color.White
+                        )
+                    }
+                }
             } else {
                 Column(
                     modifier = Modifier.fillMaxSize(),
@@ -252,7 +311,10 @@ private fun ScannedTextDialog(
 }
 
 @Composable
-private fun CameraPreviewWithScanner(onBarcodeDetected: (Barcode) -> Unit) {
+private fun CameraPreviewWithScanner(
+    onBarcodeDetected: (Barcode) -> Unit,
+    onCameraReady: (Camera) -> Unit = {}
+) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
@@ -287,12 +349,13 @@ private fun CameraPreviewWithScanner(onBarcodeDetected: (Barcode) -> Unit) {
 
                 try {
                     cameraProvider.unbindAll()
-                    cameraProvider.bindToLifecycle(
+                    val camera = cameraProvider.bindToLifecycle(
                         lifecycleOwner,
                         CameraSelector.DEFAULT_BACK_CAMERA,
                         preview,
                         imageAnalysis
                     )
+                    onCameraReady(camera)
                 } catch (e: Exception) {
                     Log.e("QrScanner", "Error al iniciar camara", e)
                 }
