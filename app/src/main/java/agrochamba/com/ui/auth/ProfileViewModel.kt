@@ -35,7 +35,10 @@ data class ProfileScreenState(
     // Flag para indicar que una eliminación fue exitosa (utilizado por la UI para disparar efectos)
     val deleteSuccess: Boolean = false,
     // Flag para indicar que una actualización de perfil fue exitosa
-    val updateSuccess: Boolean = false
+    val updateSuccess: Boolean = false,
+    // Boost
+    val boostSuccess: String? = null,
+    val boostError: String? = null
 )
 
 class ProfileViewModel : ViewModel() {
@@ -145,6 +148,46 @@ class ProfileViewModel : ViewModel() {
                 uiState = uiState.copy(isLoading = false, error = friendlyMessage)
             }
         }
+    }
+
+    fun boostJob(jobId: Int) {
+        viewModelScope.launch {
+            uiState = uiState.copy(boostSuccess = null, boostError = null)
+            try {
+                val token = AuthManager.token ?: throw Exception("No estás autenticado.")
+                val authHeader = "Bearer $token"
+                val response = WordPressApi.retrofitService.boostJob(authHeader, jobId)
+                if (response.success) {
+                    uiState = uiState.copy(
+                        boostSuccess = response.message ?: "Trabajo destacado correctamente."
+                    )
+                } else {
+                    uiState = uiState.copy(boostError = "No se pudo destacar el trabajo.")
+                }
+            } catch (e: HttpException) {
+                val errorBody = try { e.response()?.errorBody()?.string() } catch (_: Exception) { null }
+                val msg = when {
+                    errorBody?.contains("already_boosted") == true -> {
+                        val daysMatch = Regex("\"days_left\":(\\d+)").find(errorBody)
+                        val days = daysMatch?.groupValues?.get(1)?.toIntOrNull() ?: 0
+                        "Este trabajo ya está destacado. Quedan $days día(s)."
+                    }
+                    errorBody?.contains("insufficient_credits") == true -> {
+                        "Créditos insuficientes. Necesitas 3 créditos para destacar."
+                    }
+                    else -> ApiErrorUtils.getReadableApiError(e, "No se pudo destacar el trabajo")
+                }
+                uiState = uiState.copy(boostError = msg)
+            } catch (e: Exception) {
+                uiState = uiState.copy(
+                    boostError = ApiErrorUtils.getReadableApiError(e, "No se pudo destacar el trabajo")
+                )
+            }
+        }
+    }
+
+    fun clearBoostMessages() {
+        uiState = uiState.copy(boostSuccess = null, boostError = null)
     }
 
     fun updateProfile(profileData: Map<String, Any>) {

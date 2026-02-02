@@ -141,13 +141,67 @@ fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel 
             // Reiniciar el estado antes de navegar
             publishToFacebook = false
             val mensaje = if (tipoPublicacion == "trabajo") {
-                "¡Trabajo creado con éxito! Está pendiente de revisión por un administrador."
+                if (uiState.publishTier == "free") {
+                    "¡Trabajo creado con prioridad básica! Está pendiente de revisión."
+                } else {
+                    "¡Trabajo creado con éxito! Está pendiente de revisión por un administrador."
+                }
             } else {
                 "¡Artículo de blog creado con éxito!"
             }
             Toast.makeText(context, mensaje, Toast.LENGTH_LONG).show()
             navController.popBackStack()
         }
+    }
+
+    // Créditos insuficientes: si NO hay free post disponible, ir a comprar
+    LaunchedEffect(uiState.insufficientCredits, uiState.showTierDialog) {
+        if (uiState.insufficientCredits && !uiState.showTierDialog) {
+            Toast.makeText(
+                context,
+                "Necesitas ${uiState.creditsRequired ?: 5} créditos. Tienes ${uiState.creditsBalance ?: 0}.",
+                Toast.LENGTH_LONG
+            ).show()
+            navController.navigate(agrochamba.com.Screen.Credits.route)
+        }
+    }
+
+    // Diálogo elegir publicación gratuita vs comprar créditos
+    if (uiState.showTierDialog) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissTierDialog() },
+            title = { Text("Créditos insuficientes") },
+            text = {
+                Column {
+                    Text(
+                        "No tienes suficientes créditos para publicar con prioridad alta.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "Puedes publicar gratis (te queda ${uiState.freePostRemaining} esta semana), " +
+                        "pero tu publicación tendrá prioridad baja y no se compartirá en Facebook.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    viewModel.dismissTierDialog()
+                    navController.navigate(agrochamba.com.Screen.Credits.route)
+                }) {
+                    Text("Comprar créditos")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = {
+                    viewModel.selectFreeTier()
+                }) {
+                    Text("Publicar gratis")
+                }
+            }
+        )
     }
 
     // Auto-seleccionar empresa del usuario si no es admin
@@ -748,9 +802,11 @@ fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel 
                     )
                     
                     BenefitSwitch(
-                        text = "Publicar también en Facebook",
-                        checked = publishToFacebook,
-                        onCheckedChange = { publishToFacebook = it }
+                        text = if (uiState.publishTier == "free")
+                            "Facebook no disponible (plan gratis)"
+                            else "Publicar también en Facebook",
+                        checked = if (uiState.publishTier == "free") false else publishToFacebook,
+                        onCheckedChange = { if (uiState.publishTier != "free") publishToFacebook = it }
                     )
                     OptionRow(
                         icon = Icons.Default.Public,

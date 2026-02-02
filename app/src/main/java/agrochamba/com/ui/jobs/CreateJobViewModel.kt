@@ -41,7 +41,17 @@ data class CreateJobScreenState(
     val aiSuccess: String? = null,
     // Límites de uso de IA
     val aiUsesRemaining: Int = -1, // -1 = ilimitado o desconocido
-    val aiIsPremium: Boolean = false
+    val aiIsPremium: Boolean = false,
+    // Sistema de créditos
+    val insufficientCredits: Boolean = false,
+    val creditsBalance: Int? = null,
+    val creditsRequired: Int? = null,
+    val freePostAvailable: Boolean = false,
+    val freePostRemaining: Int = 0,
+    // Diálogo elegir tier
+    val showTierDialog: Boolean = false,
+    // Tier de publicación elegido (free o premium)
+    val publishTier: String = "premium"
 )
 
 @HiltViewModel
@@ -356,6 +366,21 @@ class CreateJobViewModel @Inject constructor() : androidx.lifecycle.ViewModel() 
         uiState = uiState.copy(aiError = null, aiSuccess = null)
     }
 
+    fun dismissTierDialog() {
+        uiState = uiState.copy(
+            showTierDialog = false,
+            insufficientCredits = false
+        )
+    }
+
+    fun selectFreeTier() {
+        uiState = uiState.copy(
+            showTierDialog = false,
+            insufficientCredits = false,
+            publishTier = "free"
+        )
+    }
+
     fun createJob(jobData: Map<String, Any?>, context: Context) {
         viewModelScope.launch {
             uiState = uiState.copy(isLoading = true, error = null, loadingMessage = "Publicando, por favor espera...")
@@ -532,6 +557,9 @@ class CreateJobViewModel @Inject constructor() : androidx.lifecycle.ViewModel() 
                     if (galleryIds.isNotEmpty()) {
                         put("gallery_ids", galleryIds)
                     }
+
+                    // Tier de publicación (free o premium)
+                    put("publish_tier", uiState.publishTier)
                 }
 
                 // Crear trabajo en WordPress
@@ -540,31 +568,66 @@ class CreateJobViewModel @Inject constructor() : androidx.lifecycle.ViewModel() 
 
                 // Verificar respuesta
                 if (response.success) {
-                    uiState = uiState.copy(isLoading = false, postSuccess = true)
+                    uiState = uiState.copy(
+                        isLoading = false,
+                        postSuccess = true,
+                        creditsBalance = response.creditsBalance
+                    )
                 } else {
                     throw Exception(response.message ?: "No se pudo crear el trabajo.")
                 }
             } catch (e: HttpException) {
+                val errorBody = try { e.response()?.errorBody()?.string() } catch (_: Exception) { null }
+
+                // Detectar errores de créditos (402)
+                if (e.code() == 402) {
+                    val body = errorBody ?: ""
+
+                    if (body.contains("insufficient_credits")) {
+                        // Parsear balance, required y free_available del error body
+                        val balanceMatch = Regex("\"balance\":(\\d+)").find(body)
+                        val requiredMatch = Regex("\"required\":(\\d+)").find(body)
+                        val freeAvailableMatch = Regex("\"free_available\":(true|false)").find(body)
+                        val freeRemainingMatch = Regex("\"free_remaining\":(\\d+)").find(body)
+
+                        val balance = balanceMatch?.groupValues?.get(1)?.toIntOrNull() ?: 0
+                        val required = requiredMatch?.groupValues?.get(1)?.toIntOrNull() ?: 5
+                        val freeAvailable = freeAvailableMatch?.groupValues?.get(1) == "true"
+                        val freeRemaining = freeRemainingMatch?.groupValues?.get(1)?.toIntOrNull() ?: 0
+
+                        uiState = uiState.copy(
+                            isLoading = false,
+                            insufficientCredits = true,
+                            creditsBalance = balance,
+                            creditsRequired = required,
+                            freePostAvailable = freeAvailable,
+                            freePostRemaining = freeRemaining,
+                            showTierDialog = freeAvailable // Mostrar diálogo si puede publicar gratis
+                        )
+                        return@launch
+                    }
+
+                    if (body.contains("free_limit_reached")) {
+                        uiState = uiState.copy(
+                            isLoading = false,
+                            error = "Ya usaste tu publicación gratuita esta semana. Compra créditos para publicar más."
+                        )
+                        return@launch
+                    }
+                }
+
                 val errorMessage = try {
-                    // Intentar leer el mensaje del cuerpo de la respuesta
-                    val errorBody = e.response()?.errorBody()?.string()
                     if (!errorBody.isNullOrBlank()) {
-                        // Intentar parsear el JSON de error de WordPress
                         val jsonStart = errorBody.indexOf("\"message\"")
                         if (jsonStart != -1) {
                             val messageStart = errorBody.indexOf("\"", jsonStart + 10) + 1
                             val messageEnd = errorBody.indexOf("\"", messageStart)
                             if (messageEnd != -1) {
                                 errorBody.substring(messageStart, messageEnd)
-                            } else {
-                                null
-                            }
-                        } else {
-                            null
-                        }
-                    } else {
-                        null
-                    } ?: when (e.code()) {
+                            } else null
+                        } else null
+                    } else null
+                    ?: when (e.code()) {
                         400 -> "Datos inválidos. Verifica la información."
                         401 -> "No estás autenticado. Inicia sesión nuevamente."
                         403 -> "No tienes permiso para crear trabajos."

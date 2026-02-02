@@ -1,19 +1,21 @@
 <?php
 /**
  * Módulo de Mejora de Texto con IA
- * 
+ *
  * Proporciona funcionalidades para:
  * - Mejorar automáticamente la redacción de ofertas laborales
  * - Generar títulos optimizados para SEO
  * - Extraer texto de imágenes (OCR) y convertirlo en redacción profesional
- * 
- * Sistema de límites:
- * - Empresas (employer): 3 usos gratuitos, luego requiere pago
- * - Administradores: Sin límites
- * 
+ *
+ * Sistema de créditos:
+ * - IA Mejorar texto: 1 crédito
+ * - IA Generar título: 1 crédito
+ * - IA OCR imagen: 2 créditos
+ * - Administradores: Sin límites (no consumen créditos)
+ *
  * @package AgroChamba
  * @subpackage Modules
- * @since 2.1.0
+ * @since 2.2.0
  */
 
 if (!defined('ABSPATH')) {
@@ -21,17 +23,11 @@ if (!defined('ABSPATH')) {
 }
 
 // ==========================================
-// CONFIGURACIÓN DE LÍMITES
-// ==========================================
-
-define('AGROCHAMBA_AI_FREE_USES', 3); // Usos gratuitos para empresas
-
-// ==========================================
-// FUNCIONES DE GESTIÓN DE LÍMITES
+// FUNCIONES DE GESTIÓN DE LÍMITES (BASADAS EN CRÉDITOS)
 // ==========================================
 
 /**
- * Obtener el número de usos de IA del usuario
+ * Obtener el número de usos de IA del usuario (legacy, mantener por compatibilidad)
  */
 if (!function_exists('agrochamba_get_ai_usage_count')) {
     function agrochamba_get_ai_usage_count($user_id) {
@@ -41,27 +37,46 @@ if (!function_exists('agrochamba_get_ai_usage_count')) {
 }
 
 /**
- * Incrementar el contador de usos de IA
+ * Descontar créditos por uso de IA e incrementar contador.
+ *
+ * @param int    $user_id    ID del usuario
+ * @param string $ai_action  Tipo de acción: 'enhance', 'title', 'ocr'
+ * @return bool  true si se pudo descontar, false si no hay créditos
  */
 if (!function_exists('agrochamba_increment_ai_usage')) {
-    function agrochamba_increment_ai_usage($user_id) {
+    function agrochamba_increment_ai_usage($user_id, $ai_action = 'enhance') {
+        // Incrementar contador legacy
         $current = agrochamba_get_ai_usage_count($user_id);
         update_user_meta($user_id, '_agrochamba_ai_usage_count', $current + 1);
         update_user_meta($user_id, '_agrochamba_ai_last_usage', current_time('mysql'));
+
+        // Descontar créditos si el sistema está activo
+        if (function_exists('agrochamba_credits_deduct')) {
+            $cost_map = array(
+                'enhance' => defined('AGROCHAMBA_CREDIT_COST_AI_ENHANCE') ? AGROCHAMBA_CREDIT_COST_AI_ENHANCE : 1,
+                'title'   => defined('AGROCHAMBA_CREDIT_COST_AI_TITLE') ? AGROCHAMBA_CREDIT_COST_AI_TITLE : 1,
+                'ocr'     => defined('AGROCHAMBA_CREDIT_COST_AI_OCR') ? AGROCHAMBA_CREDIT_COST_AI_OCR : 2,
+            );
+            $cost = isset($cost_map[$ai_action]) ? $cost_map[$ai_action] : 1;
+
+            agrochamba_credits_deduct($user_id, $cost, 'IA - ' . $ai_action, 'ai_' . $ai_action);
+        }
+
         return $current + 1;
     }
 }
 
 /**
- * Verificar si el usuario tiene usos de IA disponibles
- * 
- * @param int $user_id ID del usuario
- * @return array ['allowed' => bool, 'remaining' => int, 'limit' => int, 'is_premium' => bool]
+ * Verificar si el usuario puede usar IA (basado en créditos).
+ *
+ * @param int    $user_id    ID del usuario
+ * @param string $ai_action  Tipo de acción: 'enhance', 'title', 'ocr'
+ * @return array Estado de uso
  */
 if (!function_exists('agrochamba_check_ai_usage_limit')) {
-    function agrochamba_check_ai_usage_limit($user_id) {
+    function agrochamba_check_ai_usage_limit($user_id, $ai_action = 'enhance') {
         $user = get_userdata($user_id);
-        
+
         if (!$user) {
             return array(
                 'allowed' => false,
@@ -71,44 +86,51 @@ if (!function_exists('agrochamba_check_ai_usage_limit')) {
                 'reason' => 'Usuario no válido'
             );
         }
-        
+
         // Los administradores tienen uso ilimitado
         if (in_array('administrator', $user->roles)) {
-            return array(
-                'allowed' => true,
-                'remaining' => -1, // -1 = ilimitado
-                'limit' => -1,
-                'is_premium' => true,
-                'reason' => 'Acceso ilimitado de administrador'
-            );
-        }
-        
-        // Verificar si tiene suscripción premium (para futuro)
-        $is_premium = get_user_meta($user_id, '_agrochamba_ai_premium', true);
-        if ($is_premium) {
             return array(
                 'allowed' => true,
                 'remaining' => -1,
                 'limit' => -1,
                 'is_premium' => true,
-                'reason' => 'Suscripción premium activa'
+                'reason' => 'Acceso ilimitado de administrador'
             );
         }
-        
-        // Para empresas normales, verificar límite
-        $usage_count = agrochamba_get_ai_usage_count($user_id);
-        $limit = AGROCHAMBA_AI_FREE_USES;
-        $remaining = max(0, $limit - $usage_count);
-        
+
+        // Sistema de créditos
+        if (function_exists('agrochamba_credits_get_balance')) {
+            $balance = agrochamba_credits_get_balance($user_id);
+
+            $cost_map = array(
+                'enhance' => defined('AGROCHAMBA_CREDIT_COST_AI_ENHANCE') ? AGROCHAMBA_CREDIT_COST_AI_ENHANCE : 1,
+                'title'   => defined('AGROCHAMBA_CREDIT_COST_AI_TITLE') ? AGROCHAMBA_CREDIT_COST_AI_TITLE : 1,
+                'ocr'     => defined('AGROCHAMBA_CREDIT_COST_AI_OCR') ? AGROCHAMBA_CREDIT_COST_AI_OCR : 2,
+            );
+            $cost = isset($cost_map[$ai_action]) ? $cost_map[$ai_action] : 1;
+            $can_afford = $balance >= $cost;
+
+            return array(
+                'allowed'   => $can_afford,
+                'remaining' => $balance,
+                'used'      => agrochamba_get_ai_usage_count($user_id),
+                'limit'     => -1,
+                'is_premium' => false,
+                'cost'      => $cost,
+                'balance'   => $balance,
+                'reason'    => $can_afford
+                    ? "Tienes $balance créditos disponibles (costo: $cost)"
+                    : "Créditos insuficientes. Necesitas $cost, tienes $balance. Compra más créditos."
+            );
+        }
+
+        // Fallback: sin sistema de créditos, permitir
         return array(
-            'allowed' => $remaining > 0,
-            'remaining' => $remaining,
-            'used' => $usage_count,
-            'limit' => $limit,
+            'allowed' => true,
+            'remaining' => -1,
+            'limit' => -1,
             'is_premium' => false,
-            'reason' => $remaining > 0 
-                ? "Te quedan $remaining usos gratuitos de IA" 
-                : 'Has alcanzado el límite de usos gratuitos. Actualiza a premium para uso ilimitado.'
+            'reason' => 'Sistema de créditos no configurado'
         );
     }
 }
@@ -125,7 +147,7 @@ if (!function_exists('agrochamba_reset_ai_usage')) {
 }
 
 /**
- * Otorgar acceso premium a un usuario
+ * Otorgar acceso premium a un usuario (legacy, mantener compatibilidad)
  */
 if (!function_exists('agrochamba_grant_ai_premium')) {
     function agrochamba_grant_ai_premium($user_id, $expiration = null) {

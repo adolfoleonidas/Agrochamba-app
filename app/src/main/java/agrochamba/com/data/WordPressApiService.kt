@@ -288,6 +288,62 @@ interface WordPressApiService {
     ): AIOCRResponse
     
     // ==========================================
+    // ENDPOINTS DE MERCADO PAGO (PAGOS)
+    // ==========================================
+
+    @POST("agrochamba/v1/payments/create-preference")
+    suspend fun createPaymentPreference(
+        @Header("Authorization") token: String,
+        @Body data: Map<String, @JvmSuppressWildcards Any>
+    ): PaymentPreferenceResponse
+
+    @GET("agrochamba/v1/payments/status/{job_id}")
+    suspend fun getPaymentStatus(
+        @Header("Authorization") token: String,
+        @Path("job_id") jobId: Int
+    ): PaymentStatusResponse
+
+    @GET("agrochamba/v1/payments/config")
+    suspend fun getPaymentConfig(
+        @Header("Authorization") token: String
+    ): PaymentConfigResponse
+
+    // ==========================================
+    // ENDPOINTS DE CRÉDITOS
+    // ==========================================
+
+    @GET("agrochamba/v1/credits/balance")
+    suspend fun getCreditsBalance(
+        @Header("Authorization") token: String
+    ): CreditsBalanceResponse
+
+    @GET("agrochamba/v1/credits/packages")
+    suspend fun getCreditPackages(
+        @Header("Authorization") token: String
+    ): CreditPackagesResponse
+
+    @POST("agrochamba/v1/credits/purchase")
+    suspend fun purchaseCredits(
+        @Header("Authorization") token: String,
+        @Body data: Map<String, @JvmSuppressWildcards Any>
+    ): CreditPurchaseResponse
+
+    @GET("agrochamba/v1/credits/history")
+    suspend fun getCreditHistory(
+        @Header("Authorization") token: String
+    ): CreditHistoryResponse
+
+    // ==========================================
+    // DESTACAR TRABAJO (BOOST)
+    // ==========================================
+
+    @POST("agrochamba/v1/jobs/{id}/boost")
+    suspend fun boostJob(
+        @Header("Authorization") token: String,
+        @Path("id") jobId: Int
+    ): BoostJobResponse
+
+    // ==========================================
     // ENDPOINTS DE GESTIÓN DE PÁGINAS DE FACEBOOK
     // ==========================================
     

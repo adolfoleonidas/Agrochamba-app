@@ -55,7 +55,16 @@
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"
-            android:theme="@style/Theme.Agrochamba" />
+            android:theme="@style/Theme.Agrochamba">
+            <!-- Deep Links para retorno de Mercado Pago Checkout -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="agrochamba" android:host="payment" />
+                <data android:scheme="agrochamba" android:host="credits" />
+            </intent-filter>
+        </activity>
     </application>
 
 </manifest>
