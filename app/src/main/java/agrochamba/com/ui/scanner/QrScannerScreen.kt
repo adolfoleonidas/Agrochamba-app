@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -56,6 +57,59 @@ fun QrScannerScreen(navController: NavController) {
     var scanned by remember { mutableStateOf(false) }
     var scannedText by remember { mutableStateOf<String?>(null) }
 
+    // Funcion para procesar resultado de barcode (compartida entre camara y galeria)
+    fun handleBarcodeResult(rawValue: String) {
+        when {
+            rawValue.contains("agrochamba.com") -> {
+                val uri = Uri.parse(rawValue)
+                val pathSegments = uri.pathSegments
+                if (pathSegments.contains("empresa") && pathSegments.size > 1) {
+                    val companyName = pathSegments.last()
+                    navController.popBackStack()
+                    navController.navigate("company_profile/$companyName")
+                } else {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(rawValue))
+                    context.startActivity(intent)
+                    navController.popBackStack()
+                }
+            }
+            rawValue.startsWith("http://") || rawValue.startsWith("https://") -> {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(rawValue))
+                context.startActivity(intent)
+                navController.popBackStack()
+            }
+            else -> {
+                scannedText = rawValue
+            }
+        }
+    }
+
+    // Picker de galeria
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            try {
+                val image = InputImage.fromFilePath(context, uri)
+                val scanner = BarcodeScanning.getClient()
+                scanner.process(image)
+                    .addOnSuccessListener { barcodes ->
+                        val barcode = barcodes.firstOrNull()
+                        if (barcode?.rawValue != null) {
+                            handleBarcodeResult(barcode.rawValue!!)
+                        } else {
+                            Toast.makeText(context, "No se encontro codigo QR en la imagen", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                    .addOnFailureListener {
+                        Toast.makeText(context, "Error al procesar la imagen", Toast.LENGTH_SHORT).show()
+                    }
+            } catch (e: Exception) {
+                Toast.makeText(context, "Error al leer la imagen", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -77,6 +131,11 @@ fun QrScannerScreen(navController: NavController) {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
                     }
+                },
+                actions = {
+                    IconButton(onClick = { galleryLauncher.launch("image/*") }) {
+                        Icon(Icons.Default.PhotoLibrary, contentDescription = "Galeria")
+                    }
                 }
             )
         }
@@ -93,33 +152,7 @@ fun QrScannerScreen(navController: NavController) {
                         scanned = true
                         val rawValue = barcode.rawValue ?: return@CameraPreviewWithScanner
                         Log.d("QrScanner", "Codigo detectado: $rawValue")
-
-                        when {
-                            rawValue.contains("agrochamba.com") -> {
-                                // URL de agrochamba -> navegar in-app
-                                val uri = Uri.parse(rawValue)
-                                val pathSegments = uri.pathSegments
-                                if (pathSegments.contains("empresa") && pathSegments.size > 1) {
-                                    val companyName = pathSegments.last()
-                                    navController.popBackStack()
-                                    navController.navigate("company_profile/$companyName")
-                                } else {
-                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(rawValue))
-                                    context.startActivity(intent)
-                                    navController.popBackStack()
-                                }
-                            }
-                            rawValue.startsWith("http://") || rawValue.startsWith("https://") -> {
-                                // URL general -> abrir en browser
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(rawValue))
-                                context.startActivity(intent)
-                                navController.popBackStack()
-                            }
-                            else -> {
-                                // Texto plano -> mostrar modal
-                                scannedText = rawValue
-                            }
-                        }
+                        handleBarcodeResult(rawValue)
                     }
                 )
 
