@@ -1,6 +1,9 @@
 package agrochamba.com.ui.scanner
 
 import android.Manifest
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.util.Log
@@ -15,8 +18,11 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -31,6 +37,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -46,6 +54,7 @@ fun QrScannerScreen(navController: NavController) {
     val context = LocalContext.current
     var hasCameraPermission by remember { mutableStateOf(false) }
     var scanned by remember { mutableStateOf(false) }
+    var scannedText by remember { mutableStateOf<String?>(null) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -88,8 +97,6 @@ fun QrScannerScreen(navController: NavController) {
                         when {
                             rawValue.contains("agrochamba.com") -> {
                                 // URL de agrochamba -> navegar in-app
-                                Toast.makeText(context, "Enlace Agrochamba detectado", Toast.LENGTH_SHORT).show()
-                                // Intentar extraer ruta del perfil de empresa
                                 val uri = Uri.parse(rawValue)
                                 val pathSegments = uri.pathSegments
                                 if (pathSegments.contains("empresa") && pathSegments.size > 1) {
@@ -97,7 +104,6 @@ fun QrScannerScreen(navController: NavController) {
                                     navController.popBackStack()
                                     navController.navigate("company_profile/$companyName")
                                 } else {
-                                    // Abrir en browser como fallback
                                     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(rawValue))
                                     context.startActivity(intent)
                                     navController.popBackStack()
@@ -110,9 +116,8 @@ fun QrScannerScreen(navController: NavController) {
                                 navController.popBackStack()
                             }
                             else -> {
-                                // Texto plano -> mostrar Toast
-                                Toast.makeText(context, rawValue, Toast.LENGTH_LONG).show()
-                                scanned = false // Permitir re-escanear
+                                // Texto plano -> mostrar modal
+                                scannedText = rawValue
                             }
                         }
                     }
@@ -138,6 +143,79 @@ fun QrScannerScreen(navController: NavController) {
             }
         }
     }
+
+    // Modal para texto plano escaneado
+    if (scannedText != null) {
+        ScannedTextDialog(
+            text = scannedText!!,
+            onDismiss = {
+                scannedText = null
+                scanned = false
+            },
+            onCopy = {
+                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                clipboard.setPrimaryClip(ClipData.newPlainText("QR", scannedText))
+                Toast.makeText(context, "Copiado al portapapeles", Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+}
+
+@Composable
+private fun ScannedTextDialog(
+    text: String,
+    onDismiss: () -> Unit,
+    onCopy: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                Icons.Default.QrCode,
+                contentDescription = null,
+                modifier = Modifier.size(32.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+        },
+        title = {
+            Text(
+                text = "Resultado del escaneo",
+                textAlign = TextAlign.Center
+            )
+        },
+        text = {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            ) {
+                Text(
+                    text = text,
+                    modifier = Modifier.padding(16.dp),
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = onCopy) {
+                Icon(
+                    Icons.Default.ContentCopy,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Copiar")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cerrar")
+            }
+        }
+    )
 }
 
 @Composable
