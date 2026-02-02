@@ -44,7 +44,7 @@ define('AGROCHAMBA_CREDIT_COST_AI_TITLE',    1);
 define('AGROCHAMBA_CREDIT_COST_AI_OCR',      2);
 define('AGROCHAMBA_CREDIT_COST_BOOST',      3);
 define('AGROCHAMBA_CREDIT_WELCOME_BONUS',    5);
-define('AGROCHAMBA_FREE_POSTS_PER_WEEK',     1);  // Publicaciones gratis por semana
+define('AGROCHAMBA_FREE_POSTS_PER_WEEK',     3);  // Publicaciones gratis por semana
 define('AGROCHAMBA_BOOST_DURATION_DAYS',     7);  // Duración del boost en días
 define('AGROCHAMBA_BOOST_PRIORITY',        150);  // Prioridad de trabajos destacados
 

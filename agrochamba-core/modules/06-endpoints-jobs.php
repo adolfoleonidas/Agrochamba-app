@@ -276,8 +276,8 @@ if (!function_exists('agrochamba_create_job')) {
         if ($post_type === 'trabajo') {
             update_post_meta($post_id, '_job_tier', $job_tier);
 
-            // Prioridad: premium=100, free=10
-            $priority = ($job_tier === 'premium') ? 100 : 10;
+            // Prioridad: premium=100, free=40 (free sigue visible si es reciente)
+            $priority = ($job_tier === 'premium') ? 100 : 40;
             update_post_meta($post_id, '_job_priority', $priority);
         }
 
@@ -2010,7 +2010,7 @@ if (!function_exists('agrochamba_boost_job')) {
         // Guardar prioridad original antes de boost (para restaurar después)
         $current_priority = get_post_meta($post_id, '_job_priority', true);
         if (empty($current_priority)) {
-            $current_priority = (get_post_meta($post_id, '_job_tier', true) === 'free') ? 10 : 100;
+            $current_priority = (get_post_meta($post_id, '_job_tier', true) === 'free') ? 40 : 100;
         }
         update_post_meta($post_id, '_job_priority_before_boost', intval($current_priority));
         update_post_meta($post_id, '_job_priority', $boost_priority);
@@ -2074,7 +2074,7 @@ if (!function_exists('agrochamba_expire_boosts')) {
             // Restaurar prioridad original
             $original_priority = get_post_meta($post_id, '_job_priority_before_boost', true);
             if (empty($original_priority)) {
-                $original_priority = (get_post_meta($post_id, '_job_tier', true) === 'free') ? 10 : 100;
+                $original_priority = (get_post_meta($post_id, '_job_tier', true) === 'free') ? 40 : 100;
             }
 
             update_post_meta($post_id, '_job_priority', intval($original_priority));
