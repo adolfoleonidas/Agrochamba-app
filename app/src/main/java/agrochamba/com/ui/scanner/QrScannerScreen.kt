@@ -26,7 +26,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
@@ -219,7 +221,11 @@ private fun processImage(
 @Composable
 private fun ScanOverlay() {
     val primaryColor = MaterialTheme.colorScheme.primary
-    Canvas(modifier = Modifier.fillMaxSize()) {
+    Canvas(
+        modifier = Modifier
+            .fillMaxSize()
+            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+    ) {
         val scanSize = size.minDimension * 0.65f
         val left = (size.width - scanSize) / 2
         val top = (size.height - scanSize) / 2
