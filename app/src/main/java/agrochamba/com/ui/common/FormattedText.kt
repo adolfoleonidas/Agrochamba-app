@@ -10,10 +10,8 @@ import android.text.style.StyleSpan
 import android.text.style.UnderlineSpan
 import android.text.style.URLSpan
 import android.graphics.Typeface
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.text.ClickableText
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -32,34 +30,26 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * FormattedText v2.0 - Texto profesional con detección automática de secciones
+ * FormattedText v3.0 - WYSIWYG: renderiza fielmente sin modificar contenido
  *
- * SECCIONES AUTOMÁTICAS (detectadas y estilizadas):
- * - Beneficios, Requisitos, Funciones, Responsabilidades
- * - Horario, Salario, Ubicación, Contacto
- * - Descripción, Experiencia, Habilidades
- *
- * FORMATO:
+ * FORMATO SOPORTADO:
+ * - Encabezados: ## (h2), ### (h3), <h2>, <h3>
  * - Negrita: **texto** o <strong>
  * - Cursiva: *texto* o <em>
  * - Listas: • con indentación
- * - Links: clickeables con icono
- * - Teléfonos: clickeables con icono
+ * - Links: clickeables con subrayado
+ * - Teléfonos: clickeables con diálogo (Llamar/WhatsApp)
+ * - Emails: clickeables
+ *
+ * PRINCIPIO WYSIWYG:
+ * - Lo que el usuario escribe = lo que se muestra
+ * - Sin emojis automáticos ni modificaciones
+ * - El usuario controla el contenido completamente
  *
  * RENDIMIENTO:
  * - Procesamiento en background thread
  * - Sin regex pesados en main thread
- * - Cache de resultados
  */
-
-// Secciones comunes en ofertas de trabajo
-private val SECTION_KEYWORDS = listOf(
-    "beneficios", "requisitos", "funciones", "responsabilidades",
-    "horario", "salario", "sueldo", "remuneración", "ubicación",
-    "contacto", "descripción", "experiencia", "habilidades",
-    "competencias", "ofrecemos", "buscamos", "perfil", "condiciones",
-    "jornada", "modalidad", "contrato", "vacantes", "importante"
-)
 
 @Composable
 fun FormattedText(
@@ -92,28 +82,24 @@ fun FormattedText(
         buildAnnotatedString { append("") }
     }
 
-    var textLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
+    // Line-height de 1.6x es óptimo para legibilidad (recomendación: 1.5-1.7)
+    val optimizedLineHeight = (style.fontSize.value * 1.6f).sp
 
-    Text(
+    ClickableText(
         text = displayText,
-        style = style.copy(lineHeight = 26.sp),
-        modifier = modifier.pointerInput(displayText) {
-            detectTapGestures { tapOffset ->
-                textLayoutResult?.let { layout ->
-                    val offset = layout.getOffsetForPosition(tapOffset)
-                    handleClickWithCallback(
-                        offset = offset,
-                        text = displayText,
-                        context = context,
-                        onPhoneClick = { phone ->
-                            selectedPhone = phone
-                            showPhoneDialog = true
-                        }
-                    )
+        style = style.copy(lineHeight = optimizedLineHeight),
+        modifier = modifier,
+        onClick = { offset ->
+            handleClickWithCallback(
+                offset = offset,
+                text = displayText,
+                context = context,
+                onPhoneClick = { phone ->
+                    selectedPhone = phone
+                    showPhoneDialog = true
                 }
-            }
-        },
-        onTextLayout = { textLayoutResult = it }
+            )
+        }
     )
 
     // Diálogo de opciones para teléfono
@@ -176,12 +162,12 @@ private fun processHtmlText(html: String, linkColor: Color, sectionColor: Color)
         // Encabezados
         .replace(Regex("</h[1-6]>"), "<br><br>")
         .replace(Regex("<h[1-6][^>]*>"), "<br>")
-        // Listas - formato mejorado
-        .replace("<ul>", "<br>", ignoreCase = true)
-        .replace("</ul>", "<br>", ignoreCase = true)
-        .replace("<ol>", "<br>", ignoreCase = true)
-        .replace("</ol>", "<br>", ignoreCase = true)
-        .replace("<li>", "<br>    • ", ignoreCase = true)
+        // Listas - sin espaciado extra
+        .replace("<ul>", "", ignoreCase = true)
+        .replace("</ul>", "", ignoreCase = true)
+        .replace("<ol>", "", ignoreCase = true)
+        .replace("</ol>", "", ignoreCase = true)
+        .replace(Regex("<li[^>]*>"), "<br>• ")
         .replace("</li>", "", ignoreCase = true)
         // Limpiar múltiples br
         .replace(Regex("(<br>){3,}"), "<br><br>")
@@ -214,14 +200,14 @@ private fun processHtmlText(html: String, linkColor: Color, sectionColor: Color)
         .trim()
 
     return buildAnnotatedString {
-        // Procesar línea por línea para detectar secciones
+        // Procesar línea por línea
         val lines = text.split('\n')
         var isFirstLine = true
 
-        lines.forEachIndexed { index, line ->
+        lines.forEach { line ->
             if (line.isBlank()) {
                 if (!isFirstLine) append('\n')
-                return@forEachIndexed
+                return@forEach
             }
 
             if (!isFirstLine) append('\n')
@@ -229,34 +215,24 @@ private fun processHtmlText(html: String, linkColor: Color, sectionColor: Color)
 
             val trimmedLine = line.trim()
 
-            // Detectar si es una sección
-            if (isSectionHeader(trimmedLine)) {
-                // Sección con estilo especial
-                withStyle(SpanStyle(
-                    fontWeight = FontWeight.Bold,
-                    color = sectionColor,
-                    fontSize = 15.sp
-                )) {
-                    append(formatSectionHeader(trimmedLine))
+            when {
+                // Item de lista con viñeta
+                trimmedLine.startsWith("•") || trimmedLine.startsWith("-") || trimmedLine.startsWith("*") -> {
+                    withStyle(SpanStyle(color = sectionColor)) {
+                        append("• ")
+                    }
+                    appendStyledText(trimmedLine.removePrefix("•").removePrefix("-").removePrefix("*").trim(), spanned, linkColor)
                 }
-            } else if (trimmedLine.startsWith("•") || trimmedLine.startsWith("-") || trimmedLine.startsWith("*")) {
-                // Item de lista con indentación
-                append("    ")
-                withStyle(SpanStyle(color = sectionColor)) {
-                    append("• ")
-                }
-                appendStyledText(trimmedLine.removePrefix("•").removePrefix("-").removePrefix("*").trim(), spanned, linkColor)
-            } else if (trimmedLine.matches(Regex("^\\d+\\.\\s.*"))) {
                 // Lista numerada
-                val num = trimmedLine.takeWhile { it.isDigit() || it == '.' }
-                append("    ")
-                withStyle(SpanStyle(color = sectionColor, fontWeight = FontWeight.Medium)) {
-                    append("$num ")
+                trimmedLine.matches(Regex("^\\d+\\.\\s.*")) -> {
+                    val num = trimmedLine.takeWhile { it.isDigit() || it == '.' }
+                    withStyle(SpanStyle(color = sectionColor, fontWeight = FontWeight.Medium)) {
+                        append("$num ")
+                    }
+                    appendStyledText(trimmedLine.removePrefix(num).trim(), spanned, linkColor)
                 }
-                appendStyledText(trimmedLine.removePrefix(num).trim(), spanned, linkColor)
-            } else {
                 // Texto normal
-                appendStyledText(trimmedLine, spanned, linkColor)
+                else -> appendStyledText(trimmedLine, spanned, linkColor)
             }
         }
 
@@ -340,98 +316,32 @@ private fun AnnotatedString.Builder.appendStyledText(text: String, spanned: Span
 }
 
 /**
- * Detecta si una línea es un encabezado de sección
- */
-private fun isSectionHeader(line: String): Boolean {
-    val lowerLine = line.lowercase().trim()
-        .removeSuffix(":")
-        .removeSuffix("-")
-        .trim()
-
-    // Verificar si coincide con alguna keyword de sección
-    if (SECTION_KEYWORDS.any { lowerLine == it || lowerLine.startsWith("$it ") || lowerLine.endsWith(" $it") }) {
-        return true
-    }
-
-    // Detectar patrones comunes de secciones
-    // Ej: "📋 Requisitos", "✅ Beneficios", "🕐 Horario"
-    val withoutEmoji = lowerLine.replace(Regex("[\\p{So}\\p{Sk}]"), "").trim()
-    if (SECTION_KEYWORDS.any { withoutEmoji == it || withoutEmoji.startsWith("$it ") }) {
-        return true
-    }
-
-    // Línea corta que termina en ":" probablemente es sección
-    if (line.length < 40 && line.trimEnd().endsWith(":")) {
-        return true
-    }
-
-    return false
-}
-
-/**
- * Formatea el encabezado de sección
- */
-private fun formatSectionHeader(line: String): String {
-    var result = line.trim()
-
-    // Agregar emoji si no tiene
-    val lowerLine = result.lowercase()
-    val hasEmoji = result.any { Character.getType(it) == Character.OTHER_SYMBOL.toInt() }
-
-    if (!hasEmoji) {
-        val emoji = when {
-            lowerLine.contains("beneficio") || lowerLine.contains("ofrecemos") -> "✨ "
-            lowerLine.contains("requisito") || lowerLine.contains("buscamos") -> "📋 "
-            lowerLine.contains("funcion") || lowerLine.contains("responsabilidad") -> "💼 "
-            lowerLine.contains("horario") || lowerLine.contains("jornada") -> "🕐 "
-            lowerLine.contains("salario") || lowerLine.contains("sueldo") || lowerLine.contains("remuneración") -> "💰 "
-            lowerLine.contains("ubicación") || lowerLine.contains("lugar") -> "📍 "
-            lowerLine.contains("contacto") -> "📞 "
-            lowerLine.contains("experiencia") -> "⭐ "
-            lowerLine.contains("habilidad") || lowerLine.contains("competencia") -> "🎯 "
-            lowerLine.contains("importante") -> "⚠️ "
-            lowerLine.contains("perfil") -> "👤 "
-            lowerLine.contains("contrato") || lowerLine.contains("modalidad") -> "📄 "
-            else -> "▸ "
-        }
-        result = emoji + result
-    }
-
-    // Asegurar que termina en ":"
-    if (!result.endsWith(":") && !result.endsWith("-")) {
-        result = "$result:"
-    }
-
-    return result
-}
-
-/**
  * Procesa texto plano (sin HTML)
  */
 private fun AnnotatedString.Builder.processPlainText(text: String, linkColor: Color, sectionColor: Color) {
     val lines = text.split('\n')
     var isFirstLine = true
 
-    lines.forEachIndexed { index, rawLine ->
+    lines.forEach { rawLine ->
         val line = rawLine.trim()
 
         if (line.isBlank()) {
             if (!isFirstLine) append('\n')
-            return@forEachIndexed
+            return@forEach
         }
 
         if (!isFirstLine) append('\n')
         isFirstLine = false
 
         when {
-            // Encabezados Markdown
+            // Encabezados Markdown - WYSIWYG: se muestran como el usuario los escribió
             line.startsWith("### ") -> {
                 withStyle(SpanStyle(fontWeight = FontWeight.Bold, fontSize = 15.sp, color = sectionColor)) {
                     append(line.substring(4))
                 }
             }
             line.startsWith("## ") -> {
-                withStyle(SpanStyle(fontWeight = FontWeight.Bold, fontSize = 16.sp, color = sectionColor)) {
+                withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, fontSize = 17.sp, color = sectionColor)) {
                     append(line.substring(3))
                 }
             }
@@ -440,22 +350,14 @@ private fun AnnotatedString.Builder.processPlainText(text: String, linkColor: Co
                     append(line.substring(2))
                 }
             }
-            // Sección detectada
-            isSectionHeader(line) -> {
-                withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = sectionColor, fontSize = 15.sp)) {
-                    append(formatSectionHeader(line))
-                }
-            }
             // Lista con viñeta
             line.startsWith("- ") || line.startsWith("* ") -> {
-                append("    ")
                 withStyle(SpanStyle(color = sectionColor)) { append("• ") }
                 processInlineFormatting(line.substring(2), linkColor)
             }
             // Lista numerada
             line.matches(Regex("^\\d+\\.\\s.*")) -> {
                 val num = line.takeWhile { it.isDigit() || it == '.' || it == ' ' }
-                append("    ")
                 withStyle(SpanStyle(color = sectionColor, fontWeight = FontWeight.Medium)) {
                     append(num)
                 }

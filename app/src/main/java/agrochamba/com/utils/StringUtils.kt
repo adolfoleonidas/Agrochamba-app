@@ -323,6 +323,17 @@ fun String.markdownToHtml(): String {
 
     var html = this
 
+    // Encabezados Markdown (procesar primero, de mayor a menor especificidad)
+    html = Regex("^###\\s+(.+)$", RegexOption.MULTILINE).replace(html) {
+        "<h3>${it.groupValues[1]}</h3>"
+    }
+    html = Regex("^##\\s+(.+)$", RegexOption.MULTILINE).replace(html) {
+        "<h2>${it.groupValues[1]}</h2>"
+    }
+    html = Regex("^#\\s+(.+)$", RegexOption.MULTILINE).replace(html) {
+        "<h1>${it.groupValues[1]}</h1>"
+    }
+
     // Listas numeradas
     html = Regex("^(\\d+)\\.\\s+(.+)$", RegexOption.MULTILINE).replace(html) {
         "<li>${it.groupValues[2]}</li>"
@@ -344,6 +355,7 @@ fun String.markdownToHtml(): String {
         when {
             t.isEmpty() -> ""
             t.startsWith("<li>") -> "<ul>$t</ul>"
+            t.startsWith("<h1>") || t.startsWith("<h2>") || t.startsWith("<h3>") -> t
             else -> "<p>${t.replace("\n", "<br>")}</p>"
         }
     }
@@ -377,7 +389,11 @@ fun String.htmlToMarkdown(): String {
 fun String.textToHtml(): String {
     if (this.isBlank()) return ""
     if (this.contains("<p>") || this.contains("<br")) return this
-    if (this.contains("**")) return this.markdownToHtml()
+    // Detectar Markdown: negrita, encabezados o listas
+    if (this.contains("**") || this.contains("## ") || this.contains("# ") ||
+        this.lines().any { it.trimStart().startsWith("- ") || it.trimStart().startsWith("* ") }) {
+        return this.markdownToHtml()
+    }
 
     val paragraphs = this.split("\n\n")
     return paragraphs.joinToString("") { p ->

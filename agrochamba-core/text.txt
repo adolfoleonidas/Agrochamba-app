@@ -1,0 +1,754 @@
+[
+  {
+    "id": 3066,
+    "date": "2026-01-20T20:40:12",
+    "date_gmt": "2026-01-21T01:40:12",
+    "guid": {
+      "rendered": "https://agrochamba.com/trabajos/empleo-agricola-en-asica-olmos-para-campana-de-mango/"
+    },
+    "modified": "2026-01-20T20:40:12",
+    "modified_gmt": "2026-01-21T01:40:12",
+    "slug": "empleo-agricola-en-asica-olmos-para-campana-de-mango",
+    "status": "publish",
+    "type": "trabajo",
+    "link": "https://agrochamba.com/trabajos/empleo-agricola-en-asica-olmos-para-campana-de-mango/",
+    "title": {
+      "rendered": "Empleo agrícola en ASICA Olmos para campaña de mango"
+    },
+    "content": {
+      "rendered": "\u003Cp\u003E\u003Cstrong\u003EOportunidad de Trabajo en ASICA Olmos\u003C/strong\u003E\u003C/p\u003E\n\u003Cp\u003E\u003Cstrong\u003EDescripción de la Empresa:\u003C/strong\u003E\u003Cbr /\u003EASICA Olmos se encuentra en la búsqueda de personal para diversas labores agrícolas, tanto con experiencia como sin experiencia, en un ambiente dinámico y colaborativo.\u003C/p\u003E\n\u003Cp\u003E\u003Cstrong\u003EPuestos Disponibles:\u003C/strong\u003E\u003C/p\u003E\n\u003Cul\u003E\u003C/p\u003E\n\u003Cli\u003ECosecha de Mango\u003C/li\u003E\n\u003Cp\u003E\u003C/p\u003E\n\u003Cli\u003ECorte\u003C/li\u003E\n\u003Cp\u003E\u003C/p\u003E\n\u003Cli\u003EPedúnculo\u003C/li\u003E\n\u003Cp\u003E\u003C/p\u003E\n\u003Cli\u003EEstiva\u003C/li\u003E\n\u003Cp\u003E\u003C/p\u003E\n\u003Cli\u003EPacking en Acopio de Campo (con experiencia en selección y embalado)\u003C/li\u003E\n\u003Cp\u003E\u003C/ul\u003E\n\u003Cp\u003E\u003Cstrong\u003EBeneficios:\u003C/strong\u003E\u003C/p\u003E\n\u003Cul\u003E\u003C/p\u003E\n\u003Cli\u003ECampamento y alimentación (3 comidas diarias) proporcionados por la empresa.\u003C/li\u003E\n\u003Cp\u003E\u003C/p\u003E\n\u003Cli\u003ETransporte gratuito desde Talara, Sullana y Piura hacia nuestras instalaciones.\u003C/li\u003E\n\u003Cp\u003E\u003C/p\u003E\n\u003Cli\u003EBeneficios de acuerdo a la Ley del Obrero Agrario.\u003C/li\u003E\n\u003Cp\u003E\u003C/p\u003E\n\u003Cli\u003EPagos quincenales puntuales.\u003C/li\u003E\n\u003Cp\u003E\u003C/ul\u003E\n\u003Cp\u003E\u003Cstrong\u003EReunión Informativa:\u003C/strong\u003E\u003C/p\u003E\n\u003Cul\u003E\u003C/p\u003E\n\u003Cli\u003E\u003Cstrong\u003EFecha:\u003C/strong\u003E Sábado, 24 de enero\u003C/li\u003E\n\u003Cp\u003E\u003C/p\u003E\n\u003Cli\u003E\u003Cstrong\u003EHora:\u003C/strong\u003E 2:00 PM\u003C/li\u003E\n\u003Cp\u003E\u003C/p\u003E\n\u003Cli\u003E\u003Cstrong\u003ELugar:\u003C/strong\u003E Parque Cola de Gato, Talara Alta\u003C/li\u003E\n\u003Cp\u003E\u003C/ul\u003E\n\u003Cp\u003E\u003Cstrong\u003EIngreso:\u003C/strong\u003E\u003C/p\u003E\n\u003Cul\u003E\u003C/p\u003E\n\u003Cli\u003EFecha de inicio: Lunes, 26 de enero\u003C/li\u003E\n\u003Cp\u003E\u003C/ul\u003E\n\u003Cp\u003E\u003Cstrong\u003EContacto:\u003C/strong\u003E\u003Cbr /\u003EPara más información, por favor contáctenos a través de WhatsApp al número 904225934.\u003C/p\u003E\n\u003Cp\u003E¡Esperamos contar contigo para esta gran oportunidad laboral!\u003C/p\u003E\n\u003Cfigure class=\"wp-block-image size-large\"\u003E\n\u003Cimg loading=\"lazy\" decoding=\"async\" width=\"724\" height=\"1024\" src=\"https://agrochamba.com/wp-content/uploads/2026/01/1000219648-724x1024.jpg\" alt=\"Empleo agrícola en ASICA Olmos para campaña de mango\" class=\"wp-image-3063 aligncenter size-large\" srcset=\"https://agrochamba.com/wp-content/uploads/2026/01/1000219648-724x1024.jpg 724w, https://agrochamba.com/wp-content/uploads/2026/01/1000219648-212x300.jpg 212w, https://agrochamba.com/wp-content/uploads/2026/01/1000219648-768x1086.jpg 768w, https://agrochamba.com/wp-content/uploads/2026/01/1000219648-1086x1536.jpg 1086w, https://agrochamba.com/wp-content/uploads/2026/01/1000219648.jpg 1131w\" sizes=\"auto, (max-width: 724px) 100vw, 724px\" /\u003E\u003Cbr /\u003E\n\u003C/figure\u003E\n\u003Cfigure class=\"wp-block-image size-large\"\u003E\n\u003Cimg loading=\"lazy\" decoding=\"async\" width=\"724\" height=\"1024\" src=\"https://agrochamba.com/wp-content/uploads/2026/01/1000219649-724x1024.jpg\" alt=\"Empleo agrícola en ASICA Olmos para campaña de mango\" class=\"wp-image-3064 aligncenter size-large\" srcset=\"https://agrochamba.com/wp-content/uploads/2026/01/1000219649-724x1024.jpg 724w, https://agrochamba.com/wp-content/uploads/2026/01/1000219649-212x300.jpg 212w, https://agrochamba.com/wp-content/uploads/2026/01/1000219649-768x1086.jpg 768w, https://agrochamba.com/wp-content/uploads/2026/01/1000219649-1086x1536.jpg 1086w, https://agrochamba.com/wp-content/uploads/2026/01/1000219649.jpg 1131w\" sizes=\"auto, (max-width: 724px) 100vw, 724px\" /\u003E\u003Cbr /\u003E\n\u003C/figure\u003E\n\u003Cfigure class=\"wp-block-image size-large\"\u003E\n\u003Cimg loading=\"lazy\" decoding=\"async\" width=\"724\" height=\"1024\" src=\"https://agrochamba.com/wp-content/uploads/2026/01/1000219650-724x1024.jpg\" alt=\"Empleo agrícola en ASICA Olmos para campaña de mango\" class=\"wp-image-3065 aligncenter size-large\" srcset=\"https://agrochamba.com/wp-content/uploads/2026/01/1000219650-724x1024.jpg 724w, https://agrochamba.com/wp-content/uploads/2026/01/1000219650-212x300.jpg 212w, https://agrochamba.com/wp-content/uploads/2026/01/1000219650-768x1086.jpg 768w, https://agrochamba.com/wp-content/uploads/2026/01/1000219650-1086x1536.jpg 1086w, https://agrochamba.com/wp-content/uploads/2026/01/1000219650.jpg 1131w\" sizes=\"auto, (max-width: 724px) 100vw, 724px\" /\u003E\u003Cbr /\u003E\n\u003C/figure\u003E\n",
+      "protected": false
+    },
+    "excerpt": {
+      "rendered": "\u003Cp\u003EOportunidad de Trabajo en ASICA Olmos Descripción de la Empresa:ASICA Olmos se encuentra en la búsqueda de personal para diversas labores agrícolas, tanto con experiencia como sin experiencia, en un ambiente dinámico y colaborativo. Puestos Disponibles: Cosecha de Mango Corte Pedúnculo Estiva Packing en Acopio de Campo (con experiencia en selección y embalado) Beneficios: Campamento [&hellip;]\u003C/p\u003E\n",
+      "protected": false
+    },
+    "author": 1,
+    "featured_media": 3063,
+    "comment_status": "open",
+    "ping_status": "closed",
+    "template": "",
+    "meta": {
+      "estado": "activa",
+      "genero": "indiferente",
+      "_ubicacion_completa": {
+        "departamento": "Lambayeque",
+        "provincia": "Lambayeque",
+        "distrito": "Olmos",
+        "direccion": "",
+        "lat": 0,
+        "lng": 0,
+        "nivel": "DEPARTAMENTO"
+      },
+      "_ubicacion_provincia": "Lambayeque",
+      "_ubicacion_distrito": "Olmos",
+      "_ubicacion_direccion": "",
+      "footnotes": ""
+    },
+    "ubicacion": [102],
+    "empresa": [],
+    "tipo_puesto": [],
+    "cultivo": [],
+    "class_list": [
+      "post-3066",
+      "trabajo",
+      "type-trabajo",
+      "status-publish",
+      "has-post-thumbnail",
+      "hentry",
+      "ubicacion-lambayeque"
+    ],
+    "ubicacion_display": {
+      "departamento": "Lambayeque",
+      "provincia": "Lambayeque",
+      "distrito": "Olmos",
+      "direccion": "",
+      "nivel": "DEPARTAMENTO",
+      "card": "Lambayeque",
+      "full": "Lambayeque"
+    },
+    "_links": {
+      "self": [
+        {
+          "href": "https://agrochamba.com/wp-json/wp/v2/trabajos/3066",
+          "targetHints": {
+            "allow": [
+              "GET"
+            ]
+          }
+        }
+      ],
+      "collection": [
+        {
+          "href": "https://agrochamba.com/wp-json/wp/v2/trabajos"
+        }
+      ],
+      "about": [
+        {
+          "href": "https://agrochamba.com/wp-json/wp/v2/types/trabajo"
+        }
+      ],
+      "author": [
+        {
+          "embeddable": true,
+          "href": "https://agrochamba.com/wp-json/wp/v2/users/1"
+        }
+      ],
+      "replies": [
+        {
+          "embeddable": true,
+          "href": "https://agrochamba.com/wp-json/wp/v2/comments?post=3066"
+        }
+      ],
+      "version-history": [
+        {
+          "count": 0,
+          "href": "https://agrochamba.com/wp-json/wp/v2/trabajos/3066/revisions"
+        }
+      ],
+      "wp:featuredmedia": [
+        {
+          "embeddable": true,
+          "href": "https://agrochamba.com/wp-json/wp/v2/media/3063"
+        }
+      ],
+      "wp:attachment": [
+        {
+          "href": "https://agrochamba.com/wp-json/wp/v2/media?parent=3066"
+        }
+      ],
+      "wp:term": [
+        {
+          "taxonomy": "ubicacion",
+          "embeddable": true,
+          "href": "https://agrochamba.com/wp-json/wp/v2/ubicacion?post=3066"
+        },
+        {
+          "taxonomy": "empresa",
+          "embeddable": true,
+          "href": "https://agrochamba.com/wp-json/wp/v2/empresa?post=3066"
+        },
+        {
+          "taxonomy": "tipo_puesto",
+          "embeddable": true,
+          "href": "https://agrochamba.com/wp-json/wp/v2/tipo_puesto?post=3066"
+        },
+        {
+          "taxonomy": "cultivo",
+          "embeddable": true,
+          "href": "https://agrochamba.com/wp-json/wp/v2/cultivo?post=3066"
+        }
+      ],
+      "curies": [
+        {
+          "name": "wp",
+          "href": "https://api.w.org/{rel}",
+          "templated": true
+        }
+      ]
+    }
+  },
+  {
+    "id": 3052,
+    "date": "2026-01-19T11:54:56",
+    "date_gmt": "2026-01-19T16:54:56",
+    "guid": {
+      "rendered": "https://agrochamba.com/?post_type=trabajo&#038;p=3052"
+    },
+    "modified": "2026-01-19T11:54:56",
+    "modified_gmt": "2026-01-19T16:54:56",
+    "slug": "se-busca-personal-para-deshierbo-en-ica-peru",
+    "status": "publish",
+    "type": "trabajo",
+    "link": "https://agrochamba.com/trabajos/se-busca-personal-para-deshierbo-en-ica-peru/",
+    "title": {
+      "rendered": "Se busca personal para Deshierbo en Ica &#8211; Perú"
+    },
+    "content": {
+      "rendered": "\u003Cp\u003EIngreso: Martes 20 de enero \u003Cbr /\u003E📍 Ubicación: Perú 🇵🇪, Ica, Fundo San José (Panamericana sur Km 319, Santiago) 💚.\u003Cbr /\u003E🚨🚨 Interesados/as, llamar o enviar WhatsApp al:\u003Cbr /\u003E📱 922 644 501\u003Cbr /\u003E📱 922 122 479\u003Cbr /\u003E📱 922 122 554\u003Cbr /\u003E📱 981 013 695\u003C/p\u003E\n\u003Cp\u003E😉 ¡No dejes pasar esta oportunidad!\u003Cbr /\u003E.\u003Cbr /\u003E.\u003Cbr /\u003E#postula #comparte #convocatoria #trabajo #oportunidadlaboral #Ica #Iqf #Talento #Uva #Espárrago\u003C/p\u003E\n\u003Cfigure class=\"wp-block-image size-large\"\u003E\n\u003Cimg loading=\"lazy\" decoding=\"async\" width=\"1024\" height=\"1024\" src=\"https://agrochamba.com/wp-content/uploads/2026/01/1000218387-1024x1024.jpg\" alt=\"Se busca personal para Deshierbo en Ica - Perú\" class=\"wp-image-3051 aligncenter size-large\" srcset=\"https://agrochamba.com/wp-content/uploads/2026/01/1000218387-1024x1024.jpg 1024w, https://agrochamba.com/wp-content/uploads/2026/01/1000218387-300x300.jpg 300w, https://agrochamba.com/wp-content/uploads/2026/01/1000218387-150x150.jpg 150w, https://agrochamba.com/wp-content/uploads/2026/01/1000218387-768x768.jpg 768w, https://agrochamba.com/wp-content/uploads/2026/01/1000218387.jpg 1440w\" sizes=\"auto, (max-width: 1024px) 100vw, 1024px\" /\u003E\u003Cbr /\u003E\n\u003C/figure\u003E\n",
+      "protected": false
+    },
+    "excerpt": {
+      "rendered": "\u003Cp\u003EIngreso: Martes 20 de enero 📍 Ubicación: Perú 🇵🇪, Ica, Fundo San José (Panamericana sur Km 319, Santiago) 💚.🚨🚨 Interesados/as, llamar o enviar WhatsApp al:📱 922 644 501📱 922 122 479📱 922 122 554📱 981 013 695 😉 ¡No dejes pasar esta oportunidad!..#postula #comparte #convocatoria #trabajo #oportunidadlaboral #Ica #Iqf #Talento #Uva #Espárrago\u003C/p\u003E\n",
+      "protected": false
+    },
+    "author": 45,
+    "featured_media": 3051,
+    "comment_status": "open",
+    "ping_status": "closed",
+    "template": "",
+    "meta": {
+      "estado": "activa",
+      "genero": "indiferente",
+      "_ubicacion_completa": {
+        "departamento": "Ancash",
+        "provincia": "Mariscal Luzuriaga",
+        "distrito": "Llama",
+        "direccion": "",
+        "lat": 0,
+        "lng": 0,
+        "nivel": "DISTRITO"
+      },
+      "_ubicacion_provincia": "Mariscal Luzuriaga",
+      "_ubicacion_distrito": "Llama",
+      "_ubicacion_direccion": "",
+      "footnotes": ""
+    },
+    "ubicacion": [315],
+    "empresa": [109],
+    "tipo_puesto": [],
+    "cultivo": [],
+    "class_list": [
+      "post-3052",
+      "trabajo",
+      "type-trabajo",
+      "status-publish",
+      "has-post-thumbnail",
+      "hentry",
+      "ubicacion-llama-311",
+      "empresa-iqf-del-peru"
+    ],
+    "ubicacion_display": {
+      "departamento": "Ancash",
+      "provincia": "Mariscal Luzuriaga",
+      "distrito": "Llama",
+      "direccion": "",
+      "nivel": "DISTRITO",
+      "card": "Ancash",
+      "full": "Llama, Mariscal Luzuriaga, Ancash"
+    },
+    "_links": {
+      "self": [
+        {
+          "href": "https://agrochamba.com/wp-json/wp/v2/trabajos/3052",
+          "targetHints": {
+            "allow": [
+              "GET"
+            ]
+          }
+        }
+      ],
+      "collection": [
+        {
+          "href": "https://agrochamba.com/wp-json/wp/v2/trabajos"
+        }
+      ],
+      "about": [
+        {
+          "href": "https://agrochamba.com/wp-json/wp/v2/types/trabajo"
+        }
+      ],
+      "author": [
+        {
+          "embeddable": true,
+          "href": "https://agrochamba.com/wp-json/wp/v2/users/45"
+        }
+      ],
+      "replies": [
+        {
+          "embeddable": true,
+          "href": "https://agrochamba.com/wp-json/wp/v2/comments?post=3052"
+        }
+      ],
+      "version-history": [
+        {
+          "count": 1,
+          "href": "https://agrochamba.com/wp-json/wp/v2/trabajos/3052/revisions"
+        }
+      ],
+      "predecessor-version": [
+        {
+          "id": 3053,
+          "href": "https://agrochamba.com/wp-json/wp/v2/trabajos/3052/revisions/3053"
+        }
+      ],
+      "wp:featuredmedia": [
+        {
+          "embeddable": true,
+          "href": "https://agrochamba.com/wp-json/wp/v2/media/3051"
+        }
+      ],
+      "wp:attachment": [
+        {
+          "href": "https://agrochamba.com/wp-json/wp/v2/media?parent=3052"
+        }
+      ],
+      "wp:term": [
+        {
+          "taxonomy": "ubicacion",
+          "embeddable": true,
+          "href": "https://agrochamba.com/wp-json/wp/v2/ubicacion?post=3052"
+        },
+        {
+          "taxonomy": "empresa",
+          "embeddable": true,
+          "href": "https://agrochamba.com/wp-json/wp/v2/empresa?post=3052"
+        },
+        {
+          "taxonomy": "tipo_puesto",
+          "embeddable": true,
+          "href": "https://agrochamba.com/wp-json/wp/v2/tipo_puesto?post=3052"
+        },
+        {
+          "taxonomy": "cultivo",
+          "embeddable": true,
+          "href": "https://agrochamba.com/wp-json/wp/v2/cultivo?post=3052"
+        }
+      ],
+      "curies": [
+        {
+          "name": "wp",
+          "href": "https://api.w.org/{rel}",
+          "templated": true
+        }
+      ]
+    }
+  },
+  {
+    "id": 3050,
+    "date": "2026-01-19T07:42:05",
+    "date_gmt": "2026-01-19T12:42:05",
+    "guid": {
+      "rendered": "https://agrochamba.com/trabajos/empleo-agricola-en-la-joya-jornales-para-cosecha-de-esparrago/"
+    },
+    "modified": "2026-01-19T07:42:05",
+    "modified_gmt": "2026-01-19T12:42:05",
+    "slug": "empleo-agricola-en-la-joya-jornales-para-cosecha-de-esparrago",
+    "status": "publish",
+    "type": "trabajo",
+    "link": "https://agrochamba.com/trabajos/empleo-agricola-en-la-joya-jornales-para-cosecha-de-esparrago/",
+    "title": {
+      "rendered": "Empleo agrícola en La Joya: Jornales para cosecha de espárrago"
+    },
+    "content": {
+      "rendered": "\u003Cp\u003E\u003Cstrong\u003EFUNDO SAN FERNANDO S.A.\u003C/strong\u003E\u003C/p\u003E\n\u003Cp\u003E\u003Cstrong\u003EConvocatoria para la Campaña de Espárrago Verano 2025-2026\u003C/strong\u003E\u003C/p\u003E\n\u003Cp\u003E\u003Cstrong\u003E¡Únete a nuestro equipo en la Agrícola La Joya!\u003C/strong\u003E  \u003Cbr /\u003E\u003Cstrong\u003E«Forma parte de esta gran familia»\u003C/strong\u003E\u003C/p\u003E\n\u003Cp\u003E\u003Cstrong\u003EOportunidades Laborales Disponibles:\u003C/strong\u003E  \u003C/p\u003E\n\u003Cul\u003E\u003C/p\u003E\n\u003Cli\u003E\u003Cstrong\u003ECargos:\u003C/strong\u003E Jornales para la cosecha y congelado de espárrago  \u003C/li\u003E\n\u003Cp\u003E\u003C/p\u003E\n\u003Cli\u003E\u003Cstrong\u003EIncentivos:\u003C/strong\u003E ¡Ofrecemos bonos atractivos!  \u003C/li\u003E\n\u003Cp\u003E\u003C/ul\u003E\n\u003Cp\u003E\u003Cstrong\u003ERequisitos:\u003C/strong\u003E  \u003C/p\u003E\n\u003Cul\u003E\u003C/p\u003E\n\u003Cli\u003EEdad mínima de 18 años  \u003C/li\u003E\n\u003Cp\u003E\u003C/p\u003E\n\u003Cli\u003EPresentar DNI físico  \u003C/li\u003E\n\u003Cp\u003E\u003C/ul\u003E\n\u003Cp\u003E\u003Cstrong\u003EPresentación para el Proceso de Selección:\u003C/strong\u003E  \u003C/p\u003E\n\u003Cul\u003E\u003C/p\u003E\n\u003Cli\u003E\u003Cstrong\u003EFecha:\u003C/strong\u003E Lunes 19 de enero  \u003C/li\u003E\n\u003Cp\u003E\u003C/p\u003E\n\u003Cli\u003E\u003Cstrong\u003EHora:\u003C/strong\u003E 08:00 AM  \u003C/li\u003E\n\u003Cp\u003E\u003C/ul\u003E\n\u003Cp\u003E\u003Cstrong\u003EBeneficios Ofrecidos:\u003C/strong\u003E  \u003C/p\u003E\n\u003Cul\u003E\u003C/p\u003E\n\u003Cli\u003EIngreso a planilla con todos los beneficios de ley  \u003C/li\u003E\n\u003Cp\u003E\u003C/p\u003E\n\u003Cli\u003EPago semanal y puntual  \u003C/li\u003E\n\u003Cp\u003E\u003C/p\u003E\n\u003Cli\u003EAsignación familiar y seguro de vida (Ley)  \u003C/li\u003E\n\u003Cp\u003E\u003C/p\u003E\n\u003Cli\u003ESeguro de salud gratuito  \u003C/li\u003E\n\u003Cp\u003E\u003C/p\u003E\n\u003Cli\u003EAlimentación proporcionada  \u003C/li\u003E\n\u003Cp\u003E\u003C/ul\u003E\n\u003Cp\u003E\u003Cstrong\u003ENota Importante:\u003C/strong\u003E  \u003Cbr /\u003ELa empresa Fundo San Fernando S.A. no solicita ningún tipo de pago o depósito para participar en nuestros procesos de selección de personal en ninguna etapa. Además, promovemos la inclusión de personas con discapacidad, conforme a la «Ley N° 29973».\u003C/p\u003E\n\u003Cp\u003E\u003Cstrong\u003EContáctanos:\u003C/strong\u003E  \u003Cbr /\u003E\u003Cstrong\u003EUbicación:\u003C/strong\u003E Planta La Joya, Km. 310 Panamericana Sur, Pueblo Nuevo &#8211; Ica (Estamos en la misma Panamericana)  \u003Cbr /\u003E\u003Cstrong\u003ETeléfonos de Reclutamiento:\u003C/strong\u003E  \u003C/p\u003E\n\u003Cul\u003E\u003C/p\u003E\n\u003Cli\u003E969779023  \u003C/li\u003E\n\u003Cp\u003E\u003C/p\u003E\n\u003Cli\u003E982569510  \u003C/li\u003E\n\u003Cp\u003E\u003C/ul\u003E\n\u003Cp\u003E¡Esperamos contar contigo en esta emocionante campaña!\u003C/p\u003E\n\u003Cfigure class=\"wp-block-image size-large\"\u003E\n\u003Cimg loading=\"lazy\" decoding=\"async\" width=\"644\" height=\"909\" src=\"https://agrochamba.com/wp-content/uploads/2026/01/1000218280.jpg\" alt=\"Empleo agrícola en La Joya: Jornales para cosecha de espárrago\" class=\"wp-image-3049 aligncenter size-large\" srcset=\"https://agrochamba.com/wp-content/uploads/2026/01/1000218280.jpg 644w, https://agrochamba.com/wp-content/uploads/2026/01/1000218280-213x300.jpg 213w\" sizes=\"auto, (max-width: 644px) 100vw, 644px\" /\u003E\u003Cbr /\u003E\n\u003C/figure\u003E\n",
+      "protected": false
+    },
+    "excerpt": {
+      "rendered": "\u003Cp\u003EFUNDO SAN FERNANDO S.A. Convocatoria para la Campaña de Espárrago Verano 2025-2026 ¡Únete a nuestro equipo en la Agrícola La Joya! «Forma parte de esta gran familia» Oportunidades Laborales Disponibles: Cargos: Jornales para la cosecha y congelado de espárrago Incentivos: ¡Ofrecemos bonos atractivos! Requisitos: Edad mínima de 18 años Presentar DNI físico Presentación para el [&hellip;]\u003C/p\u003E\n",
+      "protected": false
+    },
+    "author": 1,
+    "featured_media": 3049,
+    "comment_status": "open",
+    "ping_status": "closed",
+    "template": "",
+    "meta": {
+      "estado": "activa",
+      "genero": "indiferente",
+      "_ubicacion_completa": {
+        "departamento": "Ancash",
+        "provincia": "Carhuaz",
+        "distrito": "Anta",
+        "direccion": "",
+        "lat": 0,
+        "lng": 0,
+        "nivel": "DISTRITO"
+      },
+      "_ubicacion_provincia": "Carhuaz",
+      "_ubicacion_distrito": "Anta",
+      "_ubicacion_direccion": "",
+      "footnotes": ""
+    },
+    "ubicacion": [238],
+    "empresa": [],
+    "tipo_puesto": [],
+    "cultivo": [],
+    "class_list": [
+      "post-3050",
+      "trabajo",
+      "type-trabajo",
+      "status-publish",
+      "has-post-thumbnail",
+      "hentry",
+      "ubicacion-anta-235"
+    ],
+    "ubicacion_display": {
+      "departamento": "Ancash",
+      "provincia": "Carhuaz",
+      "distrito": "Anta",
+      "direccion": "",
+      "nivel": "DISTRITO",
+      "card": "Ancash",
+      "full": "Anta, Carhuaz, Ancash"
+    },
+    "_links": {
+      "self": [
+        {
+          "href": "https://agrochamba.com/wp-json/wp/v2/trabajos/3050",
+          "targetHints": {
+            "allow": [
+              "GET"
+            ]
+          }
+        }
+      ],
+      "collection": [
+        {
+          "href": "https://agrochamba.com/wp-json/wp/v2/trabajos"
+        }
+      ],
+      "about": [
+        {
+          "href": "https://agrochamba.com/wp-json/wp/v2/types/trabajo"
+        }
+      ],
+      "author": [
+        {
+          "embeddable": true,
+          "href": "https://agrochamba.com/wp-json/wp/v2/users/1"
+        }
+      ],
+      "replies": [
+        {
+          "embeddable": true,
+          "href": "https://agrochamba.com/wp-json/wp/v2/comments?post=3050"
+        }
+      ],
+      "version-history": [
+        {
+          "count": 0,
+          "href": "https://agrochamba.com/wp-json/wp/v2/trabajos/3050/revisions"
+        }
+      ],
+      "wp:featuredmedia": [
+        {
+          "embeddable": true,
+          "href": "https://agrochamba.com/wp-json/wp/v2/media/3049"
+        }
+      ],
+      "wp:attachment": [
+        {
+          "href": "https://agrochamba.com/wp-json/wp/v2/media?parent=3050"
+        }
+      ],
+      "wp:term": [
+        {
+          "taxonomy": "ubicacion",
+          "embeddable": true,
+          "href": "https://agrochamba.com/wp-json/wp/v2/ubicacion?post=3050"
+        },
+        {
+          "taxonomy": "empresa",
+          "embeddable": true,
+          "href": "https://agrochamba.com/wp-json/wp/v2/empresa?post=3050"
+        },
+        {
+          "taxonomy": "tipo_puesto",
+          "embeddable": true,
+          "href": "https://agrochamba.com/wp-json/wp/v2/tipo_puesto?post=3050"
+        },
+        {
+          "taxonomy": "cultivo",
+          "embeddable": true,
+          "href": "https://agrochamba.com/wp-json/wp/v2/cultivo?post=3050"
+        }
+      ],
+      "curies": [
+        {
+          "name": "wp",
+          "href": "https://api.w.org/{rel}",
+          "templated": true
+        }
+      ]
+    }
+  },
+  {
+    "id": 3047,
+    "date": "2026-01-18T16:46:17",
+    "date_gmt": "2026-01-18T21:46:17",
+    "guid": {
+      "rendered": "https://agrochamba.com/trabajos/trabajo-agricola-de-corte-y-limpieza-en-ica/"
+    },
+    "modified": "2026-01-18T16:46:17",
+    "modified_gmt": "2026-01-18T21:46:17",
+    "slug": "trabajo-agricola-de-corte-y-limpieza-en-ica",
+    "status": "publish",
+    "type": "trabajo",
+    "link": "https://agrochamba.com/trabajos/trabajo-agricola-de-corte-y-limpieza-en-ica/",
+    "title": {
+      "rendered": "Trabajo agrícola de corte y limpieza en Ica"
+    },
+    "content": {
+      "rendered": "\u003Cp\u003E\u003Cstrong\u003EOFERTA LABORAL EN FUNDO LUZMILA\u003C/strong\u003E\u003C/p\u003E\n\u003Cp\u003E\u003Cstrong\u003EPuesto: Corte y Limpieza\u003C/strong\u003E  \u003Cbr /\u003E\u003Cstrong\u003ETipo de jornada: Completa\u003C/strong\u003E  \u003Cbr /\u003E\u003Cstrong\u003EFecha de inicio: Lunes, 19 de enero de 2026\u003C/strong\u003E\u003C/p\u003E\n\u003Cp\u003E\u003Cstrong\u003ETarifas por producto:\u003C/strong\u003E  \u003C/p\u003E\n\u003Cul\u003E\u003C/p\u003E\n\u003Cli\u003ETIMCO: S/ 3.20  \u003C/li\u003E\n\u003Cp\u003E\u003C/p\u003E\n\u003Cli\u003ESWEET GLOBE: S/ 2.90  \u003C/li\u003E\n\u003Cp\u003E\u003C/p\u003E\n\u003Cli\u003ERED GLOBE: S/ 1.80  \u003C/li\u003E\n\u003Cp\u003E\u003C/ul\u003E\n\u003Cp\u003E\u003Cem\u003E¡Incluye almuerzo!\u003C/em\u003E\u003C/p\u003E\n\u003Cp\u003E&#8212;\u003C/p\u003E\n\u003Cp\u003E\u003Cstrong\u003EBENEFICIOS OFRECIDOS:\u003C/strong\u003E  \u003C/p\u003E\n\u003Cul\u003E\u003C/p\u003E\n\u003Cli\u003EIngreso a planilla.  \u003C/li\u003E\n\u003Cp\u003E\u003C/p\u003E\n\u003Cli\u003EPagos interdiarios.  \u003C/li\u003E\n\u003Cp\u003E\u003C/p\u003E\n\u003Cli\u003EAsignación familiar.  \u003C/li\u003E\n\u003Cp\u003E\u003C/p\u003E\n\u003Cli\u003EMovilidad ida y vuelta.  \u003C/li\u003E\n\u003Cp\u003E\u003C/p\u003E\n\u003Cli\u003EIluminación en el área de trabajo.  \u003C/li\u003E\n\u003Cp\u003E\u003C/ul\u003E\n\u003Cp\u003E&#8212;\u003C/p\u003E\n\u003Cp\u003E\u003Cstrong\u003ERUTAS DISPONIBLES PARA EL TRANSPORTE:\u003C/strong\u003E  \u003C/p\u003E\n\u003Cul\u003E\u003C/p\u003E\n\u003Cli\u003EB. Chino, Santiago Pachacutec  \u003C/li\u003E\n\u003Cp\u003E\u003C/p\u003E\n\u003Cli\u003ETate, Rosarios, Parcona, La Tinguijia  \u003C/li\u003E\n\u003Cp\u003E\u003C/p\u003E\n\u003Cli\u003ETierra Prometida, El Álamo, Su Tinguijía  \u003C/li\u003E\n\u003Cp\u003E\u003C/p\u003E\n\u003Cli\u003EGuadalupe, Expansión, Subtanjala  \u003C/li\u003E\n\u003Cp\u003E\u003C/ul\u003E\n\u003Cp\u003E&#8212;\u003C/p\u003E\n\u003Cp\u003E\u003Cstrong\u003E¿CÓMO CONTACTARNOS?\u003C/strong\u003E  \u003Cbr /\u003ESi estás interesado en unirte a nuestro equipo, no dudes en comunicarte con nosotros a través de WhatsApp al número: \u003Cstrong\u003E922 491 760\u003C/strong\u003E.\u003C/p\u003E\n\u003Cp\u003E¡Te esperamos para formar parte de nuestra familia en Fundo Luzmila!\u003C/p\u003E\n\u003Cfigure class=\"wp-block-image size-large\"\u003E\n\u003Cimg loading=\"lazy\" decoding=\"async\" width=\"526\" height=\"526\" src=\"https://agrochamba.com/wp-content/uploads/2026/01/1000217834.jpg\" alt=\"Trabajo agrícola de corte y limpieza en Ica\" class=\"wp-image-3046 aligncenter size-large\" srcset=\"https://agrochamba.com/wp-content/uploads/2026/01/1000217834.jpg 526w, https://agrochamba.com/wp-content/uploads/2026/01/1000217834-300x300.jpg 300w, https://agrochamba.com/wp-content/uploads/2026/01/1000217834-150x150.jpg 150w\" sizes=\"auto, (max-width: 526px) 100vw, 526px\" /\u003E\u003Cbr /\u003E\n\u003C/figure\u003E\n",
+      "protected": false
+    },
+    "excerpt": {
+      "rendered": "\u003Cp\u003EOFERTA LABORAL EN FUNDO LUZMILA Puesto: Corte y Limpieza Tipo de jornada: Completa Fecha de inicio: Lunes, 19 de enero de 2026 Tarifas por producto: TIMCO: S/ 3.20 SWEET GLOBE: S/ 2.90 RED GLOBE: S/ 1.80 ¡Incluye almuerzo! &#8212; BENEFICIOS OFRECIDOS: Ingreso a planilla. Pagos interdiarios. Asignación familiar. Movilidad ida y vuelta. Iluminación en el [&hellip;]\u003C/p\u003E\n",
+      "protected": false
+    },
+    "author": 1,
+    "featured_media": 3046,
+    "comment_status": "open",
+    "ping_status": "closed",
+    "template": "",
+    "meta": {
+      "estado": "activa",
+      "genero": "indiferente",
+      "_ubicacion_completa": {
+        "departamento": "Ica",
+        "provincia": "",
+        "distrito": "",
+        "direccion": "",
+        "lat": 0,
+        "lng": 0,
+        "nivel": "DEPARTAMENTO"
+      },
+      "_ubicacion_provincia": "",
+      "_ubicacion_distrito": "",
+      "_ubicacion_direccion": "",
+      "footnotes": ""
+    },
+    "ubicacion": [87],
+    "empresa": [],
+    "tipo_puesto": [],
+    "cultivo": [],
+    "class_list": [
+      "post-3047",
+      "trabajo",
+      "type-trabajo",
+      "status-publish",
+      "has-post-thumbnail",
+      "hentry",
+      "ubicacion-ica"
+    ],
+    "ubicacion_display": {
+      "departamento": "Ica",
+      "provincia": "",
+      "distrito": "",
+      "direccion": "",
+      "nivel": "DEPARTAMENTO",
+      "card": "Ica",
+      "full": "Ica"
+    },
+    "_links": {
+      "self": [
+        {
+          "href": "https://agrochamba.com/wp-json/wp/v2/trabajos/3047",
+          "targetHints": {
+            "allow": [
+              "GET"
+            ]
+          }
+        }
+      ],
+      "collection": [
+        {
+          "href": "https://agrochamba.com/wp-json/wp/v2/trabajos"
+        }
+      ],
+      "about": [
+        {
+          "href": "https://agrochamba.com/wp-json/wp/v2/types/trabajo"
+        }
+      ],
+      "author": [
+        {
+          "embeddable": true,
+          "href": "https://agrochamba.com/wp-json/wp/v2/users/1"
+        }
+      ],
+      "replies": [
+        {
+          "embeddable": true,
+          "href": "https://agrochamba.com/wp-json/wp/v2/comments?post=3047"
+        }
+      ],
+      "version-history": [
+        {
+          "count": 0,
+          "href": "https://agrochamba.com/wp-json/wp/v2/trabajos/3047/revisions"
+        }
+      ],
+      "wp:featuredmedia": [
+        {
+          "embeddable": true,
+          "href": "https://agrochamba.com/wp-json/wp/v2/media/3046"
+        }
+      ],
+      "wp:attachment": [
+        {
+          "href": "https://agrochamba.com/wp-json/wp/v2/media?parent=3047"
+        }
+      ],
+      "wp:term": [
+        {
+          "taxonomy": "ubicacion",
+          "embeddable": true,
+          "href": "https://agrochamba.com/wp-json/wp/v2/ubicacion?post=3047"
+        },
+        {
+          "taxonomy": "empresa",
+          "embeddable": true,
+          "href": "https://agrochamba.com/wp-json/wp/v2/empresa?post=3047"
+        },
+        {
+          "taxonomy": "tipo_puesto",
+          "embeddable": true,
+          "href": "https://agrochamba.com/wp-json/wp/v2/tipo_puesto?post=3047"
+        },
+        {
+          "taxonomy": "cultivo",
+          "embeddable": true,
+          "href": "https://agrochamba.com/wp-json/wp/v2/cultivo?post=3047"
+        }
+      ],
+      "curies": [
+        {
+          "name": "wp",
+          "href": "https://api.w.org/{rel}",
+          "templated": true
+        }
+      ]
+    }
+  },
+  {
+    "id": 3044,
+    "date": "2026-01-18T15:06:56",
+    "date_gmt": "2026-01-18T20:06:56",
+    "guid": {
+      "rendered": "https://agrochamba.com/trabajos/oportunidad-laboral-en-casma/"
+    },
+    "modified": "2026-01-18T15:06:56",
+    "modified_gmt": "2026-01-18T20:06:56",
+    "slug": "oportunidad-laboral-en-casma",
+    "status": "publish",
+    "type": "trabajo",
+    "link": "https://agrochamba.com/trabajos/oportunidad-laboral-en-casma/",
+    "title": {
+      "rendered": "Oportunidad laboral en Casma"
+    },
+    "content": {
+      "rendered": "\u003Cp\u003E#CASMA | 🔰𝐎𝐏𝐎𝐑𝐓𝐔𝐍𝐈𝐃𝐀𝐃 𝐃𝐄 𝐓𝐑𝐀𝐁𝐀𝐉𝐎 𝐄𝐍 𝐂𝐀𝐒𝐌𝐀!\u003C/p\u003E\n\u003Cp\u003ELa Municipalidad Provincial de Casma, a través del Centro de Empleo, informa que la empresa Santa Sofía del Sur ha iniciado su campaña de mango congelado y requiere personal (mujeres y varones) para el proceso en planta. Acércate con tus documentos y forma parte de esta campaña que impulsa el empleo local.🟢🟡⚪️\u003C/p\u003E\n\u003Cp\u003E#MunicipalidadDeCasma\u003Cbr /\u003E#ServiciosParaLaComunidad\u003C/p\u003E\n\u003Cfigure class=\"wp-block-image size-large\"\u003E\n\u003Cimg loading=\"lazy\" decoding=\"async\" width=\"1024\" height=\"1024\" src=\"https://agrochamba.com/wp-content/uploads/2026/01/1000217950-1024x1024.jpg\" alt=\"Oportunidad laboral en Casma\" class=\"wp-image-3043 aligncenter size-large\" srcset=\"https://agrochamba.com/wp-content/uploads/2026/01/1000217950-1024x1024.jpg 1024w, https://agrochamba.com/wp-content/uploads/2026/01/1000217950-300x300.jpg 300w, https://agrochamba.com/wp-content/uploads/2026/01/1000217950-150x150.jpg 150w, https://agrochamba.com/wp-content/uploads/2026/01/1000217950-768x768.jpg 768w, https://agrochamba.com/wp-content/uploads/2026/01/1000217950.jpg 1350w\" sizes=\"auto, (max-width: 1024px) 100vw, 1024px\" /\u003E\u003Cbr /\u003E\n\u003C/figure\u003E\n",
+      "protected": false
+    },
+    "excerpt": {
+      "rendered": "\u003Cp\u003E#CASMA | 🔰𝐎𝐏𝐎𝐑𝐓𝐔𝐍𝐈𝐃𝐀𝐃 𝐃𝐄 𝐓𝐑𝐀𝐁𝐀𝐉𝐎 𝐄𝐍 𝐂𝐀𝐒𝐌𝐀! La Municipalidad Provincial de Casma, a través del Centro de Empleo, informa que la empresa Santa Sofía del Sur ha iniciado su campaña de mango congelado y requiere personal (mujeres y varones) para el proceso en planta. Acércate con tus documentos y forma parte de esta campaña que [&hellip;]\u003C/p\u003E\n",
+      "protected": false
+    },
+    "author": 1,
+    "featured_media": 3043,
+    "comment_status": "open",
+    "ping_status": "closed",
+    "template": "",
+    "meta": {
+      "estado": "activa",
+      "genero": "indiferente",
+      "_ubicacion_completa": {
+        "departamento": "Ancash",
+        "provincia": "Carhuaz",
+        "distrito": "Anta",
+        "direccion": "",
+        "lat": 0,
+        "lng": 0,
+        "nivel": "DISTRITO"
+      },
+      "_ubicacion_provincia": "Carhuaz",
+      "_ubicacion_distrito": "Anta",
+      "_ubicacion_direccion": "",
+      "footnotes": ""
+    },
+    "ubicacion": [238],
+    "empresa": [],
+    "tipo_puesto": [],
+    "cultivo": [],
+    "class_list": [
+      "post-3044",
+      "trabajo",
+      "type-trabajo",
+      "status-publish",
+      "has-post-thumbnail",
+      "hentry",
+      "ubicacion-anta-235"
+    ],
+    "ubicacion_display": {
+      "departamento": "Ancash",
+      "provincia": "Carhuaz",
+      "distrito": "Anta",
+      "direccion": "",
+      "nivel": "DISTRITO",
+      "card": "Ancash",
+      "full": "Anta, Carhuaz, Ancash"
+    },
+    "_links": {
+      "self": [
+        {
+          "href": "https://agrochamba.com/wp-json/wp/v2/trabajos/3044",
+          "targetHints": {
+            "allow": [
+              "GET"
+            ]
+          }
+        }
+      ],
+      "collection": [
+        {
+          "href": "https://agrochamba.com/wp-json/wp/v2/trabajos"
+        }
+      ],
+      "about": [
+        {
+          "href": "https://agrochamba.com/wp-json/wp/v2/types/trabajo"
+        }
+      ],
+      "author": [
+        {
+          "embeddable": true,
+          "href": "https://agrochamba.com/wp-json/wp/v2/users/1"
+        }
+      ],
+      "replies": [
+        {
+          "embeddable": true,
+          "href": "https://agrochamba.com/wp-json/wp/v2/comments?post=3044"
+        }
+      ],
+      "version-history": [
+        {
+          "count": 0,
+          "href": "https://agrochamba.com/wp-json/wp/v2/trabajos/3044/revisions"
+        }
+      ],
+      "wp:featuredmedia": [
+        {
+          "embeddable": true,
+          "href": "https://agrochamba.com/wp-json/wp/v2/media/3043"
+        }
+      ],
+      "wp:attachment": [
+        {
+          "href": "https://agrochamba.com/wp-json/wp/v2/media?parent=3044"
+        }
+      ],
+      "wp:term": [
+        {
+          "taxonomy": "ubicacion",
+          "embeddable": true,
+          "href": "https://agrochamba.com/wp-json/wp/v2/ubicacion?post=3044"
+        },
+        {
+          "taxonomy": "empresa",
+          "embeddable": true,
+          "href": "https://agrochamba.com/wp-json/wp/v2/empresa?post=3044"
+        },
+        {
+          "taxonomy": "tipo_puesto",
+          "embeddable": true,
+          "href": "https://agrochamba.com/wp-json/wp/v2/tipo_puesto?post=3044"
+        },
+        {
+          "taxonomy": "cultivo",
+          "embeddable": true,
+          "href": "https://agrochamba.com/wp-json/wp/v2/cultivo?post=3044"
+        }
+      ],
+      "curies": [
+        {
+          "name": "wp",
+          "href": "https://api.w.org/{rel}",
+          "templated": true
+        }
+      ]
+    }
+  }
+]

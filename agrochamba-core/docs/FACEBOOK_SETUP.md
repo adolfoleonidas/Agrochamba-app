@@ -265,3 +265,5 @@ También puedes obtenerlo desde:
 - Puedes configurar un recordatorio para renovarlo antes de que expire
 - O implementar renovación automática (requiere App Secret)
 
+ejemplo para el facebook agrochamba-reclutamiento agricola
+/oauth/access_token?grant_type=fb_exchange_token&client_id=1559763738695115&client_secret=cbc133f281272ecb5e49b5b03b9ce420&fb_exchange_token=EAAWKmMuUFcsBQbeJvdYepQ1ZAEZAcCFKEeoaU3YtZB2Ve4UnFLvCoIMAOmI3xe9J8lovN6Pa33DM3QEwq76ieKetPoazvHZCq6WI4uiAQXO7MIIdtOnZC26PfRZA3fRhRP6FDzsb8ZCDnFsZBddCmz0eSxHJlXwxsLbiwLIW9H4grlVmhHZCATBKPw494Ray7RkoWrNV5POA6wgeXqFfZCl7Cv4p0giSPR9xurz5zhnVwZD

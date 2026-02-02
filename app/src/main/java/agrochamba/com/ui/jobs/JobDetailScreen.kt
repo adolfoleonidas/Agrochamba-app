@@ -6,16 +6,15 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
@@ -35,104 +34,212 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import agrochamba.com.R
 import agrochamba.com.data.*
 import agrochamba.com.ui.common.FormattedText
-import agrochamba.com.ui.common.LocationDetailView
 import agrochamba.com.utils.htmlToString
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import coil.size.Size
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * Pantalla de detalle de trabajo - Composable Stateful
+ * Se conecta al ViewModel y maneja eventos de navegación
+ */
 @Composable
 fun JobDetailScreen(
     job: JobPost,
     mediaItems: List<MediaItem>,
     onNavigateUp: () -> Unit,
     navController: NavController? = null,
+    modifier: Modifier = Modifier,
+    viewModel: JobDetailViewModel = hiltViewModel()
+) {
+    val context = LocalContext.current
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val fullscreenImageIndex by viewModel.fullscreenImageIndex.collectAsStateWithLifecycle()
+
+    // Inicializar ViewModel con los datos
+    LaunchedEffect(job.id) {
+        viewModel.initialize(job, mediaItems)
+    }
+
+    // Manejar eventos del ViewModel
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is JobDetailEvent.NavigateBack -> onNavigateUp()
+                is JobDetailEvent.OpenDialer -> {
+                    context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:${event.phone}")))
+                }
+                is JobDetailEvent.OpenWhatsApp -> {
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/${event.phoneNumber}")))
+                }
+                is JobDetailEvent.OpenEmail -> {
+                    context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:${event.email}")))
+                }
+                is JobDetailEvent.NavigateToCompany -> {
+                    navController?.navigate("company_profile/${event.companyName}")
+                }
+            }
+        }
+    }
+
+    // Renderizar según el estado
+    when (val state = uiState) {
+        is JobDetailUiState.Loading -> {
+            JobDetailLoadingContent(
+                onNavigateUp = { viewModel.onAction(JobDetailAction.NavigateBack) },
+                modifier = modifier
+            )
+        }
+        is JobDetailUiState.Success -> {
+            JobDetailSuccessContent(
+                state = state,
+                fullscreenImageIndex = fullscreenImageIndex,
+                onAction = viewModel::onAction,
+                navController = navController,
+                modifier = modifier
+            )
+        }
+        is JobDetailUiState.Error -> {
+            JobDetailErrorContent(
+                message = state.message,
+                canRetry = state.canRetry,
+                onRetry = { viewModel.onAction(JobDetailAction.Retry) },
+                onNavigateUp = { viewModel.onAction(JobDetailAction.NavigateBack) },
+                modifier = modifier
+            )
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LOADING STATE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+@Composable
+private fun JobDetailLoadingContent(
+    onNavigateUp: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Scaffold(
+        topBar = {
+            SmallTopAppBar(
+                title = { },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateUp) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+                    }
+                }
+            )
+        }
+    ) { innerPadding ->
+        Box(
+            modifier = modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(48.dp),
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = "Cargando detalles...",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ERROR STATE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+@Composable
+private fun JobDetailErrorContent(
+    message: String,
+    canRetry: Boolean,
+    onRetry: () -> Unit,
+    onNavigateUp: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Scaffold(
+        topBar = {
+            SmallTopAppBar(
+                title = { Text("Error") },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateUp) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+                    }
+                }
+            )
+        }
+    ) { innerPadding ->
+        Box(
+            modifier = modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.padding(32.dp)
+            ) {
+                Icon(
+                    Icons.Outlined.ErrorOutline,
+                    contentDescription = null,
+                    modifier = Modifier.size(64.dp),
+                    tint = MaterialTheme.colorScheme.error
+                )
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+                if (canRetry) {
+                    Button(onClick = onRetry) {
+                        Icon(Icons.Default.Refresh, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Reintentar")
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SUCCESS STATE - Contenido principal
+// ═══════════════════════════════════════════════════════════════════════════════
+
+@Composable
+private fun JobDetailSuccessContent(
+    state: JobDetailUiState.Success,
+    fullscreenImageIndex: Int?,
+    onAction: (JobDetailAction) -> Unit,
+    navController: NavController?,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val scrollState = rememberScrollState()
-    var fullscreenImageIndex by remember { mutableStateOf<Int?>(null) }
-
-    // Extraer datos
-    val terms = job.embedded?.terms?.flatten() ?: emptyList()
-    val companyName = terms.find { it.taxonomy == "empresa" }?.name
-    val locationName = terms.find { it.taxonomy == "ubicacion" }?.name
-
-    // URLs de imágenes
-    val allImageUrls = remember(mediaItems, job) {
-        val urls = mutableListOf<String>()
-        mediaItems.forEach { media -> media.getImageUrl()?.let { if (it !in urls) urls.add(it) } }
-        if (urls.isEmpty()) {
-            job.embedded?.featuredMedia?.forEach { media ->
-                media.getImageUrl()?.let { if (it !in urls) urls.add(it) }
-            }
-        }
-        urls
-    }
-
-    val allFullImageUrls = remember(mediaItems, job) {
-        val urls = mutableListOf<String>()
-        mediaItems.forEach { media -> media.getFullImageUrl()?.let { if (it !in urls) urls.add(it) } }
-        if (urls.isEmpty()) {
-            job.embedded?.featuredMedia?.forEach { media ->
-                media.getFullImageUrl()?.let { if (it !in urls) urls.add(it) }
-            }
-        }
-        urls
-    }
-
-    // Ubicación completa
-    val ubicacionCompleta = remember(job.meta?.ubicacionCompleta, job.ubicacionDisplay, locationName) {
-        job.meta?.ubicacionCompleta?.let { return@remember it }
-        job.ubicacionDisplay?.let { display ->
-            if (!display.departamento.isNullOrBlank()) {
-                val nivel = when (display.nivel?.uppercase()) {
-                    "DISTRITO" -> LocationType.DISTRITO
-                    "PROVINCIA" -> LocationType.PROVINCIA
-                    else -> LocationType.DEPARTAMENTO
-                }
-                return@remember UbicacionCompleta(
-                    departamento = display.departamento,
-                    provincia = display.provincia ?: "",
-                    distrito = display.distrito ?: "",
-                    direccion = display.direccion,
-                    lat = display.lat,
-                    lng = display.lng,
-                    nivel = nivel
-                )
-            }
-        }
-        if (locationName == null) return@remember null
-        val parts = locationName.split(",").map { it.trim() }
-        when (parts.size) {
-            1 -> UbicacionCompleta(departamento = parts[0], provincia = "", distrito = "", nivel = LocationType.DEPARTAMENTO)
-            2 -> UbicacionCompleta(departamento = parts[1], provincia = parts[0], distrito = "", nivel = LocationType.PROVINCIA)
-            3 -> UbicacionCompleta(departamento = parts[2], provincia = parts[1], distrito = parts[0], nivel = LocationType.DISTRITO)
-            else -> UbicacionCompleta(departamento = parts.lastOrNull() ?: "", provincia = parts.getOrNull(parts.size - 2) ?: "", distrito = parts.firstOrNull() ?: "", nivel = LocationType.DISTRITO)
-        }
-    }
-
-    // Estado de empresa
-    var companyProfile by remember { mutableStateOf<CompanyProfileResponse?>(null) }
-
-    LaunchedEffect(companyName) {
-        if (companyName != null) {
-            try {
-                companyProfile = WordPressApi.retrofitService.getCompanyProfileByName(companyName.htmlToString())
-            } catch (e: Exception) { companyProfile = null }
-        }
-    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background
@@ -143,328 +250,25 @@ fun JobDetailScreen(
                     .fillMaxSize()
                     .verticalScroll(scrollState)
             ) {
-                // ═══════════════════════════════════════════════════════════
-                // HERO SECTION - Imagen con overlay
-                // ═══════════════════════════════════════════════════════════
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(280.dp)
-                ) {
-                    // Imagen de fondo
-                    if (allImageUrls.isNotEmpty()) {
-                        HeroImageSlider(
-                            imageUrls = allImageUrls,
-                            onImageClick = { index -> fullscreenImageIndex = index }
-                        )
-                    } else {
-                        // Placeholder elegante
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(
-                                    Brush.verticalGradient(
-                                        colors = listOf(
-                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
-                                            MaterialTheme.colorScheme.primaryContainer
-                                        )
-                                    )
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.ic_launcher_foreground),
-                                contentDescription = null,
-                                modifier = Modifier.size(100.dp),
-                                tint = Color.White.copy(alpha = 0.3f)
-                            )
-                        }
-                    }
+                // Hero Section
+                HeroSection(
+                    imageUrls = state.allImageUrls,
+                    onImageClick = { index -> onAction(JobDetailAction.OpenImage(index)) },
+                    onNavigateBack = { onAction(JobDetailAction.NavigateBack) }
+                )
 
-                    // Gradiente oscuro inferior para legibilidad
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(120.dp)
-                            .align(Alignment.BottomCenter)
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(
-                                        Color.Transparent,
-                                        Color.Black.copy(alpha = 0.7f)
-                                    )
-                                )
-                            )
-                    )
-
-                    // Botón de volver
-                    IconButton(
-                        onClick = onNavigateUp,
-                        modifier = Modifier
-                            .padding(16.dp)
-                            .align(Alignment.TopStart)
-                            .background(
-                                Color.Black.copy(alpha = 0.3f),
-                                CircleShape
-                            )
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Volver",
-                            tint = Color.White
-                        )
-                    }
-
-                    // Contador de imágenes
-                    if (allImageUrls.size > 1) {
-                        Surface(
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(16.dp),
-                            shape = RoundedCornerShape(16.dp),
-                            color = Color.Black.copy(alpha = 0.5f)
-                        ) {
-                            Text(
-                                text = "${allImageUrls.size} fotos",
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                color = Color.White,
-                                style = MaterialTheme.typography.labelMedium
-                            )
-                        }
-                    }
-                }
-
-                // ═══════════════════════════════════════════════════════════
-                // CONTENIDO PRINCIPAL
-                // ═══════════════════════════════════════════════════════════
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .offset(y = (-24).dp)
-                        .background(
-                            MaterialTheme.colorScheme.background,
-                            RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
-                        )
-                        .padding(horizontal = 20.dp)
-                        .padding(top = 24.dp)
-                ) {
-                    // ─────────────────────────────────────────────────────────
-                    // TÍTULO Y EMPRESA
-                    // ─────────────────────────────────────────────────────────
-                    Text(
-                        text = job.title?.rendered?.htmlToString() ?: "Sin título",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        lineHeight = 32.sp
-                    )
-
-                    Spacer(Modifier.height(12.dp))
-
-                    // Empresa clickeable
-                    if (companyName != null) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable {
-                                    navController?.navigate("company_profile/${companyName.htmlToString()}")
-                                }
-                                .padding(vertical = 4.dp)
-                        ) {
-                            // Logo de empresa o icono
-                            val logoUrl = companyProfile?.logoUrl ?: companyProfile?.profilePhotoUrl
-                            if (logoUrl != null) {
-                                AsyncImage(
-                                    model = ImageRequest.Builder(context).data(logoUrl).build(),
-                                    contentDescription = null,
-                                    modifier = Modifier
-                                        .size(32.dp)
-                                        .clip(CircleShape),
-                                    contentScale = ContentScale.Crop
-                                )
-                            } else {
-                                Box(
-                                    modifier = Modifier
-                                        .size(32.dp)
-                                        .background(
-                                            MaterialTheme.colorScheme.primaryContainer,
-                                            CircleShape
-                                        ),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        Icons.Default.Business,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(18.dp),
-                                        tint = MaterialTheme.colorScheme.primary
-                                    )
-                                }
-                            }
-                            Spacer(Modifier.width(10.dp))
-                            Text(
-                                text = companyName.htmlToString(),
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Icon(
-                                Icons.Default.ChevronRight,
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp),
-                                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
-                            )
-                        }
-                    }
-
-                    Spacer(Modifier.height(20.dp))
-
-                    // ─────────────────────────────────────────────────────────
-                    // QUICK INFO - Chips con información clave
-                    // ─────────────────────────────────────────────────────────
-                    QuickInfoSection(job = job, ubicacion = ubicacionCompleta)
-
-                    Spacer(Modifier.height(24.dp))
-
-                    // ─────────────────────────────────────────────────────────
-                    // BENEFICIOS (si existen)
-                    // ─────────────────────────────────────────────────────────
-                    val hasBenefits = job.meta?.alojamiento == true ||
-                                      job.meta?.transporte == true ||
-                                      job.meta?.alimentacion == true
-
-                    if (hasBenefits) {
-                        BenefitsSection(job = job)
-                        Spacer(Modifier.height(24.dp))
-                    }
-
-                    // ─────────────────────────────────────────────────────────
-                    // DESCRIPCIÓN DEL TRABAJO
-                    // ─────────────────────────────────────────────────────────
-                    job.content?.rendered?.let { content ->
-                        if (content.trim().isNotBlank()) {
-                            ContentSection(
-                                title = "Descripción",
-                                icon = Icons.Outlined.Description
-                            ) {
-                                FormattedText(
-                                    text = content,
-                                    style = MaterialTheme.typography.bodyLarge.copy(
-                                        lineHeight = 26.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    ),
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                            }
-                            Spacer(Modifier.height(20.dp))
-                        }
-                    }
-
-                    // ─────────────────────────────────────────────────────────
-                    // REQUISITOS
-                    // ─────────────────────────────────────────────────────────
-                    job.meta?.requisitos?.let { requisitos ->
-                        if (requisitos.isNotBlank()) {
-                            ContentSection(
-                                title = "Requisitos",
-                                icon = Icons.Outlined.Checklist
-                            ) {
-                                val items = requisitos.htmlToString()
-                                    .split("\n")
-                                    .filter { it.trim().isNotEmpty() }
-
-                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    items.forEach { item ->
-                                        RequirementRow(text = item.trim())
-                                    }
-                                }
-                            }
-                            Spacer(Modifier.height(20.dp))
-                        }
-                    }
-
-                    // ─────────────────────────────────────────────────────────
-                    // DETALLES DEL PUESTO
-                    // ─────────────────────────────────────────────────────────
-                    val hasDetails = !job.meta?.vacantes.isNullOrBlank() ||
-                                     !job.meta?.tipoContrato.isNullOrBlank() ||
-                                     !job.meta?.jornada.isNullOrBlank()
-
-                    if (hasDetails) {
-                        ContentSection(
-                            title = "Detalles del puesto",
-                            icon = Icons.Outlined.Info
-                        ) {
-                            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                                job.meta?.vacantes?.takeIf { it.isNotBlank() }?.let {
-                                    DetailItem(
-                                        icon = Icons.Outlined.Groups,
-                                        label = "Vacantes",
-                                        value = "$it disponibles"
-                                    )
-                                }
-                                job.meta?.tipoContrato?.takeIf { it.isNotBlank() }?.let {
-                                    DetailItem(
-                                        icon = Icons.Outlined.Assignment,
-                                        label = "Tipo de contrato",
-                                        value = it
-                                    )
-                                }
-                                job.meta?.jornada?.takeIf { it.isNotBlank() }?.let {
-                                    DetailItem(
-                                        icon = Icons.Outlined.Schedule,
-                                        label = "Jornada",
-                                        value = it
-                                    )
-                                }
-                            }
-                        }
-                        Spacer(Modifier.height(20.dp))
-                    }
-
-                    // ─────────────────────────────────────────────────────────
-                    // UBICACIÓN
-                    // ─────────────────────────────────────────────────────────
-                    ubicacionCompleta?.let { ubicacion ->
-                        if (ubicacion.departamento.isNotBlank()) {
-                            ContentSection(
-                                title = "Ubicación",
-                                icon = Icons.Outlined.LocationOn
-                            ) {
-                                LocationCard(ubicacion = ubicacion)
-                            }
-                            Spacer(Modifier.height(20.dp))
-                        }
-                    }
-
-                    // ─────────────────────────────────────────────────────────
-                    // INFORMACIÓN DE LA EMPRESA
-                    // ─────────────────────────────────────────────────────────
-                    if (companyName != null && companyProfile != null) {
-                        ContentSection(
-                            title = "Acerca de la empresa",
-                            icon = Icons.Outlined.Business
-                        ) {
-                            CompanyCard(
-                                companyProfile = companyProfile!!,
-                                companyName = companyName,
-                                navController = navController,
-                                context = context
-                            )
-                        }
-                        Spacer(Modifier.height(20.dp))
-                    }
-
-                    // Espacio inferior para el botón flotante
-                    Spacer(Modifier.height(80.dp))
-                }
+                // Contenido Principal
+                MainContent(
+                    state = state,
+                    onAction = onAction,
+                    navController = navController,
+                    context = context
+                )
             }
 
-            // ═══════════════════════════════════════════════════════════
-            // BOTÓN DE CONTACTO FLOTANTE
-            // ═══════════════════════════════════════════════════════════
+            // Botón de contacto flotante
             AnimatedVisibility(
-                visible = companyProfile?.phone != null || companyProfile?.email != null,
+                visible = state.companyProfile?.phone != null || state.companyProfile?.email != null,
                 enter = fadeIn(),
                 exit = fadeOut(),
                 modifier = Modifier
@@ -472,27 +276,119 @@ fun JobDetailScreen(
                     .padding(20.dp)
             ) {
                 ContactButton(
-                    phone = companyProfile?.phone,
-                    email = companyProfile?.email,
-                    context = context
+                    phone = state.companyProfile?.phone,
+                    email = state.companyProfile?.email,
+                    onAction = onAction
                 )
             }
         }
     }
 
     // Fullscreen image viewer
-    if (fullscreenImageIndex != null && allFullImageUrls.isNotEmpty()) {
+    if (fullscreenImageIndex != null && state.allFullImageUrls.isNotEmpty()) {
         FullscreenImageViewer(
-            imageUrls = allFullImageUrls,
-            initialIndex = fullscreenImageIndex ?: 0,
-            onDismiss = { fullscreenImageIndex = null }
+            imageUrls = state.allFullImageUrls,
+            initialIndex = fullscreenImageIndex,
+            onDismiss = { onAction(JobDetailAction.CloseImage) }
         )
     }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// COMPONENTES
-// ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
+// HERO SECTION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun HeroSection(
+    imageUrls: List<String>,
+    onImageClick: (Int) -> Unit,
+    onNavigateBack: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(280.dp)
+    ) {
+        if (imageUrls.isNotEmpty()) {
+            HeroImageSlider(
+                imageUrls = imageUrls,
+                onImageClick = onImageClick
+            )
+        } else {
+            // Placeholder elegante
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                                MaterialTheme.colorScheme.primaryContainer
+                            )
+                        )
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_launcher_foreground),
+                    contentDescription = null,
+                    modifier = Modifier.size(100.dp),
+                    tint = Color.White.copy(alpha = 0.3f)
+                )
+            }
+        }
+
+        // Gradiente oscuro inferior
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(120.dp)
+                .align(Alignment.BottomCenter)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            Color.Black.copy(alpha = 0.7f)
+                        )
+                    )
+                )
+        )
+
+        // Botón de volver
+        IconButton(
+            onClick = onNavigateBack,
+            modifier = Modifier
+                .padding(16.dp)
+                .align(Alignment.TopStart)
+                .background(Color.Black.copy(alpha = 0.3f), CircleShape)
+        ) {
+            Icon(
+                Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Volver",
+                tint = Color.White
+            )
+        }
+
+        // Contador de imágenes
+        if (imageUrls.size > 1) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp),
+                shape = RoundedCornerShape(16.dp),
+                color = Color.Black.copy(alpha = 0.5f)
+            ) {
+                Text(
+                    text = "${imageUrls.size} fotos",
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    color = Color.White,
+                    style = MaterialTheme.typography.labelMedium
+                )
+            }
+        }
+    }
+}
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -542,6 +438,242 @@ private fun HeroImageSlider(
                 }
             }
         }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MAIN CONTENT
+// ═══════════════════════════════════════════════════════════════════════════════
+
+@Composable
+private fun MainContent(
+    state: JobDetailUiState.Success,
+    onAction: (JobDetailAction) -> Unit,
+    navController: NavController?,
+    context: android.content.Context
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .offset(y = (-24).dp)
+            .background(
+                MaterialTheme.colorScheme.background,
+                RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+            )
+            .padding(horizontal = 20.dp)
+            .padding(top = 24.dp)
+    ) {
+        // Título
+        Text(
+            text = state.job.title?.rendered?.htmlToString() ?: "Sin título",
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+            lineHeight = 32.sp
+        )
+
+        Spacer(Modifier.height(12.dp))
+
+        // Empresa
+        state.companyName?.let { companyName ->
+            CompanyHeader(
+                companyName = companyName,
+                companyProfile = state.companyProfile,
+                isLoading = state.isLoadingCompany,
+                onAction = onAction,
+                context = context
+            )
+        }
+
+        Spacer(Modifier.height(20.dp))
+
+        // Quick Info
+        QuickInfoSection(job = state.job, ubicacion = state.ubicacionCompleta)
+
+        Spacer(Modifier.height(24.dp))
+
+        // Beneficios
+        val hasBenefits = state.job.meta?.alojamiento == true ||
+                state.job.meta?.transporte == true ||
+                state.job.meta?.alimentacion == true
+
+        if (hasBenefits) {
+            BenefitsSection(job = state.job)
+            Spacer(Modifier.height(24.dp))
+        }
+
+        // Descripción
+        state.job.content?.rendered?.let { content ->
+            if (content.trim().isNotBlank()) {
+                ContentSection(
+                    title = "Descripción",
+                    icon = Icons.Outlined.Description
+                ) {
+                    FormattedText(
+                        text = content,
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            lineHeight = 26.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                Spacer(Modifier.height(20.dp))
+            }
+        }
+
+        // Requisitos
+        state.job.meta?.requisitos?.let { requisitos ->
+            if (requisitos.isNotBlank()) {
+                ContentSection(
+                    title = "Requisitos",
+                    icon = Icons.Outlined.Checklist
+                ) {
+                    val items = requisitos.htmlToString()
+                        .split("\n")
+                        .filter { it.trim().isNotEmpty() }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        items.forEach { item ->
+                            RequirementRow(text = item.trim())
+                        }
+                    }
+                }
+                Spacer(Modifier.height(20.dp))
+            }
+        }
+
+        // Detalles del puesto
+        val hasDetails = !state.job.meta?.vacantes.isNullOrBlank() ||
+                !state.job.meta?.tipoContrato.isNullOrBlank() ||
+                !state.job.meta?.jornada.isNullOrBlank()
+
+        if (hasDetails) {
+            ContentSection(
+                title = "Detalles del puesto",
+                icon = Icons.Outlined.Info
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    state.job.meta?.vacantes?.takeIf { it.isNotBlank() }?.let {
+                        DetailItem(
+                            icon = Icons.Outlined.Groups,
+                            label = "Vacantes",
+                            value = "$it disponibles"
+                        )
+                    }
+                    state.job.meta?.tipoContrato?.takeIf { it.isNotBlank() }?.let {
+                        DetailItem(
+                            icon = Icons.Outlined.Assignment,
+                            label = "Tipo de contrato",
+                            value = it
+                        )
+                    }
+                    state.job.meta?.jornada?.takeIf { it.isNotBlank() }?.let {
+                        DetailItem(
+                            icon = Icons.Outlined.Schedule,
+                            label = "Jornada",
+                            value = it
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(20.dp))
+        }
+
+        // Información de la empresa
+        if (state.companyName != null && state.companyProfile != null) {
+            ContentSection(
+                title = "Acerca de la empresa",
+                icon = Icons.Outlined.Business
+            ) {
+                CompanyCard(
+                    companyProfile = state.companyProfile,
+                    companyName = state.companyName,
+                    onAction = onAction,
+                    context = context
+                )
+            }
+            Spacer(Modifier.height(20.dp))
+        }
+
+        // Espacio para el botón flotante
+        Spacer(Modifier.height(80.dp))
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// COMPONENTES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+@Composable
+private fun CompanyHeader(
+    companyName: String,
+    companyProfile: CompanyProfileResponse?,
+    isLoading: Boolean,
+    onAction: (JobDetailAction) -> Unit,
+    context: android.content.Context
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .clickable {
+                onAction(JobDetailAction.NavigateToCompany(companyName.htmlToString()))
+            }
+            .padding(vertical = 4.dp)
+    ) {
+        // Logo de empresa
+        val logoUrl = companyProfile?.logoUrl ?: companyProfile?.profilePhotoUrl
+        if (logoUrl != null) {
+            AsyncImage(
+                model = ImageRequest.Builder(context).data(logoUrl).build(),
+                contentDescription = null,
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .background(
+                        MaterialTheme.colorScheme.primaryContainer,
+                        CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Icon(
+                        Icons.Default.Business,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.width(10.dp))
+
+        Text(
+            text = companyName.htmlToString(),
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.Medium
+        )
+
+        Icon(
+            Icons.Default.ChevronRight,
+            contentDescription = null,
+            modifier = Modifier.size(20.dp),
+            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+        )
     }
 }
 
@@ -677,10 +809,7 @@ private fun BenefitChip(icon: ImageVector, text: String) {
     Surface(
         shape = RoundedCornerShape(12.dp),
         color = Color(0xFF4CAF50).copy(alpha = 0.1f),
-        border = androidx.compose.foundation.BorderStroke(
-            1.dp,
-            Color(0xFF4CAF50).copy(alpha = 0.3f)
-        )
+        border = BorderStroke(1.dp, Color(0xFF4CAF50).copy(alpha = 0.3f))
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
@@ -798,85 +927,19 @@ private fun DetailItem(
 }
 
 @Composable
-private fun LocationCard(ubicacion: UbicacionCompleta) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
-            // Ubicación principal
-            val mainLocation = when (ubicacion.nivel) {
-                LocationType.DISTRITO -> ubicacion.distrito
-                LocationType.PROVINCIA -> ubicacion.provincia
-                else -> ubicacion.departamento
-            }
-
-            Text(
-                text = mainLocation,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-
-            // Ubicación completa
-            val fullLocation = listOf(
-                ubicacion.distrito.takeIf { it.isNotBlank() && ubicacion.nivel == LocationType.DISTRITO },
-                ubicacion.provincia.takeIf { it.isNotBlank() },
-                ubicacion.departamento
-            ).filterNotNull().distinct().joinToString(", ")
-
-            if (fullLocation != mainLocation) {
-                Text(
-                    text = fullLocation,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            // Dirección si existe
-            ubicacion.direccion?.takeIf { it.isNotBlank() }?.let {
-                Spacer(Modifier.height(8.dp))
-                Row(
-                    verticalAlignment = Alignment.Top,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Icon(
-                        Icons.Outlined.Place,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
 private fun CompanyCard(
     companyProfile: CompanyProfileResponse,
     companyName: String,
-    navController: NavController?,
+    onAction: (JobDetailAction) -> Unit,
     context: android.content.Context
 ) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { navController?.navigate("company_profile/$companyName") },
+            .clickable { onAction(JobDetailAction.NavigateToCompany(companyName)) },
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surface,
-        border = androidx.compose.foundation.BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.outlineVariant
-        )
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(
             modifier = Modifier.padding(16.dp)
@@ -954,9 +1017,7 @@ private fun CompanyCard(
                         Row(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(8.dp))
-                                .clickable {
-                                    context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone")))
-                                }
+                                .clickable { onAction(JobDetailAction.ContactPhone(phone)) }
                                 .padding(4.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -979,9 +1040,7 @@ private fun CompanyCard(
                         Row(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(8.dp))
-                                .clickable {
-                                    context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:$email")))
-                                }
+                                .clickable { onAction(JobDetailAction.ContactEmail(email)) }
                                 .padding(4.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -1009,7 +1068,7 @@ private fun CompanyCard(
 private fun ContactButton(
     phone: String?,
     email: String?,
-    context: android.content.Context
+    onAction: (JobDetailAction) -> Unit
 ) {
     var showOptions by remember { mutableStateOf(false) }
 
@@ -1018,9 +1077,9 @@ private fun ContactButton(
             if (phone != null && email != null) {
                 showOptions = true
             } else if (phone != null) {
-                context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone")))
+                onAction(JobDetailAction.ContactPhone(phone))
             } else if (email != null) {
-                context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:$email")))
+                onAction(JobDetailAction.ContactEmail(email))
             }
         },
         modifier = Modifier
@@ -1054,26 +1113,24 @@ private fun ContactButton(
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (phone != null) {
                         TextButton(onClick = {
-                            context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone")))
+                            onAction(JobDetailAction.ContactPhone(phone))
                             showOptions = false
                         }) {
-                            Text("📞 Llamar")
+                            Text("Llamar")
                         }
                         TextButton(onClick = {
-                            val cleanPhone = phone.replace(Regex("[\\s\\-()]"), "")
-                            val whatsappNumber = if (cleanPhone.startsWith("+")) cleanPhone else "+51$cleanPhone"
-                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/${whatsappNumber.removePrefix("+")}")))
+                            onAction(JobDetailAction.ContactWhatsApp(phone))
                             showOptions = false
                         }) {
-                            Text("💬 WhatsApp")
+                            Text("WhatsApp")
                         }
                     }
                     if (email != null) {
                         TextButton(onClick = {
-                            context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:$email")))
+                            onAction(JobDetailAction.ContactEmail(email))
                             showOptions = false
                         }) {
-                            Text("📧 Email")
+                            Text("Email")
                         }
                     }
                 }
@@ -1161,4 +1218,17 @@ private fun FullscreenImageViewer(
             }
         }
     }
+}
+
+// Alias for backward compatibility
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SmallTopAppBar(
+    title: @Composable () -> Unit,
+    navigationIcon: @Composable () -> Unit
+) {
+    TopAppBar(
+        title = title,
+        navigationIcon = navigationIcon
+    )
 }

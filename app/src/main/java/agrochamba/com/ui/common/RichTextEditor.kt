@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.FormatBold
 import androidx.compose.material.icons.filled.FormatItalic
 import androidx.compose.material.icons.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.FormatListNumbered
+import androidx.compose.material.icons.filled.Title
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -94,6 +95,7 @@ fun RichTextEditor(
     val isItalic = detectFormat(textFieldValue.text, selection, "*")
     val isBulletList = detectBulletList(textFieldValue.text, selection)
     val isNumberedList = detectNumberedList(textFieldValue.text, selection)
+    val isHeading = detectHeading(textFieldValue.text, selection)
     
     Column(
         modifier = modifier
@@ -173,6 +175,7 @@ fun RichTextEditor(
             isItalic = if (hasSelection) isItalic else false,
             isBulletList = isBulletList,
             isNumberedList = isNumberedList,
+            isHeading = isHeading,
             onBoldClick = {
                 textFieldValue = toggleFormat(textFieldValue, "**")
                 keyboardController?.show()
@@ -187,6 +190,10 @@ fun RichTextEditor(
             },
             onNumberedListClick = {
                 textFieldValue = toggleNumberedList(textFieldValue)
+                keyboardController?.show()
+            },
+            onHeadingClick = {
+                textFieldValue = toggleHeading(textFieldValue)
                 keyboardController?.show()
             },
             // Funciones de IA
@@ -209,10 +216,12 @@ private fun FormatToolbar(
     isItalic: Boolean,
     isBulletList: Boolean,
     isNumberedList: Boolean,
+    isHeading: Boolean = false,
     onBoldClick: () -> Unit,
     onItalicClick: () -> Unit,
     onBulletListClick: () -> Unit,
     onNumberedListClick: () -> Unit,
+    onHeadingClick: () -> Unit = {},
     // Funciones de IA
     onAIEnhanceClick: (() -> Unit)? = null,
     onOCRClick: (() -> Unit)? = null,
@@ -243,23 +252,30 @@ private fun FormatToolbar(
                 onClick = onBoldClick,
                 contentDescription = "Negrita"
             )
-            
+
             FormatButton(
                 icon = Icons.Default.FormatItalic,
                 isSelected = isItalic,
                 onClick = onItalicClick,
                 contentDescription = "Cursiva"
             )
-            
+
+            FormatButton(
+                icon = Icons.Default.Title,
+                isSelected = isHeading,
+                onClick = onHeadingClick,
+                contentDescription = "Encabezado/Sección"
+            )
+
             Spacer(modifier = Modifier.width(4.dp))
-            
+
             FormatButton(
                 icon = Icons.Default.FormatListBulleted,
                 isSelected = isBulletList,
                 onClick = onBulletListClick,
                 contentDescription = "Lista con viñetas"
             )
-            
+
             FormatButton(
                 icon = Icons.Default.FormatListNumbered,
                 isSelected = isNumberedList,
@@ -689,6 +705,71 @@ private fun toggleNumberedList(textFieldValue: TextFieldValue): TextFieldValue {
                 }
             }
             val newLine = indent + "$nextNumber. " + line.trimStart()
+            val newText = text.substring(0, lineStart) + newLine + text.substring(lineEnd)
+            val offset = newLine.length - line.length
+            val newSelection = TextRange(selection.start + offset)
+            textFieldValue.copy(text = newText, selection = newSelection)
+        }
+    } catch (e: StringIndexOutOfBoundsException) {
+        return textFieldValue
+    }
+}
+
+/**
+ * Detecta si la línea actual es un encabezado Markdown (##)
+ */
+private fun detectHeading(text: String, selection: TextRange): Boolean {
+    if (text.isEmpty()) return false
+    try {
+        val safeStart = selection.start.coerceIn(0, text.length)
+        val searchStart = maxOf(0, safeStart - 1)
+        val lineStart = text.lastIndexOf('\n', searchStart) + 1
+        val lineEnd = text.indexOf('\n', safeStart).let { if (it == -1) text.length else it }
+        if (lineStart < 0 || lineEnd > text.length || lineStart >= lineEnd || lineStart == lineEnd) return false
+        if (lineStart >= text.length || lineEnd > text.length || lineStart < 0 || lineEnd < 0) return false
+        val line = text.substring(lineStart, lineEnd)
+        return line.trimStart().startsWith("## ")
+    } catch (e: StringIndexOutOfBoundsException) {
+        return false
+    }
+}
+
+/**
+ * Alterna encabezado Markdown (##) en la línea actual
+ */
+private fun toggleHeading(textFieldValue: TextFieldValue): TextFieldValue {
+    val text = textFieldValue.text
+    val selection = textFieldValue.selection
+
+    try {
+        val safeStart = selection.start.coerceIn(0, text.length)
+        val searchStart = maxOf(0, safeStart - 1)
+        val lineStart = text.lastIndexOf('\n', searchStart) + 1
+        val lineEnd = text.indexOf('\n', safeStart).let { if (it == -1) text.length else it }
+
+        if (lineStart < 0 || lineEnd > text.length || lineStart >= lineEnd) return textFieldValue
+
+        val line = text.substring(lineStart, lineEnd)
+        val isHeading = line.trimStart().startsWith("## ")
+
+        return if (isHeading) {
+            // Remover ## del inicio
+            val newLine = line.replaceFirst(Regex("^\\s*##\\s+"), "")
+            val newText = text.substring(0, lineStart) + newLine + text.substring(lineEnd)
+            val offset = line.length - newLine.length
+            val newSelection = TextRange(maxOf(0, selection.start - offset))
+            textFieldValue.copy(text = newText, selection = newSelection)
+        } else {
+            // Agregar ## al inicio (respetando indentación)
+            val indent = line.takeWhile { it == ' ' }
+            val content = line.trimStart()
+            // Si ya tiene otro formato de encabezado, convertirlo
+            val cleanContent = when {
+                content.startsWith("# ") -> content.substring(2)
+                content.startsWith("### ") -> content.substring(4)
+                else -> content
+            }
+            val newLine = indent + "## " + cleanContent
             val newText = text.substring(0, lineStart) + newLine + text.substring(lineEnd)
             val offset = newLine.length - line.length
             val newSelection = TextRange(selection.start + offset)
