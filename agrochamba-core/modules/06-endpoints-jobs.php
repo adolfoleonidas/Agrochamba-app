@@ -162,9 +162,21 @@ if (!function_exists('agrochamba_create_job')) {
         
         if (isset($params['post_type'])) {
             $requested_type = sanitize_text_field($params['post_type']);
-            
+
+            // Admins y empresas pueden crear avisos
+            if ($requested_type === 'aviso') {
+                // Verificar permisos para crear avisos
+                if (in_array('administrator', $user->roles) ||
+                    in_array('employer', $user->roles) ||
+                    current_user_can('edit_posts')) {
+                    $post_type = 'aviso_operativo';
+                    if (function_exists('error_log')) {
+                        error_log('AgroChamba: Cambiando post_type a: aviso_operativo');
+                    }
+                }
+            }
             // Solo admins pueden crear posts de blog
-            if (in_array('administrator', $user->roles)) {
+            elseif (in_array('administrator', $user->roles)) {
                 if ($requested_type === 'post' || $requested_type === 'blog') {
                     $post_type = 'post'; // WordPress post type nativo para blogs
                     if (function_exists('error_log')) {
@@ -279,6 +291,56 @@ if (!function_exists('agrochamba_create_job')) {
             // Prioridad: premium=100, free=40 (free sigue visible si es reciente)
             $priority = ($job_tier === 'premium') ? 100 : 40;
             update_post_meta($post_id, '_job_priority', $priority);
+        }
+
+        // ==========================================
+        // GUARDAR CAMPOS ESPECÍFICOS DE AVISO OPERATIVO
+        // ==========================================
+        if ($post_type === 'aviso_operativo') {
+            // Tipo de aviso
+            if (!empty($params['tipo_aviso'])) {
+                update_post_meta($post_id, '_tipo_aviso', sanitize_text_field($params['tipo_aviso']));
+            } else {
+                update_post_meta($post_id, '_tipo_aviso', 'anuncio');
+            }
+
+            // Ubicación (para resumen_trabajos y alerta_clima)
+            if (!empty($params['ubicacion'])) {
+                update_post_meta($post_id, '_ubicacion', sanitize_text_field($params['ubicacion']));
+            }
+
+            // Preview (para resumen_trabajos)
+            if (!empty($params['preview'])) {
+                update_post_meta($post_id, '_preview', sanitize_textarea_field($params['preview']));
+            }
+
+            // Horarios (para horario_ingreso)
+            if (!empty($params['hora_operativos'])) {
+                update_post_meta($post_id, '_hora_operativos', sanitize_text_field($params['hora_operativos']));
+            }
+            if (!empty($params['hora_administrativos'])) {
+                update_post_meta($post_id, '_hora_administrativos', sanitize_text_field($params['hora_administrativos']));
+            }
+
+            // Fecha de expiración
+            if (!empty($params['fecha_expiracion'])) {
+                update_post_meta($post_id, '_fecha_expiracion', sanitize_text_field($params['fecha_expiracion']));
+            }
+
+            // Activar por defecto
+            update_post_meta($post_id, '_activo', true);
+
+            // Asociar empresa si el usuario tiene una
+            if (in_array('employer', $user->roles)) {
+                $empresa_cpt = agrochamba_get_empresa_by_user_id($user_id);
+                if ($empresa_cpt) {
+                    update_post_meta($post_id, '_empresa_id', $empresa_cpt->ID);
+                }
+            }
+
+            if (function_exists('error_log')) {
+                error_log('AgroChamba: Aviso operativo creado con ID: ' . $post_id);
+            }
         }
 
         // ==========================================
