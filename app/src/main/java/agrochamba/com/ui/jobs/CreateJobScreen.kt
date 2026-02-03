@@ -112,8 +112,15 @@ fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel 
     
     // Selector de tipo de publicación (solo para admins)
     val isAdmin = AuthManager.isUserAdmin()
-    var tipoPublicacion by remember { mutableStateOf("trabajo") } // "trabajo" o "post" (blog)
-    
+    var tipoPublicacion by remember { mutableStateOf("trabajo") } // "trabajo", "post" (blog) o "aviso"
+
+    // Campos específicos para Avisos Operativos
+    var tipoAviso by remember { mutableStateOf("resumen_trabajos") } // resumen_trabajos, horario_ingreso, alerta_clima, anuncio
+    var avisoUbicacion by remember { mutableStateOf("") }
+    var avisoPreview by remember { mutableStateOf("") }
+    var avisoHoraOperativos by remember { mutableStateOf("06:00 AM") }
+    var avisoHoraAdministrativos by remember { mutableStateOf("08:00 AM") }
+
     var showMoreOptions by remember { mutableStateOf(false) }
     var showOCRDialog by remember { mutableStateOf(false) }
     
@@ -140,14 +147,16 @@ fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel 
         if (uiState.postSuccess) {
             // Reiniciar el estado antes de navegar
             publishToFacebook = false
-            val mensaje = if (tipoPublicacion == "trabajo") {
-                if (uiState.publishTier == "free") {
-                    "¡Trabajo creado con prioridad básica! Está pendiente de revisión."
-                } else {
-                    "¡Trabajo creado con éxito! Está pendiente de revisión por un administrador."
+            val mensaje = when (tipoPublicacion) {
+                "trabajo" -> {
+                    if (uiState.publishTier == "free") {
+                        "¡Trabajo creado con prioridad básica! Está pendiente de revisión."
+                    } else {
+                        "¡Trabajo creado con éxito! Está pendiente de revisión por un administrador."
+                    }
                 }
-            } else {
-                "¡Artículo de blog creado con éxito!"
+                "aviso" -> "¡Aviso operativo publicado con éxito!"
+                else -> "¡Artículo de blog creado con éxito!"
             }
             Toast.makeText(context, mensaje, Toast.LENGTH_LONG).show()
             navController.popBackStack()
@@ -339,6 +348,45 @@ fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel 
                         empresaId?.let { jobData["empresa_id"] = it }
                         
                     viewModel.createJob(jobData, context)
+                    } else if (tipoPublicacion == "aviso") {
+                        // Para avisos operativos
+                        android.util.Log.d("CreateJobScreen", "Creando AVISO - tipo: $tipoAviso")
+
+                        // Validaciones específicas por tipo de aviso
+                        if (tipoAviso == "resumen_trabajos" && avisoUbicacion.isBlank()) {
+                            Toast.makeText(context, "La ubicación es obligatoria para resumen de trabajos", Toast.LENGTH_SHORT).show()
+                            return@BottomActionBar
+                        }
+                        if (tipoAviso == "resumen_trabajos" && avisoPreview.isBlank()) {
+                            Toast.makeText(context, "El preview es obligatorio para resumen de trabajos", Toast.LENGTH_SHORT).show()
+                            return@BottomActionBar
+                        }
+
+                        val avisoData = mutableMapOf<String, Any?>(
+                            "post_type" to "aviso",
+                            "tipo_aviso" to tipoAviso,
+                            "title" to title.trim(),
+                            "content" to description.textToHtml(),
+                            "comentarios_habilitados" to false // Avisos no tienen comentarios
+                        )
+
+                        // Campos específicos según tipo de aviso
+                        when (tipoAviso) {
+                            "resumen_trabajos" -> {
+                                avisoData["ubicacion"] = avisoUbicacion.trim()
+                                avisoData["preview"] = avisoPreview.trim()
+                            }
+                            "horario_ingreso" -> {
+                                avisoData["hora_operativos"] = avisoHoraOperativos.trim()
+                                avisoData["hora_administrativos"] = avisoHoraAdministrativos.trim()
+                            }
+                            "alerta_clima" -> {
+                                avisoData["ubicacion"] = avisoUbicacion.trim()
+                            }
+                            // "anuncio" solo usa title y content
+                        }
+
+                        viewModel.createJob(avisoData, context)
                     } else {
                         // Para blogs (post) - NO requiere ubicación ni empresa
                         android.util.Log.d("CreateJobScreen", "Creando BLOG - sin validar ubicación ni empresa")
@@ -577,6 +625,13 @@ fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel 
                                 label = { Text("📝 Blog") },
                                 modifier = Modifier.weight(1f)
                             )
+                            // Botón Aviso
+                            FilterChip(
+                                selected = tipoPublicacion == "aviso",
+                                onClick = { tipoPublicacion = "aviso" },
+                                label = { Text("📢 Aviso") },
+                                modifier = Modifier.weight(1f)
+                            )
                         }
                     }
                     Spacer(Modifier.height(16.dp))
@@ -595,7 +650,120 @@ fun CreateJobScreen(navController: NavController, viewModel: CreateJobViewModel 
                     }
                     Spacer(Modifier.height(16.dp))
                 }
-                
+
+                // Campos específicos para Avisos Operativos
+                if (tipoPublicacion == "aviso") {
+                    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        // Selector de tipo de aviso
+                        Text(
+                            "Tipo de Aviso",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            FilterChip(
+                                selected = tipoAviso == "resumen_trabajos",
+                                onClick = { tipoAviso = "resumen_trabajos" },
+                                label = { Text("📋 Resumen") },
+                                modifier = Modifier.weight(1f)
+                            )
+                            FilterChip(
+                                selected = tipoAviso == "horario_ingreso",
+                                onClick = { tipoAviso = "horario_ingreso" },
+                                label = { Text("🕐 Horario") },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            FilterChip(
+                                selected = tipoAviso == "alerta_clima",
+                                onClick = { tipoAviso = "alerta_clima" },
+                                label = { Text("⚠️ Clima") },
+                                modifier = Modifier.weight(1f)
+                            )
+                            FilterChip(
+                                selected = tipoAviso == "anuncio",
+                                onClick = { tipoAviso = "anuncio" },
+                                label = { Text("📢 Anuncio") },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+
+                        Spacer(Modifier.height(16.dp))
+
+                        // Campo de ubicación para avisos (especialmente resumen_trabajos)
+                        if (tipoAviso == "resumen_trabajos" || tipoAviso == "alerta_clima") {
+                            OutlinedTextField(
+                                value = avisoUbicacion,
+                                onValueChange = { avisoUbicacion = it },
+                                label = { Text("Ubicación del aviso") },
+                                placeholder = { Text("Ej: Ica, Lima, Arequipa...") },
+                                leadingIcon = {
+                                    Icon(Icons.Default.LocationOn, contentDescription = null)
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true
+                            )
+                            Spacer(Modifier.height(12.dp))
+                        }
+
+                        // Campos específicos para Horario de Ingreso
+                        if (tipoAviso == "horario_ingreso") {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                OutlinedTextField(
+                                    value = avisoHoraOperativos,
+                                    onValueChange = { avisoHoraOperativos = it },
+                                    label = { Text("Hora Operativos") },
+                                    placeholder = { Text("06:00 AM") },
+                                    modifier = Modifier.weight(1f),
+                                    singleLine = true
+                                )
+                                OutlinedTextField(
+                                    value = avisoHoraAdministrativos,
+                                    onValueChange = { avisoHoraAdministrativos = it },
+                                    label = { Text("Hora Admin") },
+                                    placeholder = { Text("08:00 AM") },
+                                    modifier = Modifier.weight(1f),
+                                    singleLine = true
+                                )
+                            }
+                            Spacer(Modifier.height(12.dp))
+                        }
+
+                        // Preview (para resumen_trabajos)
+                        if (tipoAviso == "resumen_trabajos") {
+                            OutlinedTextField(
+                                value = avisoPreview,
+                                onValueChange = { avisoPreview = it },
+                                label = { Text("Preview (texto corto)") },
+                                placeholder = { Text("• Beta recibirá personal para siembra...") },
+                                modifier = Modifier.fillMaxWidth(),
+                                minLines = 2,
+                                maxLines = 3
+                            )
+                            Text(
+                                "Este texto se muestra en la tarjeta. El contenido completo va en la descripción.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+                            Spacer(Modifier.height(12.dp))
+                        }
+                    }
+                }
+
                 // Ubicación y Empresa - uno debajo del otro (solo para trabajos)
                 if (tipoPublicacion == "trabajo") {
                     Column(modifier = Modifier.padding(horizontal = 16.dp)) {

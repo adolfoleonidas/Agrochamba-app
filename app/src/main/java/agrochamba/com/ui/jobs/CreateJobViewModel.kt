@@ -450,12 +450,17 @@ class CreateJobViewModel @Inject constructor() : androidx.lifecycle.ViewModel() 
                 }
 
                 // Preparar payload para WordPress
-                uiState = uiState.copy(loadingMessage = "Creando trabajo...")
+                val postType = jobData["post_type"] as? String ?: "trabajo"
+                val loadingMsg = when (postType) {
+                    "aviso" -> "Publicando aviso..."
+                    "post" -> "Publicando artículo..."
+                    else -> "Creando trabajo..."
+                }
+                uiState = uiState.copy(loadingMessage = loadingMsg)
                 
                 // Validaciones básicas
                 val title = jobData["title"] as? String
                 val content = jobData["content"] as? String
-                val postType = jobData["post_type"] as? String ?: "trabajo" // Por defecto trabajo
                 val ubicacionId = jobData["ubicacion_id"] as? Number
                 
                 // Obtener ubicación completa (nuevo sistema)
@@ -526,6 +531,22 @@ class CreateJobViewModel @Inject constructor() : androidx.lifecycle.ViewModel() 
                                 put("categories", categoryIds)
                             }
                         }
+                    }
+
+                    // Campos específicos para Avisos Operativos
+                    if (postType == "aviso") {
+                        // Tipo de aviso (resumen_trabajos, horario_ingreso, alerta_clima, anuncio)
+                        (jobData["tipo_aviso"] as? String)?.let { put("tipo_aviso", it) }
+
+                        // Ubicación del aviso (para resumen_trabajos y alerta_clima)
+                        (jobData["ubicacion"] as? String)?.let { if (it.isNotBlank()) put("ubicacion", it) }
+
+                        // Preview (para resumen_trabajos)
+                        (jobData["preview"] as? String)?.let { if (it.isNotBlank()) put("preview", it) }
+
+                        // Horarios (para horario_ingreso)
+                        (jobData["hora_operativos"] as? String)?.let { if (it.isNotBlank()) put("hora_operativos", it) }
+                        (jobData["hora_administrativos"] as? String)?.let { if (it.isNotBlank()) put("hora_administrativos", it) }
                     }
 
                     // Beneficios (solo enviar si son true)

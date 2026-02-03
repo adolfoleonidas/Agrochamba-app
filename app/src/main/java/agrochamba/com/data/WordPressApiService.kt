@@ -72,6 +72,14 @@ interface WordPressApiService {
     @GET("wp/v2/categories?per_page=100")
     suspend fun getCategories(): List<Category>
 
+    // Avisos Operativos
+    @GET("agrochamba/v1/avisos")
+    suspend fun getAvisos(
+        @Query("ubicacion") ubicacion: String? = null,
+        @Query("tipo") tipo: String? = null,
+        @Query("per_page") perPage: Int = 10
+    ): List<AvisoOperativoResponse>
+
     @GET("wp/v2/media")
     suspend fun getMediaForPost(@Query("parent") postId: Int): List<MediaItem>
 
