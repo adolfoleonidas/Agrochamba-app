@@ -65,6 +65,7 @@ import agrochamba.com.ui.payment.PaymentScreen
 import agrochamba.com.ui.scanner.QrScannerScreen
 import agrochamba.com.ui.theme.AgrochambaTheme
 import agrochamba.com.ui.WebViewScreen
+import agrochamba.com.ui.auth.ProfileViewModel
 
 sealed class Screen(val route: String, val label: String? = null, val icon: ImageVector? = null) {
     object Jobs : Screen("jobs", "Chambas", Icons.Default.Work)
@@ -397,8 +398,32 @@ fun MainAppScreen() {
             }
         }
     ) { innerPadding ->
+        // ViewModel compartido para el perfil del usuario
+        val profileViewModel: ProfileViewModel = viewModel()
+        val userProfile = profileViewModel.uiState.userProfile
+
         NavHost(navController, startDestination = Screen.Jobs.route, Modifier.padding(innerPadding)) {
-            composable(Screen.Jobs.route) { JobsScreen() }
+            composable(Screen.Jobs.route) {
+                JobsScreen(
+                    userProfile = userProfile,
+                    onNavigateToProfile = {
+                        navController.navigate(Screen.Profile.route) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateToNotifications = {
+                        // Por ahora navegar a perfil, luego se puede crear pantalla de notificaciones
+                        navController.navigate(Screen.Profile.route) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateToRoutes = {
+                        navController.navigate(Screen.Routes.route) {
+                            launchSingleTop = true
+                        }
+                    }
+                )
+            }
             composable(Screen.Routes.route) { WebViewScreen(url = "https://agrobus.agrochamba.com/") }
             composable(Screen.Dates.route) { WebViewScreen(url = "https://agrochamba.com/wp-content/fechas.html") }
             composable(Screen.Rooms.route) { WebViewScreen(url = "https://cuartos.agrochamba.com/") }

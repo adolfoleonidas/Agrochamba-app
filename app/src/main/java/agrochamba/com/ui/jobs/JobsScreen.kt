@@ -20,6 +20,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import com.google.accompanist.swiperefresh.SwipeRefresh
 import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -58,6 +60,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -93,13 +96,30 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import agrochamba.com.data.AuthManager
 import agrochamba.com.data.Category
 import agrochamba.com.data.JobPost
+import agrochamba.com.data.UserProfileResponse
 import agrochamba.com.ui.common.ActiveFilter
 import agrochamba.com.ui.common.CreateAlertBanner
 import agrochamba.com.ui.common.FilterChipsBar
 import agrochamba.com.ui.common.FilterType
 import agrochamba.com.ui.common.NoResultsMessage
+import agrochamba.com.ui.home.AvisosOperativosSection
+import agrochamba.com.ui.home.CategoriasSection
+import agrochamba.com.ui.home.CategoriaJob
+import agrochamba.com.ui.home.EmpleosDestacadosSection
+import agrochamba.com.ui.home.HomeHeader
+import agrochamba.com.ui.home.HomeSearchBar
+import agrochamba.com.ui.home.defaultAvisos
+import agrochamba.com.ui.home.defaultCategorias
+import agrochamba.com.ui.theme.AgroGreen
+import agrochamba.com.ui.theme.DarkBackground
+import agrochamba.com.ui.theme.DarkCard
+import agrochamba.com.ui.theme.DarkCardElevated
+import agrochamba.com.ui.theme.TextMuted
+import agrochamba.com.ui.theme.TextPrimary
+import agrochamba.com.ui.theme.TextSecondary
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import kotlinx.coroutines.delay
@@ -180,9 +200,15 @@ fun formatDate(dateString: String?): String {
 }
 
 @Composable
-fun JobsScreen(jobsViewModel: JobsViewModel = viewModel()) {
+fun JobsScreen(
+    jobsViewModel: JobsViewModel = viewModel(),
+    userProfile: UserProfileResponse? = null,
+    onNavigateToProfile: () -> Unit = {},
+    onNavigateToNotifications: () -> Unit = {},
+    onNavigateToRoutes: () -> Unit = {}
+) {
     android.util.Log.d("JobsScreen", "📱 JobsScreen() INICIADO")
-    
+
     val uiState = jobsViewModel.uiState
     android.util.Log.d("JobsScreen", "📊 Estado: isLoading=${uiState.isLoading}, jobs=${uiState.allJobs.size}, filtered=${uiState.filteredJobs.size}")
 
@@ -194,7 +220,13 @@ fun JobsScreen(jobsViewModel: JobsViewModel = viewModel()) {
 
     if (uiState.selectedJob == null) {
         android.util.Log.d("JobsScreen", "📋 Mostrando JobsListWithSearchScreen...")
-        JobsListWithSearchScreen(jobsViewModel)
+        JobsListWithSearchScreen(
+            jobsViewModel = jobsViewModel,
+            userProfile = userProfile,
+            onNavigateToProfile = onNavigateToProfile,
+            onNavigateToNotifications = onNavigateToNotifications,
+            onNavigateToRoutes = onNavigateToRoutes
+        )
     } else {
         android.util.Log.d("JobsScreen", "📄 Mostrando JobDetailScreen para: ${uiState.selectedJob.id}")
         JobDetailScreen(
@@ -207,14 +239,29 @@ fun JobsScreen(jobsViewModel: JobsViewModel = viewModel()) {
 }
 
 @Composable
-fun JobsListWithSearchScreen(jobsViewModel: JobsViewModel) {
+fun JobsListWithSearchScreen(
+    jobsViewModel: JobsViewModel,
+    userProfile: UserProfileResponse? = null,
+    onNavigateToProfile: () -> Unit = {},
+    onNavigateToNotifications: () -> Unit = {},
+    onNavigateToRoutes: () -> Unit = {}
+) {
     android.util.Log.d("JobsListWithSearchScreen", "🔍 JobsListWithSearchScreen() INICIADO")
-    
+
     val uiState = jobsViewModel.uiState
     android.util.Log.d("JobsListWithSearchScreen", "📊 uiState obtenido: isLoading=${uiState.isLoading}")
-    
-    // Vista siempre en lista (mapa movido a futuras implementaciones en Perfil)
-    
+
+    // Estado para mostrar modal de filtros avanzados
+    var showAdvancedFilters by remember { mutableStateOf(false) }
+
+    // Determinar si hay filtros activos (para mostrar vista Home o vista filtrada)
+    val hasActiveFilters = uiState.searchQuery.isNotBlank() ||
+        uiState.selectedLocationFilter != null ||
+        uiState.selectedLocation != null ||
+        uiState.selectedCrop != null ||
+        uiState.selectedJobType != null ||
+        uiState.selectedCompany != null
+
     // Construir lista de filtros activos
     android.util.Log.d("JobsListWithSearchScreen", "🏗️ Construyendo filtros activos...")
     val activeFilters = remember(
@@ -227,7 +274,7 @@ fun JobsListWithSearchScreen(jobsViewModel: JobsViewModel) {
         android.util.Log.d("JobsListWithSearchScreen", "🔧 Dentro de remember para activeFilters")
         mutableListOf<ActiveFilter>().apply {
             // Priorizar selectedLocationFilter sobre selectedLocation
-            val locationLabel = uiState.selectedLocationFilter?.displayLabel 
+            val locationLabel = uiState.selectedLocationFilter?.displayLabel
                 ?: uiState.selectedLocation?.name
             val locationIcon = when (uiState.selectedLocationFilter?.tipo) {
                 LocationType.DEPARTAMENTO -> "📍"
@@ -235,7 +282,7 @@ fun JobsListWithSearchScreen(jobsViewModel: JobsViewModel) {
                 LocationType.DISTRITO -> "📌"
                 null -> "📍"
             }
-            
+
             if (locationLabel != null) {
                 add(ActiveFilter(
                     id = "location",
@@ -270,151 +317,550 @@ fun JobsListWithSearchScreen(jobsViewModel: JobsViewModel) {
             }
         }
     }
-    
-    Column(modifier = Modifier.fillMaxSize()) {
-        SearchAndFilterPanel(
-            uiState = uiState, 
-            onFilterChange = jobsViewModel::onFilterChange,
-            onLocationFilterChange = jobsViewModel::onLocationFilterChange
-        )
-        
-        Spacer(modifier = Modifier.height(4.dp))
 
-        // Contador de resultados y chips de filtros
-        if (!uiState.isLoading && !uiState.isError) {
-            FilterChipsBar(
-                resultCount = uiState.filteredJobs.size,
-                filters = activeFilters,
-                onRemoveFilter = { filter ->
-                    when (filter.id) {
-                        "location" -> {
-                            // Limpiar filtro de ubicación inteligente
-                            jobsViewModel.onLocationFilterChange(null)
-                        }
-                        "crop" -> jobsViewModel.onFilterChange(
-                            uiState.searchQuery, uiState.selectedLocation, uiState.selectedCompany,
-                            uiState.selectedJobType, null
-                        )
-                        "jobType" -> jobsViewModel.onFilterChange(
-                            uiState.searchQuery, uiState.selectedLocation, uiState.selectedCompany,
-                            null, uiState.selectedCrop
-                        )
-                        "company" -> jobsViewModel.onFilterChange(
-                            uiState.searchQuery, uiState.selectedLocation, null,
-                            uiState.selectedJobType, uiState.selectedCrop
-                        )
-                    }
-                },
-                onClearAll = {
-                    jobsViewModel.clearAllFilters()
-                },
-                searchQuery = uiState.searchQuery,
-                locationName = uiState.selectedLocationFilter?.displayLabel ?: uiState.selectedLocation?.name,
-                isLoading = uiState.isLoading,
-                modifier = Modifier.padding(vertical = 8.dp)
-            )
-            
-            // Banner para crear alerta (solo si hay búsqueda activa y resultados)
-            val hasActiveLocationFilter = uiState.selectedLocationFilter != null || uiState.selectedLocation != null
-            if (uiState.filteredJobs.isNotEmpty() && 
-                (uiState.searchQuery.isNotBlank() || hasActiveLocationFilter)) {
-                CreateAlertBanner(
-                    searchQuery = uiState.searchQuery,
-                    locationId = uiState.selectedLocation?.id,
-                    locationName = uiState.selectedLocationFilter?.displayLabel ?: uiState.selectedLocation?.name,
-                    cropId = uiState.selectedCrop?.id,
-                    cropName = uiState.selectedCrop?.name,
-                    jobTypeId = uiState.selectedJobType?.id,
-                    jobTypeName = uiState.selectedJobType?.name,
-                    onDismiss = { /* Usuario rechazó la alerta */ }
-                )
+    // Obtener empleos destacados (los primeros 5 con imagen)
+    val empleosDestacados = remember(uiState.allJobs) {
+        uiState.allJobs
+            .filter { job ->
+                val hasImage = job.embedded?.featuredMedia?.firstOrNull()?.source_url != null ||
+                    job.featuredImageUrl != null
+                hasImage
             }
-        }
+            .take(5)
+    }
 
-        when {
-            uiState.isLoading -> LoadingScreen()
-            uiState.isError -> ErrorScreen(
-                onRetry = { jobsViewModel.retry() },
-                errorMessage = uiState.errorMessage
-            )
-            uiState.filteredJobs.isEmpty() && (uiState.searchQuery.isNotBlank() || activeFilters.isNotEmpty()) -> {
-                // Mostrar mensaje especial cuando no hay resultados con filtros activos
-                val locationFilter = uiState.selectedLocationFilter
-                val locationDisplayName = locationFilter?.displayLabel
-                    ?: uiState.selectedLocation?.name
-
-                // Generar sugerencias jerárquicas inteligentes
-                val hierarchicalSuggestions = buildList {
-                    if (locationFilter != null) {
-                        when (locationFilter.tipo) {
-                            LocationType.DISTRITO -> {
-                                // Sugerir buscar en la provincia
-                                add("Buscar en toda la provincia ${locationFilter.provincia}")
-                                // Sugerir buscar en el departamento
-                                add("Buscar en todo ${locationFilter.departamento}")
-                            }
-                            LocationType.PROVINCIA -> {
-                                // Sugerir buscar en el departamento
-                                add("Buscar en todo ${locationFilter.departamento}")
-                            }
-                            LocationType.DEPARTAMENTO -> {
-                                // Ya está en el nivel más alto de ubicación
-                            }
-                        }
-                    }
-                    // Siempre agregar opción de ver todos los trabajos
-                    add("Ver todos los trabajos")
+    // Fondo oscuro para el nuevo diseño
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(DarkBackground)
+    ) {
+        if (!hasActiveFilters) {
+            // ====================================================
+            // VISTA HOME: Sin filtros activos
+            // ====================================================
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = 100.dp)
+            ) {
+                // Header con perfil y notificaciones
+                item {
+                    HomeHeader(
+                        userProfile = userProfile,
+                        onNotificationClick = onNavigateToNotifications,
+                        onProfileClick = onNavigateToProfile
+                    )
                 }
 
-                NoResultsMessage(
-                    searchQuery = uiState.searchQuery,
-                    locationName = locationDisplayName,
-                    suggestions = hierarchicalSuggestions,
-                    onSuggestionClick = { suggestion ->
-                        when {
-                            suggestion.startsWith("Buscar en toda la provincia") && locationFilter != null -> {
-                                // Subir a nivel PROVINCIA
-                                val provinciaFilter = SelectedLocationFilter(
-                                    departamento = locationFilter.departamento,
-                                    provincia = locationFilter.provincia,
-                                    distrito = null,
-                                    displayLabel = "${locationFilter.provincia}, ${locationFilter.departamento}",
-                                    tipo = LocationType.PROVINCIA
+                // Barra de búsqueda
+                item {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    HomeSearchBar(
+                        searchQuery = uiState.searchQuery,
+                        onSearchQueryChange = { query ->
+                            jobsViewModel.onFilterChange(query, uiState.selectedLocation, uiState.selectedCompany, uiState.selectedJobType, uiState.selectedCrop)
+                        },
+                        onFilterClick = { showAdvancedFilters = true }
+                    )
+                }
+
+                // Avisos Operativos
+                item {
+                    AvisosOperativosSection(
+                        avisos = defaultAvisos,
+                        onVerRutas = onNavigateToRoutes
+                    )
+                }
+
+                // Categorías
+                item {
+                    CategoriasSection(
+                        categorias = defaultCategorias,
+                        onCategoriaClick = { categoria ->
+                            // Buscar la categoría correspondiente en jobTypeCategories o cropCategories
+                            val matchingJobType = uiState.jobTypeCategories.find {
+                                it.name.contains(categoria.nombre, ignoreCase = true)
+                            }
+                            val matchingCrop = uiState.cropCategories.find {
+                                it.name.contains(categoria.nombre, ignoreCase = true)
+                            }
+
+                            if (matchingJobType != null) {
+                                jobsViewModel.onFilterChange(
+                                    uiState.searchQuery,
+                                    uiState.selectedLocation,
+                                    uiState.selectedCompany,
+                                    matchingJobType,
+                                    uiState.selectedCrop
                                 )
-                                jobsViewModel.onLocationFilterChange(provinciaFilter)
-                            }
-                            suggestion.startsWith("Buscar en todo") && locationFilter != null -> {
-                                // Subir a nivel DEPARTAMENTO
-                                val deptoFilter = SelectedLocationFilter(
-                                    departamento = locationFilter.departamento,
-                                    provincia = null,
-                                    distrito = null,
-                                    displayLabel = locationFilter.departamento,
-                                    tipo = LocationType.DEPARTAMENTO
+                            } else if (matchingCrop != null) {
+                                jobsViewModel.onFilterChange(
+                                    uiState.searchQuery,
+                                    uiState.selectedLocation,
+                                    uiState.selectedCompany,
+                                    uiState.selectedJobType,
+                                    matchingCrop
                                 )
-                                jobsViewModel.onLocationFilterChange(deptoFilter)
+                            } else {
+                                // Buscar por nombre en el query
+                                jobsViewModel.onFilterChange(
+                                    categoria.nombre,
+                                    uiState.selectedLocation,
+                                    uiState.selectedCompany,
+                                    uiState.selectedJobType,
+                                    uiState.selectedCrop
+                                )
                             }
-                            suggestion == "Ver todos los trabajos" -> {
-                                // Limpiar todos los filtros
-                                jobsViewModel.clearAllFilters()
-                            }
-                            else -> jobsViewModel.clearAllFilters()
-                        }
-                    },
-                    onClearFilters = {
-                        jobsViewModel.onFilterChange("", null, null, null, null)
+                        },
+                        onVerTodas = { /* Navegar a pantalla de categorías */ }
+                    )
+                }
+
+                // Empleos Destacados (horizontal)
+                item {
+                    if (empleosDestacados.isNotEmpty()) {
+                        EmpleosDestacadosSection(
+                            empleos = empleosDestacados,
+                            onEmpleoClick = { empleo -> jobsViewModel.selectJob(empleo) },
+                            onPostular = { empleo -> jobsViewModel.selectJob(empleo) }
+                        )
                     }
+                }
+
+                // Título "Todos los Empleos"
+                item {
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Text(
+                        text = "Todos los Empleos",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+
+                // Loading state
+                if (uiState.isLoading) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(color = AgroGreen)
+                        }
+                    }
+                } else if (uiState.isError) {
+                    item {
+                        ErrorScreen(
+                            onRetry = { jobsViewModel.retry() },
+                            errorMessage = uiState.errorMessage
+                        )
+                    }
+                } else {
+                    // Lista de todos los empleos
+                    itemsIndexed(uiState.filteredJobs) { index, job ->
+                        if (index == uiState.filteredJobs.size - 1 && uiState.canLoadMore && !uiState.isLoadingMore) {
+                            LaunchedEffect(Unit) { jobsViewModel.loadMoreJobs() }
+                        }
+                        Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                            SafeJobCard(
+                                job = job,
+                                onClick = { jobsViewModel.selectJob(job) },
+                                viewModel = jobsViewModel
+                            )
+                        }
+                    }
+
+                    if (uiState.isLoadingMore) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(color = AgroGreen)
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            // ====================================================
+            // VISTA CON FILTROS: Mostrar resultados filtrados
+            // ====================================================
+            Column(modifier = Modifier.fillMaxSize()) {
+                // Header simplificado con búsqueda
+                HomeSearchBar(
+                    searchQuery = uiState.searchQuery,
+                    onSearchQueryChange = { query ->
+                        jobsViewModel.onFilterChange(query, uiState.selectedLocation, uiState.selectedCompany, uiState.selectedJobType, uiState.selectedCrop)
+                    },
+                    onFilterClick = { showAdvancedFilters = true },
+                    modifier = Modifier.padding(top = 16.dp)
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Contador de resultados y chips de filtros
+                if (!uiState.isLoading && !uiState.isError) {
+                    FilterChipsBar(
+                        resultCount = uiState.filteredJobs.size,
+                        filters = activeFilters,
+                        onRemoveFilter = { filter ->
+                            when (filter.id) {
+                                "location" -> {
+                                    jobsViewModel.onLocationFilterChange(null)
+                                }
+                                "crop" -> jobsViewModel.onFilterChange(
+                                    uiState.searchQuery, uiState.selectedLocation, uiState.selectedCompany,
+                                    uiState.selectedJobType, null
+                                )
+                                "jobType" -> jobsViewModel.onFilterChange(
+                                    uiState.searchQuery, uiState.selectedLocation, uiState.selectedCompany,
+                                    null, uiState.selectedCrop
+                                )
+                                "company" -> jobsViewModel.onFilterChange(
+                                    uiState.searchQuery, uiState.selectedLocation, null,
+                                    uiState.selectedJobType, uiState.selectedCrop
+                                )
+                            }
+                        },
+                        onClearAll = {
+                            jobsViewModel.clearAllFilters()
+                        },
+                        searchQuery = uiState.searchQuery,
+                        locationName = uiState.selectedLocationFilter?.displayLabel ?: uiState.selectedLocation?.name,
+                        isLoading = uiState.isLoading,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+
+                    // Banner para crear alerta
+                    val hasActiveLocationFilter = uiState.selectedLocationFilter != null || uiState.selectedLocation != null
+                    if (uiState.filteredJobs.isNotEmpty() &&
+                        (uiState.searchQuery.isNotBlank() || hasActiveLocationFilter)) {
+                        CreateAlertBanner(
+                            searchQuery = uiState.searchQuery,
+                            locationId = uiState.selectedLocation?.id,
+                            locationName = uiState.selectedLocationFilter?.displayLabel ?: uiState.selectedLocation?.name,
+                            cropId = uiState.selectedCrop?.id,
+                            cropName = uiState.selectedCrop?.name,
+                            jobTypeId = uiState.selectedJobType?.id,
+                            jobTypeName = uiState.selectedJobType?.name,
+                            onDismiss = { /* Usuario rechazó la alerta */ }
+                        )
+                    }
+                }
+
+                when {
+                    uiState.isLoading -> LoadingScreen()
+                    uiState.isError -> ErrorScreen(
+                        onRetry = { jobsViewModel.retry() },
+                        errorMessage = uiState.errorMessage
+                    )
+                    uiState.filteredJobs.isEmpty() -> {
+                        val locationFilter = uiState.selectedLocationFilter
+                        val locationDisplayName = locationFilter?.displayLabel
+                            ?: uiState.selectedLocation?.name
+
+                        val hierarchicalSuggestions = buildList {
+                            if (locationFilter != null) {
+                                when (locationFilter.tipo) {
+                                    LocationType.DISTRITO -> {
+                                        add("Buscar en toda la provincia ${locationFilter.provincia}")
+                                        add("Buscar en todo ${locationFilter.departamento}")
+                                    }
+                                    LocationType.PROVINCIA -> {
+                                        add("Buscar en todo ${locationFilter.departamento}")
+                                    }
+                                    LocationType.DEPARTAMENTO -> { }
+                                }
+                            }
+                            add("Ver todos los trabajos")
+                        }
+
+                        NoResultsMessage(
+                            searchQuery = uiState.searchQuery,
+                            locationName = locationDisplayName,
+                            suggestions = hierarchicalSuggestions,
+                            onSuggestionClick = { suggestion ->
+                                when {
+                                    suggestion.startsWith("Buscar en toda la provincia") && locationFilter != null -> {
+                                        val provinciaFilter = SelectedLocationFilter(
+                                            departamento = locationFilter.departamento,
+                                            provincia = locationFilter.provincia,
+                                            distrito = null,
+                                            displayLabel = "${locationFilter.provincia}, ${locationFilter.departamento}",
+                                            tipo = LocationType.PROVINCIA
+                                        )
+                                        jobsViewModel.onLocationFilterChange(provinciaFilter)
+                                    }
+                                    suggestion.startsWith("Buscar en todo") && locationFilter != null -> {
+                                        val deptoFilter = SelectedLocationFilter(
+                                            departamento = locationFilter.departamento,
+                                            provincia = null,
+                                            distrito = null,
+                                            displayLabel = locationFilter.departamento,
+                                            tipo = LocationType.DEPARTAMENTO
+                                        )
+                                        jobsViewModel.onLocationFilterChange(deptoFilter)
+                                    }
+                                    suggestion == "Ver todos los trabajos" -> {
+                                        jobsViewModel.clearAllFilters()
+                                    }
+                                    else -> jobsViewModel.clearAllFilters()
+                                }
+                            },
+                            onClearFilters = {
+                                jobsViewModel.onFilterChange("", null, null, null, null)
+                            }
+                        )
+                    }
+                    else -> JobsListScreen(
+                        jobs = uiState.filteredJobs,
+                        onJobClicked = { job -> jobsViewModel.selectJob(job) },
+                        onLoadMore = { jobsViewModel.loadMoreJobs() },
+                        onRefresh = { jobsViewModel.refresh() },
+                        isRefreshing = uiState.isLoading,
+                        uiState = uiState,
+                        viewModel = jobsViewModel
+                    )
+                }
+            }
+        }
+    }
+
+    // Modal de filtros avanzados
+    if (showAdvancedFilters) {
+        AdvancedFiltersModal(
+            uiState = uiState,
+            onFilterChange = jobsViewModel::onFilterChange,
+            onLocationFilterChange = jobsViewModel::onLocationFilterChange,
+            onDismiss = { showAdvancedFilters = false }
+        )
+    }
+}
+
+/**
+ * Modal de filtros avanzados
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AdvancedFiltersModal(
+    uiState: JobsScreenState,
+    onFilterChange: (String?, Category?, Category?, Category?, Category?) -> Unit,
+    onLocationFilterChange: (SelectedLocationFilter?) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    var selectedLocation by remember { mutableStateOf<Category?>(uiState.selectedLocation) }
+    var selectedLocationFilter by remember { mutableStateOf<SelectedLocationFilter?>(uiState.selectedLocationFilter) }
+    var selectedCompany by remember { mutableStateOf<Category?>(uiState.selectedCompany) }
+    var selectedJobType by remember { mutableStateOf<Category?>(uiState.selectedJobType) }
+    var selectedCrop by remember { mutableStateOf<Category?>(uiState.selectedCrop) }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = DarkCard
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 32.dp)
+        ) {
+            // Título
+            Text(
+                text = "Filtros Avanzados",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = TextPrimary,
+                modifier = Modifier.padding(bottom = 24.dp)
+            )
+
+            // Buscador de ubicación
+            Text(
+                text = "Ubicacion",
+                style = MaterialTheme.typography.labelLarge,
+                color = TextSecondary,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            agrochamba.com.ui.common.LocationSearchBar(
+                selectedLocation = selectedLocationFilter,
+                onLocationSelected = { filter ->
+                    selectedLocationFilter = filter
+                    selectedLocation = if (filter != null) {
+                        uiState.locationCategories.find {
+                            it.name.equals(filter.departamento, ignoreCase = true)
+                        }
+                    } else null
+                },
+                placeholder = "Donde buscas trabajo?",
+                showGpsButton = true
+            )
+
+            Spacer(Modifier.height(16.dp))
+
+            // Filtro de Cultivo
+            Text(
+                text = "Cultivo",
+                style = MaterialTheme.typography.labelLarge,
+                color = TextSecondary,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                item {
+                    FilterChip(
+                        selected = selectedCrop == null,
+                        onClick = { selectedCrop = null },
+                        label = { Text("Todos", color = if (selectedCrop == null) Color.White else TextSecondary) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = AgroGreen,
+                            containerColor = DarkCardElevated
+                        )
+                    )
+                }
+                items(uiState.cropCategories) { crop ->
+                    FilterChip(
+                        selected = selectedCrop?.id == crop.id,
+                        onClick = { selectedCrop = crop },
+                        label = {
+                            Text(
+                                "${getEmojiForCrop(crop.name)} ${crop.name}",
+                                color = if (selectedCrop?.id == crop.id) Color.White else TextSecondary
+                            )
+                        },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = AgroGreen,
+                            containerColor = DarkCardElevated
+                        )
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            // Filtro de Empresa
+            var isCompanyExpanded by remember { mutableStateOf(false) }
+            Text(
+                text = "Empresa",
+                style = MaterialTheme.typography.labelLarge,
+                color = TextSecondary,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            ExposedDropdownMenuBox(
+                expanded = isCompanyExpanded,
+                onExpandedChange = { isCompanyExpanded = !isCompanyExpanded }
+            ) {
+                OutlinedTextField(
+                    value = selectedCompany?.name ?: "Todas las empresas",
+                    onValueChange = {},
+                    readOnly = true,
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isCompanyExpanded) },
+                    modifier = Modifier.fillMaxWidth().menuAnchor(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        unfocusedContainerColor = DarkCardElevated,
+                        focusedContainerColor = DarkCardElevated,
+                        unfocusedBorderColor = Color.Transparent,
+                        focusedBorderColor = AgroGreen,
+                        unfocusedTextColor = TextPrimary,
+                        focusedTextColor = TextPrimary
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                ExposedDropdownMenu(
+                    expanded = isCompanyExpanded,
+                    onDismissRequest = { isCompanyExpanded = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Todas") },
+                        onClick = { selectedCompany = null; isCompanyExpanded = false }
+                    )
+                    uiState.companyCategories.forEach { item ->
+                        DropdownMenuItem(
+                            text = { Text(item.name) },
+                            onClick = { selectedCompany = item; isCompanyExpanded = false }
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            // Filtro de Tipo de Puesto
+            var isJobTypeExpanded by remember { mutableStateOf(false) }
+            Text(
+                text = "Tipo de Puesto",
+                style = MaterialTheme.typography.labelLarge,
+                color = TextSecondary,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            ExposedDropdownMenuBox(
+                expanded = isJobTypeExpanded,
+                onExpandedChange = { isJobTypeExpanded = !isJobTypeExpanded }
+            ) {
+                OutlinedTextField(
+                    value = selectedJobType?.name ?: "Todos los tipos",
+                    onValueChange = {},
+                    readOnly = true,
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isJobTypeExpanded) },
+                    modifier = Modifier.fillMaxWidth().menuAnchor(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        unfocusedContainerColor = DarkCardElevated,
+                        focusedContainerColor = DarkCardElevated,
+                        unfocusedBorderColor = Color.Transparent,
+                        focusedBorderColor = AgroGreen,
+                        unfocusedTextColor = TextPrimary,
+                        focusedTextColor = TextPrimary
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                ExposedDropdownMenu(
+                    expanded = isJobTypeExpanded,
+                    onDismissRequest = { isJobTypeExpanded = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Todos") },
+                        onClick = { selectedJobType = null; isJobTypeExpanded = false }
+                    )
+                    uiState.jobTypeCategories.forEach { item ->
+                        DropdownMenuItem(
+                            text = { Text(item.name) },
+                            onClick = { selectedJobType = item; isJobTypeExpanded = false }
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(24.dp))
+
+            // Botón aplicar
+            Button(
+                onClick = {
+                    onFilterChange(uiState.searchQuery, selectedLocation, selectedCompany, selectedJobType, selectedCrop)
+                    if (selectedLocationFilter != null) {
+                        onLocationFilterChange(selectedLocationFilter)
+                    }
+                    onDismiss()
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = AgroGreen),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text(
+                    "Aplicar Filtros",
+                    modifier = Modifier.padding(vertical = 8.dp),
+                    fontWeight = FontWeight.Bold
                 )
             }
-            else -> JobsListScreen(
-                jobs = uiState.filteredJobs,
-                onJobClicked = { job -> jobsViewModel.selectJob(job) },
-                onLoadMore = { jobsViewModel.loadMoreJobs() },
-                onRefresh = { jobsViewModel.refresh() },
-                isRefreshing = uiState.isLoading,
-                uiState = uiState,
-                viewModel = jobsViewModel
-            )
         }
     }
 }
