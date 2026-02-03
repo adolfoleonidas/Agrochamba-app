@@ -2,7 +2,7 @@ package agrochamba.com.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Light Theme Colors
+// Light Theme Colors (Default)
 val Green80 = Color(0xFF9CCC65)
 val GreenGrey80 = Color(0xFFC5E1A5)
 val LightGreen80 = Color(0xFFF1F8E9)
@@ -11,7 +11,13 @@ val AgroChambaGreen = Color(0xFF2E7D32)
 val GreenGrey40 = Color(0xFF1B5E20)
 val LightGreen40 = Color(0xFF558B2F)
 
-// Dark Theme Colors (Home Screen Design)
+// Light Theme Background & Surface
+val LightBackground = Color(0xFFF8FAF8)
+val LightSurface = Color(0xFFFFFFFF)
+val LightCard = Color(0xFFFFFFFF)
+val LightCardElevated = Color(0xFFF5F5F5)
+
+// Dark Theme Colors (for dark mode support)
 val DarkBackground = Color(0xFF0D1117)
 val DarkSurface = Color(0xFF161B22)
 val DarkCard = Color(0xFF1C2128)
@@ -33,7 +39,12 @@ val LiveIndicator = Color(0xFFEF4444)    // Rojo para indicador LIVE
 val PremiumBadge = Color(0xFFEF4444)     // Rojo para badge premium
 val UrgentBadge = Color(0xFFF97316)      // Naranja para urgente
 
-// Text Colors for Dark Theme
+// Text Colors - Light Theme (Default)
+val TextPrimaryLight = Color(0xFF1F2937)
+val TextSecondaryLight = Color(0xFF6B7280)
+val TextMutedLight = Color(0xFF9CA3AF)
+
+// Text Colors - Dark Theme
 val TextPrimary = Color(0xFFFFFFFF)
 val TextSecondary = Color(0xFFB0B0B0)
 val TextMuted = Color(0xFF6B7280)

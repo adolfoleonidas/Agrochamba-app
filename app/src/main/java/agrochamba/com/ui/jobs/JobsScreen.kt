@@ -113,13 +113,6 @@ import agrochamba.com.ui.home.HomeHeader
 import agrochamba.com.ui.home.HomeSearchBar
 import agrochamba.com.ui.home.defaultAvisos
 import agrochamba.com.ui.home.defaultCategorias
-import agrochamba.com.ui.theme.AgroGreen
-import agrochamba.com.ui.theme.DarkBackground
-import agrochamba.com.ui.theme.DarkCard
-import agrochamba.com.ui.theme.DarkCardElevated
-import agrochamba.com.ui.theme.TextMuted
-import agrochamba.com.ui.theme.TextPrimary
-import agrochamba.com.ui.theme.TextSecondary
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import kotlinx.coroutines.delay
@@ -329,11 +322,11 @@ fun JobsListWithSearchScreen(
             .take(5)
     }
 
-    // Fondo oscuro para el nuevo diseño
+    // Fondo del tema (claro por defecto)
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(DarkBackground)
+            .background(MaterialTheme.colorScheme.background)
     ) {
         if (!hasActiveFilters) {
             // ====================================================
@@ -427,14 +420,14 @@ fun JobsListWithSearchScreen(
                     }
                 }
 
-                // Título "Todos los Empleos"
+                // Titulo "Todos los Empleos"
                 item {
                     Spacer(modifier = Modifier.height(24.dp))
                     Text(
                         text = "Todos los Empleos",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = TextPrimary,
+                        color = MaterialTheme.colorScheme.onBackground,
                         modifier = Modifier.padding(horizontal = 16.dp)
                     )
                     Spacer(modifier = Modifier.height(12.dp))
@@ -449,7 +442,7 @@ fun JobsListWithSearchScreen(
                                 .padding(32.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            CircularProgressIndicator(color = AgroGreen)
+                            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                         }
                     }
                 } else if (uiState.isError) {
@@ -482,7 +475,7 @@ fun JobsListWithSearchScreen(
                                     .padding(16.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                CircularProgressIndicator(color = AgroGreen)
+                                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                             }
                         }
                     }
@@ -666,7 +659,7 @@ fun AdvancedFiltersModal(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = DarkCard
+        containerColor = MaterialTheme.colorScheme.surface
     ) {
         Column(
             modifier = Modifier
@@ -674,20 +667,20 @@ fun AdvancedFiltersModal(
                 .padding(horizontal = 16.dp)
                 .padding(bottom = 32.dp)
         ) {
-            // Título
+            // Titulo
             Text(
                 text = "Filtros Avanzados",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
-                color = TextPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(bottom = 24.dp)
             )
 
-            // Buscador de ubicación
+            // Buscador de ubicacion
             Text(
                 text = "Ubicacion",
                 style = MaterialTheme.typography.labelLarge,
-                color = TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
             agrochamba.com.ui.common.LocationSearchBar(
@@ -710,7 +703,7 @@ fun AdvancedFiltersModal(
             Text(
                 text = "Cultivo",
                 style = MaterialTheme.typography.labelLarge,
-                color = TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
             LazyRow(
@@ -721,10 +714,10 @@ fun AdvancedFiltersModal(
                     FilterChip(
                         selected = selectedCrop == null,
                         onClick = { selectedCrop = null },
-                        label = { Text("Todos", color = if (selectedCrop == null) Color.White else TextSecondary) },
+                        label = { Text("Todos", color = if (selectedCrop == null) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant) },
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = AgroGreen,
-                            containerColor = DarkCardElevated
+                            selectedContainerColor = MaterialTheme.colorScheme.primary,
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
                         )
                     )
                 }
@@ -735,12 +728,12 @@ fun AdvancedFiltersModal(
                         label = {
                             Text(
                                 "${getEmojiForCrop(crop.name)} ${crop.name}",
-                                color = if (selectedCrop?.id == crop.id) Color.White else TextSecondary
+                                color = if (selectedCrop?.id == crop.id) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         },
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = AgroGreen,
-                            containerColor = DarkCardElevated
+                            selectedContainerColor = MaterialTheme.colorScheme.primary,
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
                         )
                     )
                 }
@@ -753,7 +746,7 @@ fun AdvancedFiltersModal(
             Text(
                 text = "Empresa",
                 style = MaterialTheme.typography.labelLarge,
-                color = TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
             ExposedDropdownMenuBox(
@@ -767,12 +760,12 @@ fun AdvancedFiltersModal(
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isCompanyExpanded) },
                     modifier = Modifier.fillMaxWidth().menuAnchor(),
                     colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedContainerColor = DarkCardElevated,
-                        focusedContainerColor = DarkCardElevated,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                         unfocusedBorderColor = Color.Transparent,
-                        focusedBorderColor = AgroGreen,
-                        unfocusedTextColor = TextPrimary,
-                        focusedTextColor = TextPrimary
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface
                     ),
                     shape = RoundedCornerShape(12.dp)
                 )
@@ -800,7 +793,7 @@ fun AdvancedFiltersModal(
             Text(
                 text = "Tipo de Puesto",
                 style = MaterialTheme.typography.labelLarge,
-                color = TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
             ExposedDropdownMenuBox(
@@ -814,12 +807,12 @@ fun AdvancedFiltersModal(
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isJobTypeExpanded) },
                     modifier = Modifier.fillMaxWidth().menuAnchor(),
                     colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedContainerColor = DarkCardElevated,
-                        focusedContainerColor = DarkCardElevated,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                         unfocusedBorderColor = Color.Transparent,
-                        focusedBorderColor = AgroGreen,
-                        unfocusedTextColor = TextPrimary,
-                        focusedTextColor = TextPrimary
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface
                     ),
                     shape = RoundedCornerShape(12.dp)
                 )
@@ -842,7 +835,7 @@ fun AdvancedFiltersModal(
 
             Spacer(Modifier.height(24.dp))
 
-            // Botón aplicar
+            // Boton aplicar
             Button(
                 onClick = {
                     onFilterChange(uiState.searchQuery, selectedLocation, selectedCompany, selectedJobType, selectedCrop)
@@ -852,7 +845,7 @@ fun AdvancedFiltersModal(
                     onDismiss()
                 },
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = AgroGreen),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Text(

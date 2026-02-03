@@ -1,11 +1,8 @@
 package agrochamba.com.ui.home
 
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,8 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -39,16 +34,11 @@ import androidx.compose.material.icons.outlined.Route
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -66,19 +56,13 @@ import agrochamba.com.data.JobPost
 import agrochamba.com.data.UserProfileResponse
 import agrochamba.com.ui.theme.AgroGreen
 import agrochamba.com.ui.theme.AgroGreenLight
+import agrochamba.com.ui.theme.AgroChambaGreen
 import agrochamba.com.ui.theme.CategoryCosecha
 import agrochamba.com.ui.theme.CategoryIngenieria
 import agrochamba.com.ui.theme.CategoryLogistica
 import agrochamba.com.ui.theme.CategoryMantenimiento
-import agrochamba.com.ui.theme.DarkBackground
-import agrochamba.com.ui.theme.DarkCard
-import agrochamba.com.ui.theme.DarkCardElevated
-import agrochamba.com.ui.theme.DarkSurface
 import agrochamba.com.ui.theme.LiveIndicator
 import agrochamba.com.ui.theme.PremiumBadge
-import agrochamba.com.ui.theme.TextMuted
-import agrochamba.com.ui.theme.TextPrimary
-import agrochamba.com.ui.theme.TextSecondary
 import agrochamba.com.utils.htmlToString
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -117,8 +101,8 @@ fun HomeHeader(
                 modifier = Modifier
                     .size(52.dp)
                     .clip(CircleShape)
-                    .background(DarkCardElevated)
-                    .border(2.dp, AgroGreen, CircleShape),
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 if (profilePhotoUrl != null) {
@@ -137,7 +121,7 @@ fun HomeHeader(
                     Icon(
                         Icons.Default.Person,
                         contentDescription = null,
-                        tint = TextSecondary,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(28.dp)
                     )
                 }
@@ -148,7 +132,7 @@ fun HomeHeader(
                         .align(Alignment.BottomEnd)
                         .size(14.dp)
                         .background(AgroGreen, CircleShape)
-                        .border(2.dp, DarkBackground, CircleShape)
+                        .border(2.dp, MaterialTheme.colorScheme.background, CircleShape)
                 )
             }
 
@@ -159,40 +143,38 @@ fun HomeHeader(
                 Text(
                     text = "Hola, bienvenido!",
                     style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
                     text = displayName,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = TextPrimary
+                    color = MaterialTheme.colorScheme.onBackground
                 )
             }
         }
 
-        // Botón de notificaciones
+        // Boton de notificaciones
         Box(
             modifier = Modifier
                 .size(44.dp)
                 .clip(CircleShape)
-                .background(DarkCardElevated)
+                .background(MaterialTheme.colorScheme.surfaceVariant)
                 .clickable(onClick = onNotificationClick),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 Icons.Default.Notifications,
                 contentDescription = "Notificaciones",
-                tint = TextSecondary,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(24.dp)
             )
-            // Badge de notificaciones (opcional)
-            // Box(modifier = Modifier.align(Alignment.TopEnd).size(8.dp).background(LiveIndicator, CircleShape))
         }
     }
 }
 
 /**
- * Barra de búsqueda estilizada
+ * Barra de busqueda estilizada
  */
 @Composable
 fun HomeSearchBar(
@@ -208,50 +190,50 @@ fun HomeSearchBar(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Campo de búsqueda
+        // Campo de busqueda
         OutlinedTextField(
             value = searchQuery,
             onValueChange = onSearchQueryChange,
             placeholder = {
                 Text(
                     "Que trabajo buscas hoy?",
-                    color = TextMuted
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             },
             leadingIcon = {
                 Icon(
                     Icons.Default.Search,
                     contentDescription = "Buscar",
-                    tint = TextMuted
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             },
             modifier = Modifier.weight(1f),
             shape = RoundedCornerShape(16.dp),
             colors = OutlinedTextFieldDefaults.colors(
-                unfocusedContainerColor = DarkCard,
-                focusedContainerColor = DarkCard,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                 unfocusedBorderColor = Color.Transparent,
-                focusedBorderColor = AgroGreen,
-                cursorColor = AgroGreen,
-                focusedTextColor = TextPrimary,
-                unfocusedTextColor = TextPrimary
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                cursorColor = MaterialTheme.colorScheme.primary,
+                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
             ),
             singleLine = true
         )
 
-        // Botón de filtros
+        // Boton de filtros
         Box(
             modifier = Modifier
                 .size(56.dp)
                 .clip(RoundedCornerShape(16.dp))
-                .background(AgroGreen)
+                .background(MaterialTheme.colorScheme.primary)
                 .clickable(onClick = onFilterClick),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 Icons.Default.Tune,
                 contentDescription = "Filtros",
-                tint = Color.White,
+                tint = MaterialTheme.colorScheme.onPrimary,
                 modifier = Modifier.size(24.dp)
             )
         }
@@ -259,7 +241,7 @@ fun HomeSearchBar(
 }
 
 /**
- * Sección de Avisos Operativos con carrusel
+ * Seccion de Avisos Operativos con carrusel
  */
 @Composable
 fun AvisosOperativosSection(
@@ -268,7 +250,7 @@ fun AvisosOperativosSection(
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.padding(top = 24.dp)) {
-        // Header de la sección
+        // Header de la seccion
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -280,7 +262,7 @@ fun AvisosOperativosSection(
                 text = "AVISOS OPERATIVOS",
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Bold,
-                color = TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 letterSpacing = 1.sp
             )
 
@@ -328,7 +310,10 @@ fun AvisosOperativosSection(
                         .padding(horizontal = 3.dp)
                         .size(if (index == 0) 20.dp else 8.dp, 8.dp)
                         .clip(RoundedCornerShape(4.dp))
-                        .background(if (index == 0) AgroGreen else DarkCardElevated)
+                        .background(
+                            if (index == 0) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.surfaceVariant
+                        )
                 )
             }
         }
@@ -346,7 +331,8 @@ fun AvisoCard(
     Card(
         modifier = Modifier.width(300.dp),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = DarkCard)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             // Header con icono
@@ -358,13 +344,13 @@ fun AvisoCard(
                     modifier = Modifier
                         .size(32.dp)
                         .clip(CircleShape)
-                        .background(AgroGreen.copy(alpha = 0.2f)),
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         aviso.icon,
                         contentDescription = null,
-                        tint = AgroGreen,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -372,7 +358,7 @@ fun AvisoCard(
                     text = aviso.titulo,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
-                    color = TextPrimary
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
 
@@ -393,12 +379,12 @@ fun AvisoCard(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Botón de acción
+            // Boton de accion
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
-                    .background(DarkCardElevated)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
                     .clickable(onClick = onVerRutas)
                     .padding(12.dp),
                 contentAlignment = Alignment.Center
@@ -410,14 +396,14 @@ fun AvisoCard(
                     Icon(
                         Icons.Outlined.Route,
                         contentDescription = null,
-                        tint = AgroGreen,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(18.dp)
                     )
                     Text(
                         text = "Ver Rutas de Hoy",
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Medium,
-                        color = AgroGreen
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
             }
@@ -432,15 +418,31 @@ private fun HorarioIngresoContent(aviso: AvisoOperativo.HorarioIngreso) {
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text("Operativos", color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
-            Text(aviso.horaOperativos, color = AgroGreen, fontWeight = FontWeight.Bold)
+            Text(
+                "Operativos",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Text(
+                aviso.horaOperativos,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold
+            )
         }
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text("Administrativos", color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
-            Text(aviso.horaAdministrativos, color = AgroGreen, fontWeight = FontWeight.Bold)
+            Text(
+                "Administrativos",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Text(
+                aviso.horaAdministrativos,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold
+            )
         }
     }
 }
@@ -450,7 +452,7 @@ private fun AlertaClimaContent(aviso: AvisoOperativo.AlertaClima) {
     Text(
         text = aviso.mensaje,
         style = MaterialTheme.typography.bodyMedium,
-        color = TextSecondary
+        color = MaterialTheme.colorScheme.onSurfaceVariant
     )
 }
 
@@ -459,14 +461,14 @@ private fun AnuncioContent(aviso: AvisoOperativo.Anuncio) {
     Text(
         text = aviso.mensaje,
         style = MaterialTheme.typography.bodyMedium,
-        color = TextSecondary,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         maxLines = 3,
         overflow = TextOverflow.Ellipsis
     )
 }
 
 /**
- * Sección de Categorías
+ * Seccion de Categorias
  */
 @Composable
 fun CategoriasSection(
@@ -488,20 +490,20 @@ fun CategoriasSection(
                 text = "Categorias",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
-                color = TextPrimary
+                color = MaterialTheme.colorScheme.onBackground
             )
             Text(
                 text = "VER TODAS",
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Bold,
-                color = AgroGreen,
+                color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.clickable(onClick = onVerTodas)
             )
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Grid de categorías
+        // Grid de categorias
         LazyRow(
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
@@ -545,14 +547,14 @@ fun CategoriaItem(
         Text(
             text = categoria.nombre,
             style = MaterialTheme.typography.bodySmall,
-            color = TextSecondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontWeight = FontWeight.Medium
         )
     }
 }
 
 /**
- * Sección de Empleos Destacados
+ * Seccion de Empleos Destacados
  */
 @Composable
 fun EmpleosDestacadosSection(
@@ -567,7 +569,7 @@ fun EmpleosDestacadosSection(
             text = "Empleos Destacados",
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
-            color = TextPrimary,
+            color = MaterialTheme.colorScheme.onBackground,
             modifier = Modifier.padding(horizontal = 16.dp)
         )
 
@@ -639,8 +641,8 @@ fun EmpleoDestacadoCard(
                         .background(
                             Brush.verticalGradient(
                                 colors = listOf(
-                                    AgroGreen.copy(alpha = 0.3f),
-                                    DarkCard
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
+                                    MaterialTheme.colorScheme.surfaceVariant
                                 )
                             )
                         )
@@ -688,9 +690,9 @@ fun EmpleoDestacadoCard(
                     .align(Alignment.BottomStart)
                     .padding(16.dp)
             ) {
-                // Título del empleo
+                // Titulo del empleo
                 Text(
-                    text = empleo.title?.rendered?.htmlToString() ?: "Sin título",
+                    text = empleo.title?.rendered?.htmlToString() ?: "Sin titulo",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
@@ -700,12 +702,12 @@ fun EmpleoDestacadoCard(
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                // Empresa y ubicación
+                // Empresa y ubicacion
                 Text(
                     text = buildString {
                         append(companyName.htmlToString())
                         if (locationName.isNotBlank()) {
-                            append(" • ")
+                            append(" - ")
                             append(locationName)
                         }
                     },
@@ -717,7 +719,7 @@ fun EmpleoDestacadoCard(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Salario y botón postular
+                // Salario y boton postular
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -741,7 +743,7 @@ fun EmpleoDestacadoCard(
                         Spacer(modifier = Modifier.width(1.dp))
                     }
 
-                    // Botón Postular
+                    // Boton Postular
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(24.dp))
@@ -787,7 +789,7 @@ sealed class AvisoOperativo(
     ) : AvisoOperativo(titulo, icon)
 }
 
-// Data class para categorías
+// Data class para categorias
 data class CategoriaJob(
     val id: String,
     val nombre: String,
@@ -796,7 +798,7 @@ data class CategoriaJob(
     val iconColor: Color = Color.White
 )
 
-// Categorías por defecto
+// Categorias por defecto
 val defaultCategorias = listOf(
     CategoriaJob(
         id = "cosecha",
@@ -832,6 +834,6 @@ val defaultCategorias = listOf(
 val defaultAvisos = listOf(
     AvisoOperativo.HorarioIngreso(),
     AvisoOperativo.AlertaClima(
-        mensaje = "La temperatura de hoy será de 28°C. Se recomienda hidratarse constantemente."
+        mensaje = "La temperatura de hoy sera de 28C. Se recomienda hidratarse constantemente."
     )
 )
