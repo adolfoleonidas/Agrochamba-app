@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Agriculture
+import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Engineering
 import androidx.compose.material.icons.filled.LocalShipping
@@ -31,6 +32,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.Route
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -38,7 +40,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -328,6 +337,16 @@ fun AvisoCard(
     aviso: AvisoOperativo,
     onVerRutas: () -> Unit
 ) {
+    var showResumenDialog by remember { mutableStateOf(false) }
+
+    // Dialog para ResumenTrabajos
+    if (aviso is AvisoOperativo.ResumenTrabajos && showResumenDialog) {
+        ResumenTrabajosDialog(
+            aviso = aviso,
+            onDismiss = { showResumenDialog = false }
+        )
+    }
+
     Card(
         modifier = Modifier.width(300.dp),
         shape = RoundedCornerShape(16.dp),
@@ -375,36 +394,44 @@ fun AvisoCard(
                 is AvisoOperativo.Anuncio -> {
                     AnuncioContent(aviso)
                 }
+                is AvisoOperativo.ResumenTrabajos -> {
+                    ResumenTrabajosContent(
+                        aviso = aviso,
+                        onLeerMas = { showResumenDialog = true }
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Boton de accion
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .clickable(onClick = onVerRutas)
-                    .padding(12.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+            // Boton de accion (solo para avisos que no son ResumenTrabajos)
+            if (aviso !is AvisoOperativo.ResumenTrabajos) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .clickable(onClick = onVerRutas)
+                        .padding(12.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        Icons.Outlined.Route,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Text(
-                        text = "Ver Rutas de Hoy",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            Icons.Outlined.Route,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                            text = "Ver Rutas de Hoy",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
             }
         }
@@ -464,6 +491,120 @@ private fun AnuncioContent(aviso: AvisoOperativo.Anuncio) {
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         maxLines = 3,
         overflow = TextOverflow.Ellipsis
+    )
+}
+
+@Composable
+private fun ResumenTrabajosContent(
+    aviso: AvisoOperativo.ResumenTrabajos,
+    onLeerMas: () -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        // Ubicacion badge
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
+                .padding(horizontal = 8.dp, vertical = 4.dp)
+        ) {
+            Text(
+                text = "📍 ${aviso.ubicacion}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Medium
+            )
+        }
+
+        // Preview del contenido
+        Text(
+            text = aviso.preview,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis,
+            lineHeight = 20.sp
+        )
+
+        // Boton Leer mas
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.primary)
+                .clickable(onClick = onLeerMas)
+                .padding(12.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "Leer más",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimary
+            )
+        }
+    }
+}
+
+/**
+ * Dialog para mostrar el contenido completo del Resumen de Trabajos
+ */
+@Composable
+fun ResumenTrabajosDialog(
+    aviso: AvisoOperativo.ResumenTrabajos,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    aviso.icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+                Column {
+                    Text(
+                        text = aviso.titulo,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "📍 ${aviso.ubicacion}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Text(
+                    text = aviso.contenidoCompleto,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 24.sp
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(
+                    text = "Cerrar",
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        },
+        containerColor = MaterialTheme.colorScheme.surface,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurfaceVariant
     )
 }
 
@@ -787,6 +928,14 @@ sealed class AvisoOperativo(
         override val icon: ImageVector = Icons.Default.Notifications,
         val mensaje: String
     ) : AvisoOperativo(titulo, icon)
+
+    data class ResumenTrabajos(
+        override val titulo: String = "RESUMEN DE TRABAJOS",
+        override val icon: ImageVector = Icons.Default.Assignment,
+        val ubicacion: String,
+        val preview: String,
+        val contenidoCompleto: String
+    ) : AvisoOperativo(titulo, icon)
 }
 
 // Data class para categorias
@@ -832,6 +981,22 @@ val defaultCategorias = listOf(
 
 // Avisos de ejemplo
 val defaultAvisos = listOf(
+    AvisoOperativo.ResumenTrabajos(
+        ubicacion = "Ica",
+        preview = "• Beta recibirá personal para siembra de arándanos.\n• Athos requiere personal con experiencia para cosecha de granada...",
+        contenidoCompleto = """📋 Resumen de trabajos para mañana en Ica
+
+• Beta recibirá personal para siembra de arándanos.
+• Athos requiere personal con experiencia para cosecha de granada.
+• Agrícola Don Ricardo busca operarios para packing de uva.
+• Camposol tiene vacantes para mantenimiento de sistemas de riego.
+• Virú necesita supervisores de campo para espárrago.
+
+⚠️ Importante:
+Es fundamental asistir desde temprano para asegurar tu lugar. ¡No dejes pasar esta oportunidad!
+
+📱 Descarga la app para recibir notificaciones de nuevas ofertas."""
+    ),
     AvisoOperativo.HorarioIngreso(),
     AvisoOperativo.AlertaClima(
         mensaje = "La temperatura de hoy sera de 28C. Se recomienda hidratarse constantemente."
