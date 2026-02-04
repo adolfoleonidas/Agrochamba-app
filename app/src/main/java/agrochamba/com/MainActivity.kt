@@ -94,6 +94,7 @@ sealed class Screen(val route: String, val label: String? = null, val icon: Imag
     object SedesManagement : Screen("sedes_management")
     object QrScanner : Screen("qr_scanner")
     object Credits : Screen("credits")
+    object Rendimiento : Screen("rendimiento")
     object Payment : Screen("payment/{jobId}/{amount}/{currency}") {
         fun createRoute(jobId: Int, amount: Double, currency: String): String {
             return "payment/$jobId/$amount/$currency"
@@ -404,8 +405,13 @@ fun MainAppScreen() {
 
         NavHost(navController, startDestination = Screen.Jobs.route, Modifier.padding(innerPadding)) {
             composable(Screen.Jobs.route) {
+                // TODO: Obtener rendimiento real del usuario desde el backend
+                // Por ahora usamos un valor placeholder (null = no mostrar badge)
+                val rendimientoScore: Int? = 146 // Placeholder - conectar con API cuando esté lista
+
                 JobsScreen(
                     userProfile = userProfile,
+                    rendimientoScore = rendimientoScore,
                     onNavigateToProfile = {
                         navController.navigate(Screen.Profile.route) {
                             launchSingleTop = true
@@ -419,6 +425,11 @@ fun MainAppScreen() {
                     },
                     onNavigateToRoutes = {
                         navController.navigate(Screen.Routes.route) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateToRendimiento = {
+                        navController.navigate(Screen.Rendimiento.route) {
                             launchSingleTop = true
                         }
                     }
@@ -502,6 +513,12 @@ fun MainAppScreen() {
             // Pantalla de créditos
             composable(Screen.Credits.route) {
                 CreditsScreen(navController = navController)
+            }
+            // Pantalla de rendimiento del trabajador
+            composable(Screen.Rendimiento.route) {
+                agrochamba.com.ui.rendimiento.RendimientoScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
             }
             // Pantalla de pago con Mercado Pago
             composable(Screen.Payment.route) { backStackEntry ->

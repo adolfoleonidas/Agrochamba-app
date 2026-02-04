@@ -196,9 +196,11 @@ fun formatDate(dateString: String?): String {
 fun JobsScreen(
     jobsViewModel: JobsViewModel = viewModel(),
     userProfile: UserProfileResponse? = null,
+    rendimientoScore: Int? = null,
     onNavigateToProfile: () -> Unit = {},
     onNavigateToNotifications: () -> Unit = {},
-    onNavigateToRoutes: () -> Unit = {}
+    onNavigateToRoutes: () -> Unit = {},
+    onNavigateToRendimiento: () -> Unit = {}
 ) {
     android.util.Log.d("JobsScreen", "📱 JobsScreen() INICIADO")
 
@@ -340,8 +342,10 @@ fun JobsListWithSearchScreen(
                 item {
                     HomeHeader(
                         userProfile = userProfile,
+                        rendimientoScore = rendimientoScore,
                         onNotificationClick = onNavigateToNotifications,
-                        onProfileClick = onNavigateToProfile
+                        onProfileClick = onNavigateToProfile,
+                        onRendimientoClick = onNavigateToRendimiento
                     )
                 }
 

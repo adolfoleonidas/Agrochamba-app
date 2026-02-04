@@ -23,12 +23,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Agriculture
 import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Engineering
 import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Stars
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.Route
@@ -77,13 +79,15 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 
 /**
- * Header del Home con saludo, foto de perfil y notificaciones
+ * Header del Home con saludo, foto de perfil, rendimiento y notificaciones
  */
 @Composable
 fun HomeHeader(
     userProfile: UserProfileResponse?,
+    rendimientoScore: Int? = null,
     onNotificationClick: () -> Unit,
     onProfileClick: () -> Unit,
+    onRendimientoClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val displayName = userProfile?.displayName
@@ -103,7 +107,7 @@ fun HomeHeader(
         // Foto de perfil y saludo
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.clickable(onClick = onProfileClick)
+            modifier = Modifier.weight(1f)
         ) {
             // Avatar
             Box(
@@ -111,7 +115,8 @@ fun HomeHeader(
                     .size(52.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape),
+                    .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                    .clickable(onClick = onProfileClick),
                 contentAlignment = Alignment.Center
             ) {
                 if (profilePhotoUrl != null) {
@@ -147,8 +152,8 @@ fun HomeHeader(
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            // Textos de saludo
-            Column {
+            // Textos de saludo y rendimiento
+            Column(modifier = Modifier.clickable(onClick = onProfileClick)) {
                 Text(
                     text = "Hola, bienvenido!",
                     style = MaterialTheme.typography.bodySmall,
@@ -161,6 +166,40 @@ fun HomeHeader(
                     color = MaterialTheme.colorScheme.onBackground
                 )
             }
+        }
+
+        // Badge de rendimiento (si hay puntaje)
+        if (rendimientoScore != null) {
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer)
+                    .clickable(onClick = onRendimientoClick)
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Icon(
+                    Icons.Default.Stars,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(
+                    text = rendimientoScore.toString(),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Icon(
+                    Icons.Default.ChevronRight,
+                    contentDescription = "Ver rendimiento",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
         }
 
         // Boton de notificaciones
