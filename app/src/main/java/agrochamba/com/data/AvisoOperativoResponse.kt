@@ -50,3 +50,15 @@ data class AvisosListResponse(
     @Json(name = "per_page")
     val perPage: Int
 )
+
+/**
+ * Respuesta al crear un aviso
+ */
+@JsonClass(generateAdapter = true)
+data class CreateAvisoResponse(
+    val success: Boolean,
+    val message: String,
+    @Json(name = "post_id")
+    val postId: Int? = null,
+    val aviso: AvisoOperativoResponse? = null
+)

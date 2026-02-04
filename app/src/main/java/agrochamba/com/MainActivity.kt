@@ -66,6 +66,8 @@ import agrochamba.com.ui.scanner.QrScannerScreen
 import agrochamba.com.ui.theme.AgrochambaTheme
 import agrochamba.com.ui.WebViewScreen
 import agrochamba.com.ui.auth.ProfileViewModel
+import agrochamba.com.ui.fotocheck.FotocheckScreen
+import agrochamba.com.ui.rendimiento.RendimientoScreen
 
 sealed class Screen(val route: String, val label: String? = null, val icon: ImageVector? = null) {
     object Jobs : Screen("jobs", "Chambas", Icons.Default.Work)
@@ -95,6 +97,7 @@ sealed class Screen(val route: String, val label: String? = null, val icon: Imag
     object QrScanner : Screen("qr_scanner")
     object Credits : Screen("credits")
     object Rendimiento : Screen("rendimiento")
+    object Fotocheck : Screen("fotocheck")
     object Payment : Screen("payment/{jobId}/{amount}/{currency}") {
         fun createRoute(jobId: Int, amount: Double, currency: String): String {
             return "payment/$jobId/$amount/$currency"
@@ -432,6 +435,11 @@ fun MainAppScreen() {
                         navController.navigate(Screen.Rendimiento.route) {
                             launchSingleTop = true
                         }
+                    },
+                    onNavigateToFotocheck = {
+                        navController.navigate(Screen.Fotocheck.route) {
+                            launchSingleTop = true
+                        }
                     }
                 )
             }
@@ -516,8 +524,14 @@ fun MainAppScreen() {
             }
             // Pantalla de rendimiento del trabajador
             composable(Screen.Rendimiento.route) {
-                agrochamba.com.ui.rendimiento.RendimientoScreen(
+                RendimientoScreen(
                     onNavigateBack = { navController.popBackStack() }
+                )
+            }
+            composable(Screen.Fotocheck.route) {
+                FotocheckScreen(
+                    userProfile = profileViewModel.userProfile.value,
+                    onBack = { navController.popBackStack() }
                 )
             }
             // Pantalla de pago con Mercado Pago

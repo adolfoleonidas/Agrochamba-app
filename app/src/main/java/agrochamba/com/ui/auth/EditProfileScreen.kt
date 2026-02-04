@@ -45,6 +45,7 @@ fun EditProfileScreen(navController: NavController, viewModel: ProfileViewModel 
     var lastName by remember { mutableStateOf(profile?.lastName ?: "") }
     var email by remember { mutableStateOf(profile?.email ?: "") }
     var phone by remember { mutableStateOf(profile?.phone ?: "") }
+    var dni by remember { mutableStateOf(profile?.dni ?: "") }
     var bio by remember { mutableStateOf(profile?.bio ?: "") }
     var companyDescription by remember { mutableStateOf(profile?.companyDescription ?: "") }
     var companyAddress by remember { mutableStateOf(profile?.companyAddress ?: "") }
@@ -64,6 +65,7 @@ fun EditProfileScreen(navController: NavController, viewModel: ProfileViewModel 
             lastName = it.lastName ?: ""
             email = it.email
             phone = it.phone ?: ""
+            dni = it.dni ?: ""
             bio = it.bio ?: ""
             companyDescription = it.companyDescription ?: ""
             companyAddress = it.companyAddress ?: ""
@@ -274,6 +276,29 @@ fun EditProfileScreen(navController: NavController, viewModel: ProfileViewModel 
                     enabled = !uiState.isLoading
                 )
 
+                // Campo DNI solo para trabajadores (no empresas)
+                if (profile?.isEnterprise != true) {
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    OutlinedTextField(
+                        value = dni,
+                        onValueChange = { newValue ->
+                            // Solo permitir números y máximo 8 dígitos
+                            if (newValue.all { it.isDigit() } && newValue.length <= 8) {
+                                dni = newValue
+                            }
+                        },
+                        label = { Text("DNI") },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !uiState.isLoading,
+                        placeholder = { Text("8 dígitos") },
+                        supportingText = {
+                            Text("Para tu fotocheck virtual")
+                        },
+                        isError = dni.isNotEmpty() && dni.length != 8
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(16.dp))
 
                 OutlinedTextField(
@@ -417,7 +442,12 @@ fun EditProfileScreen(navController: NavController, viewModel: ProfileViewModel 
                                 "phone" to phone,
                                 "bio" to bio
                             )
-                            
+
+                            // Si es trabajador y tiene DNI válido, agregarlo
+                            if (profile?.isEnterprise != true && dni.length == 8) {
+                                profileData["dni"] = dni
+                            }
+
                             // Si es empresa, agregar información de empresa
                             if (profile?.isEnterprise == true) {
                                 profileData["company_description"] = companyDescription

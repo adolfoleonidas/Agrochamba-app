@@ -17,6 +17,7 @@ object AuthManager {
     private const val KEY_DISPLAY_NAME = "user_display_name"
     private const val KEY_ROLES = "user_roles"
     private const val KEY_COMPANY_ID = "user_company_id"
+    private const val KEY_USER_DNI = "user_dni"
 
     private var prefs: SharedPreferences? = null
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())

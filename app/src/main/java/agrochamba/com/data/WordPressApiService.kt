@@ -80,6 +80,12 @@ interface WordPressApiService {
         @Query("per_page") perPage: Int = 10
     ): List<AvisoOperativoResponse>
 
+    @POST("agrochamba/v1/avisos")
+    suspend fun createAviso(
+        @Header("Authorization") token: String,
+        @Body data: Map<String, @JvmSuppressWildcards Any>
+    ): CreateAvisoResponse
+
     @GET("wp/v2/media")
     suspend fun getMediaForPost(@Query("parent") postId: Int): List<MediaItem>
 

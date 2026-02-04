@@ -38,6 +38,8 @@ import androidx.compose.material.icons.filled.ToggleOff
 import androidx.compose.material.icons.filled.ToggleOn
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Work
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.QrCode2
 import androidx.compose.material.icons.outlined.Route
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -96,6 +98,7 @@ fun HomeHeader(
     onNotificationClick: () -> Unit,
     onProfileClick: () -> Unit,
     onRendimientoClick: () -> Unit = {},
+    onFotocheckClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val displayName = userProfile?.displayName
@@ -104,125 +107,300 @@ fun HomeHeader(
         ?: "Usuario"
 
     val profilePhotoUrl = userProfile?.profilePhotoUrl
+    val isWorker = userProfile?.isEnterprise != true
 
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Foto de perfil y saludo
+    Column(modifier = modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+        // Fila superior: Avatar, nombre y notificaciones
         Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // Avatar
-            Box(
-                modifier = Modifier
-                    .size(52.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape)
-                    .clickable(onClick = onProfileClick),
-                contentAlignment = Alignment.Center
+            // Foto de perfil y saludo
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
             ) {
-                if (profilePhotoUrl != null) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data(profilePhotoUrl)
-                            .crossfade(true)
-                            .build(),
-                        contentDescription = "Foto de perfil",
+                // Avatar
+                Box(
+                    modifier = Modifier
+                        .size(52.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                        .clickable(onClick = onProfileClick),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (profilePhotoUrl != null) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(profilePhotoUrl)
+                                .crossfade(true)
+                                .build(),
+                            contentDescription = "Foto de perfil",
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(CircleShape),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Icon(
+                            Icons.Default.Person,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+
+                    // Indicador de estado online
+                    Box(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .clip(CircleShape),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    Icon(
-                        Icons.Default.Person,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(28.dp)
+                            .align(Alignment.BottomEnd)
+                            .size(14.dp)
+                            .background(AgroGreen, CircleShape)
+                            .border(2.dp, MaterialTheme.colorScheme.background, CircleShape)
                     )
                 }
 
-                // Indicador de estado online
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .size(14.dp)
-                        .background(AgroGreen, CircleShape)
-                        .border(2.dp, MaterialTheme.colorScheme.background, CircleShape)
-                )
+                Spacer(modifier = Modifier.width(12.dp))
+
+                // Textos de saludo
+                Column(modifier = Modifier.clickable(onClick = onProfileClick)) {
+                    Text(
+                        text = "Hola, bienvenido!",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = displayName,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
-
-            // Textos de saludo y rendimiento
-            Column(modifier = Modifier.clickable(onClick = onProfileClick)) {
-                Text(
-                    text = "Hola, bienvenido!",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = displayName,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-            }
-        }
-
-        // Badge de rendimiento (si hay puntaje)
-        if (rendimientoScore != null) {
-            Row(
+            // Boton de notificaciones
+            Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.primaryContainer)
-                    .clickable(onClick = onRendimientoClick)
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .clickable(onClick = onNotificationClick),
+                contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    Icons.Default.Stars,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(16.dp)
-                )
-                Text(
-                    text = rendimientoScore.toString(),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Icon(
-                    Icons.Default.ChevronRight,
-                    contentDescription = "Ver rendimiento",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp)
+                    Icons.Default.Notifications,
+                    contentDescription = "Notificaciones",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(24.dp)
                 )
             }
-
-            Spacer(modifier = Modifier.width(8.dp))
         }
 
-        // Boton de notificaciones
+        // Solo para trabajadores: Puntajes y Fotocheck
+        if (isWorker) {
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Fila de acciones rápidas: Rendimiento y Fotocheck
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Card de Rendimiento/Puntajes
+                Card(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable(onClick = onRendimientoClick),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Stars,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Column {
+                                Text(
+                                    text = "Mi Rendimiento",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = if (rendimientoScore != null) "$rendimientoScore pts" else "Ver puntajes",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = "Ver más",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+
+                // Card de Fotocheck QR
+                Card(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable(onClick = onFotocheckClick),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.QrCode2,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.secondary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Column {
+                                Text(
+                                    text = "Fotocheck",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = "Mostrar QR",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.secondary
+                                )
+                            }
+                        }
+                        Icon(
+                            Icons.Default.ChevronRight,
+                            contentDescription = "Abrir",
+                            tint = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Barra de busqueda estilizada - Abre pantalla de búsqueda al tocar
+ */
+@Composable
+fun HomeSearchBar(
+    searchQuery: String,
+    locationLabel: String? = null,
+    onSearchClick: () -> Unit,
+    onFilterClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        // Campo de búsqueda (clickeable, no editable)
+        Card(
+            modifier = Modifier
+                .weight(1f)
+                .height(56.dp)
+                .clickable(onClick = onSearchClick),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Icon(
+                    Icons.Default.Search,
+                    contentDescription = "Buscar",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(24.dp)
+                )
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    if (searchQuery.isNotBlank() || locationLabel != null) {
+                        // Mostrar búsqueda activa
+                        Text(
+                            text = searchQuery.ifBlank { "Buscar trabajo" },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        if (locationLabel != null) {
+                            Text(
+                                text = locationLabel,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    } else {
+                        // Placeholder
+                        Text(
+                            text = "¿Qué trabajo buscas hoy?",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+
+        // Boton de filtros avanzados
         Box(
             modifier = Modifier
-                .size(44.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .clickable(onClick = onNotificationClick),
+                .size(56.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.primary)
+                .clickable(onClick = onFilterClick),
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                Icons.Default.Notifications,
-                contentDescription = "Notificaciones",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                Icons.Default.Tune,
+                contentDescription = "Filtros",
+                tint = MaterialTheme.colorScheme.onPrimary,
                 modifier = Modifier.size(24.dp)
             )
         }
@@ -230,10 +408,10 @@ fun HomeHeader(
 }
 
 /**
- * Barra de busqueda estilizada
+ * Barra de búsqueda editable (para la pantalla de búsqueda)
  */
 @Composable
-fun HomeSearchBar(
+fun HomeSearchBarEditable(
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
     onFilterClick: () -> Unit,
@@ -246,13 +424,13 @@ fun HomeSearchBar(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Campo de busqueda
+        // Campo de búsqueda editable
         OutlinedTextField(
             value = searchQuery,
             onValueChange = onSearchQueryChange,
             placeholder = {
                 Text(
-                    "Que trabajo buscas hoy?",
+                    "¿Qué trabajo buscas hoy?",
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             },
@@ -303,8 +481,23 @@ fun HomeSearchBar(
 fun AvisosOperativosSection(
     avisos: List<AvisoOperativo>,
     onVerRutas: () -> Unit,
+    isAdminOrEmpresa: Boolean = false,
+    onCrearAviso: (TipoAviso, String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
+    var showCrearAvisoDialog by remember { mutableStateOf(false) }
+
+    // Dialog para crear aviso
+    if (showCrearAvisoDialog) {
+        CrearAvisoDialog(
+            onDismiss = { showCrearAvisoDialog = false },
+            onPublicar = { tipo, mensaje ->
+                onCrearAviso(tipo, mensaje)
+                showCrearAvisoDialog = false
+            }
+        )
+    }
+
     Column(modifier = modifier.padding(top = 24.dp)) {
         // Header de la seccion
         Row(
@@ -343,6 +536,15 @@ fun AvisosOperativosSection(
 
         Spacer(modifier = Modifier.height(12.dp))
 
+        // Campo para crear aviso (solo admin/empresa)
+        if (isAdminOrEmpresa) {
+            CrearAvisoPrompt(
+                onClick = { showCrearAvisoDialog = true },
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+        }
+
         // Carrusel de avisos
         LazyRow(
             contentPadding = PaddingValues(horizontal = 16.dp),
@@ -377,7 +579,193 @@ fun AvisosOperativosSection(
 }
 
 /**
- * Card de Aviso Operativo
+ * Prompt estilo Facebook para crear aviso
+ */
+@Composable
+fun CrearAvisoPrompt(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.Notifications,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Text(
+                text = "¿Qué quieres comunicar hoy?",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+/**
+ * Tipos de aviso disponibles
+ */
+enum class TipoAviso(val label: String, val icon: ImageVector) {
+    ANUNCIO("Anuncio general", Icons.Default.Notifications),
+    HORARIO("Horario de ingreso", Icons.Default.Schedule),
+    CLIMA("Alerta de clima", Icons.Default.Warning),
+    RESUMEN("Resumen de trabajos", Icons.Default.Assignment)
+}
+
+/**
+ * Dialog para crear un nuevo aviso operativo
+ */
+@Composable
+fun CrearAvisoDialog(
+    onDismiss: () -> Unit,
+    onPublicar: (TipoAviso, String) -> Unit
+) {
+    var tipoSeleccionado by remember { mutableStateOf(TipoAviso.ANUNCIO) }
+    var mensaje by remember { mutableStateOf("") }
+    var expanded by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Crear Aviso Operativo",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Selector de tipo
+                Text(
+                    text = "Tipo de aviso",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                // Dropdown simulado con cards
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TipoAviso.entries.forEach { tipo ->
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { tipoSeleccionado = tipo },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (tipoSeleccionado == tipo)
+                                    MaterialTheme.colorScheme.primaryContainer
+                                else
+                                    MaterialTheme.colorScheme.surfaceVariant
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Icon(
+                                    tipo.icon,
+                                    contentDescription = null,
+                                    tint = if (tipoSeleccionado == tipo)
+                                        MaterialTheme.colorScheme.primary
+                                    else
+                                        MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text(
+                                    text = tipo.label,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = if (tipoSeleccionado == tipo) FontWeight.SemiBold else FontWeight.Normal,
+                                    color = if (tipoSeleccionado == tipo)
+                                        MaterialTheme.colorScheme.primary
+                                    else
+                                        MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Campo de mensaje
+                OutlinedTextField(
+                    value = mensaje,
+                    onValueChange = { mensaje = it },
+                    placeholder = {
+                        Text(
+                            text = when (tipoSeleccionado) {
+                                TipoAviso.ANUNCIO -> "Escribe tu anuncio..."
+                                TipoAviso.HORARIO -> "Ej: Operativos 6:00 AM, Administrativos 8:00 AM"
+                                TipoAviso.CLIMA -> "Ej: Temperatura de 28°C, recuerden hidratarse"
+                                TipoAviso.RESUMEN -> "Escribe el resumen de trabajos disponibles..."
+                            }
+                        )
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(120.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                    )
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onPublicar(tipoSeleccionado, mensaje) },
+                enabled = mensaje.isNotBlank()
+            ) {
+                Text(
+                    text = "Publicar",
+                    fontWeight = FontWeight.Bold,
+                    color = if (mensaje.isNotBlank())
+                        MaterialTheme.colorScheme.primary
+                    else
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(
+                    text = "Cancelar",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        containerColor = MaterialTheme.colorScheme.surface
+    )
+}
+
+/**
+ * Card de Aviso Operativo - Altura fija para consistencia
  */
 @Composable
 fun AvisoCard(
@@ -395,12 +783,19 @@ fun AvisoCard(
     }
 
     Card(
-        modifier = Modifier.width(300.dp),
+        modifier = Modifier
+            .width(280.dp)
+            .height(180.dp), // Altura fija para todas las cards
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
             // Header con icono
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -410,13 +805,13 @@ fun AvisoCard(
                     modifier = Modifier
                         .size(32.dp)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                        .background(aviso.accentColor.copy(alpha = 0.15f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         aviso.icon,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = aviso.accentColor,
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -424,70 +819,101 @@ fun AvisoCard(
                     text = aviso.titulo,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Contenido del aviso
-            when (aviso) {
-                is AvisoOperativo.HorarioIngreso -> {
-                    HorarioIngresoContent(aviso)
-                }
-                is AvisoOperativo.AlertaClima -> {
-                    AlertaClimaContent(aviso)
-                }
-                is AvisoOperativo.Anuncio -> {
-                    AnuncioContent(aviso)
-                }
-                is AvisoOperativo.ResumenTrabajos -> {
-                    ResumenTrabajosContent(
-                        aviso = aviso,
-                        onLeerMas = { showResumenDialog = true }
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Boton de accion (solo para avisos que no son ResumenTrabajos)
-            if (aviso !is AvisoOperativo.ResumenTrabajos) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .clickable(onClick = onVerRutas)
-                        .padding(12.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            Icons.Outlined.Route,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Text(
-                            text = "Ver Rutas de Hoy",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.primary
-                        )
+            // Contenido del aviso (área central flexible)
+            Box(modifier = Modifier.weight(1f).padding(vertical = 8.dp)) {
+                when (aviso) {
+                    is AvisoOperativo.HorarioIngreso -> {
+                        HorarioIngresoContent(aviso)
+                    }
+                    is AvisoOperativo.AlertaClima -> {
+                        AlertaClimaContent(aviso)
+                    }
+                    is AvisoOperativo.Anuncio -> {
+                        AnuncioContent(aviso)
+                    }
+                    is AvisoOperativo.ResumenTrabajos -> {
+                        ResumenTrabajosContentCompact(aviso)
                     }
                 }
             }
+
+            // Botón de acción según tipo de aviso
+            when (aviso) {
+                is AvisoOperativo.HorarioIngreso -> {
+                    AvisoActionButton(
+                        text = "Ver Rutas de Hoy",
+                        icon = Icons.Outlined.Route,
+                        onClick = onVerRutas
+                    )
+                }
+                is AvisoOperativo.ResumenTrabajos -> {
+                    AvisoActionButton(
+                        text = "Leer más",
+                        icon = Icons.Default.ChevronRight,
+                        onClick = { showResumenDialog = true },
+                        isPrimary = true
+                    )
+                }
+                // AlertaClima y Anuncio no tienen botón de acción
+                else -> { }
+            }
+        }
+    }
+}
+
+/**
+ * Botón de acción reutilizable para avisos
+ */
+@Composable
+private fun AvisoActionButton(
+    text: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+    isPrimary: Boolean = false
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(
+                if (isPrimary) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.surfaceVariant
+            )
+            .clickable(onClick = onClick)
+            .padding(10.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = if (isPrimary) MaterialTheme.colorScheme.onPrimary
+                       else MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(16.dp)
+            )
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Medium,
+                color = if (isPrimary) MaterialTheme.colorScheme.onPrimary
+                        else MaterialTheme.colorScheme.primary
+            )
         }
     }
 }
 
 @Composable
 private fun HorarioIngresoContent(aviso: AvisoOperativo.HorarioIngreso) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
@@ -495,11 +921,12 @@ private fun HorarioIngresoContent(aviso: AvisoOperativo.HorarioIngreso) {
             Text(
                 "Operativos",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodyMedium
+                style = MaterialTheme.typography.bodySmall
             )
             Text(
                 aviso.horaOperativos,
                 color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Bold
             )
         }
@@ -510,11 +937,12 @@ private fun HorarioIngresoContent(aviso: AvisoOperativo.HorarioIngreso) {
             Text(
                 "Administrativos",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodyMedium
+                style = MaterialTheme.typography.bodySmall
             )
             Text(
                 aviso.horaAdministrativos,
                 color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Bold
             )
         }
@@ -525,8 +953,11 @@ private fun HorarioIngresoContent(aviso: AvisoOperativo.HorarioIngreso) {
 private fun AlertaClimaContent(aviso: AvisoOperativo.AlertaClima) {
     Text(
         text = aviso.mensaje,
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 4,
+        overflow = TextOverflow.Ellipsis,
+        lineHeight = 18.sp
     )
 }
 
@@ -534,29 +965,27 @@ private fun AlertaClimaContent(aviso: AvisoOperativo.AlertaClima) {
 private fun AnuncioContent(aviso: AvisoOperativo.Anuncio) {
     Text(
         text = aviso.mensaje,
-        style = MaterialTheme.typography.bodyMedium,
+        style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        maxLines = 3,
-        overflow = TextOverflow.Ellipsis
+        maxLines = 4,
+        overflow = TextOverflow.Ellipsis,
+        lineHeight = 18.sp
     )
 }
 
 @Composable
-private fun ResumenTrabajosContent(
-    aviso: AvisoOperativo.ResumenTrabajos,
-    onLeerMas: () -> Unit
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+private fun ResumenTrabajosContentCompact(aviso: AvisoOperativo.ResumenTrabajos) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         // Ubicacion badge
         Box(
             modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
+                .clip(RoundedCornerShape(6.dp))
                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
-                .padding(horizontal = 8.dp, vertical = 4.dp)
+                .padding(horizontal = 6.dp, vertical = 2.dp)
         ) {
             Text(
                 text = "📍 ${aviso.ubicacion}",
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Medium
             )
@@ -565,30 +994,12 @@ private fun ResumenTrabajosContent(
         // Preview del contenido
         Text(
             text = aviso.preview,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 3,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
-            lineHeight = 20.sp
+            lineHeight = 16.sp
         )
-
-        // Boton Leer mas
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.primary)
-                .clickable(onClick = onLeerMas)
-                .padding(12.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "Leer más",
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onPrimary
-            )
-        }
     }
 }
 
@@ -952,37 +1363,48 @@ fun EmpleoDestacadoCard(
     }
 }
 
+// Colores de acento para cada tipo de aviso
+val AvisoColorHorario = Color(0xFF2196F3) // Azul
+val AvisoColorClima = Color(0xFFFF9800) // Naranja
+val AvisoColorAnuncio = Color(0xFF9C27B0) // Púrpura
+val AvisoColorResumen = Color(0xFF4CAF50) // Verde
+
 // Data classes para los avisos
 sealed class AvisoOperativo(
     open val titulo: String,
-    open val icon: ImageVector
+    open val icon: ImageVector,
+    open val accentColor: Color
 ) {
     data class HorarioIngreso(
         override val titulo: String = "HORARIOS DE INGRESO",
         override val icon: ImageVector = Icons.Default.Schedule,
+        override val accentColor: Color = AvisoColorHorario,
         val horaOperativos: String = "06:00 AM",
         val horaAdministrativos: String = "08:00 AM"
-    ) : AvisoOperativo(titulo, icon)
+    ) : AvisoOperativo(titulo, icon, accentColor)
 
     data class AlertaClima(
         override val titulo: String = "ALERTA CLIMA",
         override val icon: ImageVector = Icons.Default.Warning,
+        override val accentColor: Color = AvisoColorClima,
         val mensaje: String
-    ) : AvisoOperativo(titulo, icon)
+    ) : AvisoOperativo(titulo, icon, accentColor)
 
     data class Anuncio(
         override val titulo: String,
         override val icon: ImageVector = Icons.Default.Notifications,
+        override val accentColor: Color = AvisoColorAnuncio,
         val mensaje: String
-    ) : AvisoOperativo(titulo, icon)
+    ) : AvisoOperativo(titulo, icon, accentColor)
 
     data class ResumenTrabajos(
         override val titulo: String = "RESUMEN DE TRABAJOS",
         override val icon: ImageVector = Icons.Default.Assignment,
+        override val accentColor: Color = AvisoColorResumen,
         val ubicacion: String,
         val preview: String,
         val contenidoCompleto: String
-    ) : AvisoOperativo(titulo, icon)
+    ) : AvisoOperativo(titulo, icon, accentColor)
 }
 
 // Data class para categorias
@@ -1026,7 +1448,7 @@ val defaultCategorias = listOf(
     )
 )
 
-// Avisos de ejemplo
+// Avisos de ejemplo (fallback cuando no hay conexión)
 val defaultAvisos = listOf(
     AvisoOperativo.ResumenTrabajos(
         ubicacion = "Ica",
@@ -1049,6 +1471,33 @@ Es fundamental asistir desde temprano para asegurar tu lugar. ¡No dejes pasar e
         mensaje = "La temperatura de hoy sera de 28C. Se recomienda hidratarse constantemente."
     )
 )
+
+/**
+ * Convierte la respuesta del API a los modelos de UI
+ */
+fun agrochamba.com.data.AvisoOperativoResponse.toUiModel(): AvisoOperativo {
+    return when (tipo) {
+        "resumen_trabajos" -> AvisoOperativo.ResumenTrabajos(
+            titulo = titulo.ifBlank { "RESUMEN DE TRABAJOS" },
+            ubicacion = ubicacion ?: "Perú",
+            preview = preview ?: contenido?.take(100) ?: "",
+            contenidoCompleto = contenido ?: preview ?: ""
+        )
+        "horario_ingreso" -> AvisoOperativo.HorarioIngreso(
+            titulo = titulo.ifBlank { "HORARIOS DE INGRESO" },
+            horaOperativos = horaOperativos ?: "06:00 AM",
+            horaAdministrativos = horaAdministrativos ?: "08:00 AM"
+        )
+        "alerta_clima" -> AvisoOperativo.AlertaClima(
+            titulo = titulo.ifBlank { "ALERTA CLIMA" },
+            mensaje = contenido ?: preview ?: "Sin información de clima"
+        )
+        else -> AvisoOperativo.Anuncio(
+            titulo = titulo.ifBlank { "ANUNCIO" },
+            mensaje = contenido ?: preview ?: ""
+        )
+    }
+}
 
 // ==========================================
 // DISPONIBILIDAD DEL TRABAJADOR (ESTILO UBER)

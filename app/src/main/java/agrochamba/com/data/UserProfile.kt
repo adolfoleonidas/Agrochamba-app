@@ -9,6 +9,7 @@ data class UserProfileResponse(
     val email: String,
     @Json(name = "first_name") val firstName: String?,
     @Json(name = "last_name") val lastName: String?,
+    val dni: String? = null,
     val roles: List<String>,
     @Json(name = "is_enterprise") val isEnterprise: Boolean,
     @Json(name = "profile_photo_id") val profilePhotoId: Int?,

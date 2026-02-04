@@ -35,7 +35,7 @@ class DisponibilidadViewModel : ViewModel() {
     }
 
     fun loadDisponibilidad() {
-        val token = AuthManager.authToken ?: return
+        val token = AuthManager.token ?: return
 
         viewModelScope.launch {
             uiState = uiState.copy(isLoading = true, error = null)
@@ -73,7 +73,7 @@ class DisponibilidadViewModel : ViewModel() {
      * Toggle de disponibilidad (tipo Uber)
      */
     fun toggleDisponibilidad() {
-        val token = AuthManager.authToken ?: return
+        val token = AuthManager.token ?: return
         val nuevoEstado = !uiState.disponibleParaTrabajo
 
         viewModelScope.launch {
@@ -112,7 +112,7 @@ class DisponibilidadViewModel : ViewModel() {
      * Actualizar ubicación y coordenadas
      */
     fun updateUbicacion(ubicacion: String, lat: Double? = null, lng: Double? = null) {
-        val token = AuthManager.authToken ?: return
+        val token = AuthManager.token ?: return
 
         viewModelScope.launch {
             try {

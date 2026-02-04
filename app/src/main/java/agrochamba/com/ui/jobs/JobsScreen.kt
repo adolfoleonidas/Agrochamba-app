@@ -113,7 +113,8 @@ import agrochamba.com.ui.home.DisponibilidadBanner
 import agrochamba.com.ui.home.EmpleosDestacadosSection
 import agrochamba.com.ui.home.HomeHeader
 import agrochamba.com.ui.home.HomeSearchBar
-import agrochamba.com.ui.home.defaultAvisos
+import agrochamba.com.ui.home.TipoAviso
+import agrochamba.com.ui.home.AvisosViewModel
 import agrochamba.com.ui.home.defaultCategorias
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -202,7 +203,8 @@ fun JobsScreen(
     onNavigateToProfile: () -> Unit = {},
     onNavigateToNotifications: () -> Unit = {},
     onNavigateToRoutes: () -> Unit = {},
-    onNavigateToRendimiento: () -> Unit = {}
+    onNavigateToRendimiento: () -> Unit = {},
+    onNavigateToFotocheck: () -> Unit = {}
 ) {
     android.util.Log.d("JobsScreen", "📱 JobsScreen() INICIADO")
 
@@ -220,9 +222,12 @@ fun JobsScreen(
         JobsListWithSearchScreen(
             jobsViewModel = jobsViewModel,
             userProfile = userProfile,
+            rendimientoScore = rendimientoScore,
             onNavigateToProfile = onNavigateToProfile,
             onNavigateToNotifications = onNavigateToNotifications,
-            onNavigateToRoutes = onNavigateToRoutes
+            onNavigateToRoutes = onNavigateToRoutes,
+            onNavigateToRendimiento = onNavigateToRendimiento,
+            onNavigateToFotocheck = onNavigateToFotocheck
         )
     } else {
         android.util.Log.d("JobsScreen", "📄 Mostrando JobDetailScreen para: ${uiState.selectedJob.id}")
@@ -239,9 +244,12 @@ fun JobsScreen(
 fun JobsListWithSearchScreen(
     jobsViewModel: JobsViewModel,
     userProfile: UserProfileResponse? = null,
+    rendimientoScore: Int? = null,
     onNavigateToProfile: () -> Unit = {},
     onNavigateToNotifications: () -> Unit = {},
-    onNavigateToRoutes: () -> Unit = {}
+    onNavigateToRoutes: () -> Unit = {},
+    onNavigateToRendimiento: () -> Unit = {},
+    onNavigateToFotocheck: () -> Unit = {}
 ) {
     android.util.Log.d("JobsListWithSearchScreen", "🔍 JobsListWithSearchScreen() INICIADO")
 
@@ -253,8 +261,15 @@ fun JobsListWithSearchScreen(
     val disponibilidadViewModel: DisponibilidadViewModel = viewModel()
     val disponibilidadState = disponibilidadViewModel.uiState
 
+    // ViewModel de avisos operativos
+    val avisosViewModel: AvisosViewModel = viewModel()
+    val avisosState = avisosViewModel.uiState
+
     // Estado para mostrar modal de filtros avanzados
     var showAdvancedFilters by remember { mutableStateOf(false) }
+
+    // Estado para mostrar pantalla de búsqueda
+    var showSearchScreen by remember { mutableStateOf(false) }
 
     // Determinar si hay filtros activos (para mostrar vista Home o vista filtrada)
     val hasActiveFilters = uiState.searchQuery.isNotBlank() ||
@@ -331,6 +346,30 @@ fun JobsListWithSearchScreen(
             .take(5)
     }
 
+    // Pantalla de búsqueda
+    if (showSearchScreen) {
+        SearchScreen(
+            initialQuery = uiState.searchQuery,
+            initialLocation = uiState.selectedLocationFilter,
+            onSearch = { query, location ->
+                // Aplicar filtros y cerrar pantalla de búsqueda
+                jobsViewModel.onFilterChange(
+                    query,
+                    uiState.selectedLocation,
+                    uiState.selectedCompany,
+                    uiState.selectedJobType,
+                    uiState.selectedCrop
+                )
+                if (location != null) {
+                    jobsViewModel.onLocationFilterChange(location)
+                }
+                showSearchScreen = false
+            },
+            onBack = { showSearchScreen = false }
+        )
+        return
+    }
+
     // Fondo del tema (claro por defecto)
     Box(
         modifier = Modifier
@@ -352,7 +391,8 @@ fun JobsListWithSearchScreen(
                         rendimientoScore = rendimientoScore,
                         onNotificationClick = onNavigateToNotifications,
                         onProfileClick = onNavigateToProfile,
-                        onRendimientoClick = onNavigateToRendimiento
+                        onRendimientoClick = onNavigateToRendimiento,
+                        onFotocheckClick = onNavigateToFotocheck
                     )
                 }
 
@@ -376,18 +416,24 @@ fun JobsListWithSearchScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     HomeSearchBar(
                         searchQuery = uiState.searchQuery,
-                        onSearchQueryChange = { query ->
-                            jobsViewModel.onFilterChange(query, uiState.selectedLocation, uiState.selectedCompany, uiState.selectedJobType, uiState.selectedCrop)
-                        },
+                        locationLabel = uiState.selectedLocationFilter?.displayLabel
+                            ?: uiState.selectedLocation?.name,
+                        onSearchClick = { showSearchScreen = true },
                         onFilterClick = { showAdvancedFilters = true }
                     )
                 }
 
                 // Avisos Operativos
                 item {
+                    val isAdminOrEmpresa = userProfile?.isEnterprise == true ||
+                                           AuthManager.isUserAdmin()
                     AvisosOperativosSection(
-                        avisos = defaultAvisos,
-                        onVerRutas = onNavigateToRoutes
+                        avisos = avisosState.avisos,
+                        onVerRutas = onNavigateToRoutes,
+                        isAdminOrEmpresa = isAdminOrEmpresa,
+                        onCrearAviso = { tipo, mensaje ->
+                            avisosViewModel.createAviso(tipo, mensaje)
+                        }
                     )
                 }
 
@@ -515,9 +561,9 @@ fun JobsListWithSearchScreen(
                 // Header simplificado con búsqueda
                 HomeSearchBar(
                     searchQuery = uiState.searchQuery,
-                    onSearchQueryChange = { query ->
-                        jobsViewModel.onFilterChange(query, uiState.selectedLocation, uiState.selectedCompany, uiState.selectedJobType, uiState.selectedCrop)
-                    },
+                    locationLabel = uiState.selectedLocationFilter?.displayLabel
+                        ?: uiState.selectedLocation?.name,
+                    onSearchClick = { showSearchScreen = true },
                     onFilterClick = { showAdvancedFilters = true },
                     modifier = Modifier.padding(top = 16.dp)
                 )

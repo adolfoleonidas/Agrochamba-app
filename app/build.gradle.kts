@@ -146,6 +146,9 @@ dependencies {
     implementation("androidx.camera:camera-view:1.4.1")
     implementation("com.google.android.gms:play-services-mlkit-barcode-scanning:18.3.1")
 
+    // ZXing para generar códigos QR y de barras (Fotocheck Virtual)
+    implementation("com.google.zxing:core:3.5.3")
+
     // Mercado Pago - Custom Tabs para Checkout Pro
     implementation("androidx.browser:browser:1.8.0")
 

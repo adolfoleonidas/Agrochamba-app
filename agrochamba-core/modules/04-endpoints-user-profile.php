@@ -68,6 +68,7 @@ if (!function_exists('agrochamba_get_user_profile')) {
         $profile_photo_id = get_user_meta($user_id, 'profile_photo_id', true);
         $phone = get_user_meta($user_id, 'phone', true);
         $bio = get_user_meta($user_id, 'bio', true);
+        $dni = get_user_meta($user_id, 'dni', true);
         $company_description = get_user_meta($user_id, 'company_description', true);
         $company_address = get_user_meta($user_id, 'company_address', true);
         $company_phone = get_user_meta($user_id, 'company_phone', true);
@@ -93,6 +94,7 @@ if (!function_exists('agrochamba_get_user_profile')) {
             'email' => $user->user_email,
             'first_name' => $user->first_name,
             'last_name' => $user->last_name,
+            'dni' => $dni ?: null,
             'roles' => $user->roles,
             'is_enterprise' => $is_enterprise,
             'profile_photo_id' => $profile_photo_id ? intval($profile_photo_id) : null,
@@ -222,6 +224,15 @@ if (!function_exists('agrochamba_update_user_profile')) {
         if (isset($params['bio'])) {
             update_user_meta($user_id, 'bio', sanitize_textarea_field($params['bio']));
             $updated_fields[] = 'bio';
+        }
+
+        // Actualizar DNI (solo números, 8 dígitos para Perú)
+        if (isset($params['dni'])) {
+            $dni = preg_replace('/[^0-9]/', '', $params['dni']);
+            if (strlen($dni) === 8) {
+                update_user_meta($user_id, 'dni', $dni);
+                $updated_fields[] = 'dni';
+            }
         }
 
         // Actualizar información de empresa (solo para empresas)
