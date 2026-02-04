@@ -420,6 +420,53 @@ interface WordPressApiService {
         @Query("company_id") companyId: Int,
         @Query("sede_id") sedeId: String
     ): Response<DeleteSedeResponse>
+
+    // ==========================================
+    // ENDPOINTS DE RENDIMIENTO DE TRABAJADORES
+    // ==========================================
+
+    // Obtener rendimientos del usuario actual
+    @GET("agrochamba/v1/rendimiento")
+    suspend fun getRendimiento(
+        @Header("Authorization") token: String,
+        @Query("categoria") categoria: String? = null,
+        @Query("desde") desde: String? = null,
+        @Query("hasta") hasta: String? = null,
+        @Query("per_page") perPage: Int = 50
+    ): RendimientoListResponse
+
+    // Obtener resumen de rendimiento (totales por categoría)
+    @GET("agrochamba/v1/rendimiento/resumen")
+    suspend fun getRendimientoResumen(
+        @Header("Authorization") token: String,
+        @Query("periodo") periodo: String = "semana" // semana, mes, año
+    ): RendimientoResumenResponse
+
+    // Crear registro de rendimiento (para empresas)
+    @POST("agrochamba/v1/rendimiento")
+    suspend fun createRendimiento(
+        @Header("Authorization") token: String,
+        @Body data: Map<String, @JvmSuppressWildcards Any>
+    ): CreateRendimientoResponse
+
+    // Obtener rendimientos de trabajadores (para empresas)
+    @GET("agrochamba/v1/rendimiento/empresa")
+    suspend fun getRendimientoEmpresa(
+        @Header("Authorization") token: String,
+        @Query("dni") dni: String? = null,
+        @Query("nombre") nombre: String? = null,
+        @Query("categoria") categoria: String? = null,
+        @Query("desde") desde: String? = null,
+        @Query("hasta") hasta: String? = null,
+        @Query("per_page") perPage: Int = 50
+    ): RendimientoListResponse
+
+    // Eliminar registro de rendimiento
+    @DELETE("agrochamba/v1/rendimiento/{id}")
+    suspend fun deleteRendimiento(
+        @Header("Authorization") token: String,
+        @Path("id") id: Int
+    ): Response<Unit>
 }
 
 object WordPressApi {

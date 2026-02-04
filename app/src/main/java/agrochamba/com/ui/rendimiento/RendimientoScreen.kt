@@ -9,16 +9,19 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Inventory2
-import androidx.compose.material.icons.filled.Stars
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.TrendingDown
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import agrochamba.com.data.RendimientoCategoria
 
 /**
  * Pantalla dedicada para mostrar el rendimiento del trabajador
@@ -27,39 +30,10 @@ import androidx.compose.ui.unit.dp
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RendimientoScreen(
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    viewModel: RendimientoViewModel = viewModel()
 ) {
-    // TODO: Conectar con API real para obtener datos de rendimiento
-    // Por ahora usamos datos de ejemplo
-    val rendimientoItems = remember {
-        listOf(
-            RendimientoItem(
-                categoria = "Embalaje",
-                valor = 146,
-                unidad = "cajas",
-                tendencia = TendenciaRendimiento.SUBIENDO,
-                fechaRegistro = "03 Feb 2026"
-            ),
-            RendimientoItem(
-                categoria = "Selección",
-                valor = 89,
-                unidad = "bandejas",
-                tendencia = TendenciaRendimiento.ESTABLE,
-                fechaRegistro = "03 Feb 2026"
-            ),
-            RendimientoItem(
-                categoria = "Clamshell",
-                valor = 234,
-                unidad = "unidades",
-                tendencia = TendenciaRendimiento.SUBIENDO,
-                fechaRegistro = "02 Feb 2026"
-            )
-        )
-    }
-
-    val totalPuntaje = remember(rendimientoItems) {
-        rendimientoItems.sumOf { it.valor }
-    }
+    val uiState = viewModel.uiState
 
     Scaffold(
         topBar = {
@@ -70,49 +44,134 @@ fun RendimientoScreen(
                         Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
                     }
                 },
+                actions = {
+                    IconButton(onClick = { viewModel.refresh() }) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Actualizar")
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface
                 )
             )
         }
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // Tarjeta de resumen total
-            item {
-                ResumenTotalCard(totalPuntaje = totalPuntaje)
+        when {
+            uiState.isLoading -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
             }
 
-            // Título de sección
-            item {
-                Text(
-                    text = "Detalle por Categoría",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(top = 8.dp)
+            uiState.error != null -> {
+                ErrorContent(
+                    error = uiState.error,
+                    onRetry = { viewModel.refresh() },
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding)
                 )
             }
 
-            // Lista de rendimientos por categoría
-            items(rendimientoItems) { item ->
-                RendimientoItemCard(item = item)
+            uiState.categorias.isEmpty() -> {
+                EmptyContent(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding)
+                )
             }
 
-            // Espacio al final
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
+            else -> {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding)
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Selector de período
+                    item {
+                        PeriodoSelector(
+                            periodoActual = uiState.periodo,
+                            onPeriodoChange = { viewModel.changePeriodo(it) }
+                        )
+                    }
+
+                    // Tarjeta de resumen total
+                    item {
+                        ResumenTotalCard(
+                            totalPuntaje = uiState.totalGeneral,
+                            periodo = uiState.periodo
+                        )
+                    }
+
+                    // Título de sección
+                    item {
+                        Text(
+                            text = "Detalle por Categoría",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                    }
+
+                    // Lista de rendimientos por categoría
+                    items(uiState.categorias) { categoria ->
+                        RendimientoCategoriaCard(categoria = categoria)
+                    }
+
+                    // Espacio al final
+                    item {
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun ResumenTotalCard(totalPuntaje: Int) {
+private fun PeriodoSelector(
+    periodoActual: String,
+    onPeriodoChange: (String) -> Unit
+) {
+    val periodos = listOf(
+        "semana" to "Esta semana",
+        "mes" to "Este mes",
+        "año" to "Este año"
+    )
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        periodos.forEach { (value, label) ->
+            FilterChip(
+                selected = periodoActual == value,
+                onClick = { onPeriodoChange(value) },
+                label = { Text(label) },
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun ResumenTotalCard(
+    totalPuntaje: Double,
+    periodo: String
+) {
+    val periodoLabel = when (periodo) {
+        "semana" -> "Esta semana"
+        "mes" -> "Este mes"
+        "año" -> "Este año"
+        else -> periodo
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -142,14 +201,14 @@ private fun ResumenTotalCard(totalPuntaje: Int) {
             )
 
             Text(
-                text = totalPuntaje.toString(),
+                text = totalPuntaje.toInt().toString(),
                 style = MaterialTheme.typography.displayMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onPrimaryContainer
             )
 
             Text(
-                text = "Esta semana",
+                text = periodoLabel,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
             )
@@ -158,7 +217,32 @@ private fun ResumenTotalCard(totalPuntaje: Int) {
 }
 
 @Composable
-private fun RendimientoItemCard(item: RendimientoItem) {
+private fun RendimientoCategoriaCard(categoria: RendimientoCategoria) {
+    val tendenciaIcon = when (categoria.tendencia) {
+        "subiendo" -> Icons.Default.TrendingUp
+        "bajando" -> Icons.Default.TrendingDown
+        else -> null
+    }
+
+    val tendenciaColor = when (categoria.tendencia) {
+        "subiendo" -> MaterialTheme.colorScheme.primary
+        "bajando" -> MaterialTheme.colorScheme.error
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    // Formatear fecha
+    val fechaFormateada = try {
+        val parts = categoria.ultimaFecha.split("-")
+        if (parts.size == 3) {
+            val meses = listOf("Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic")
+            "${parts[2]} ${meses[parts[1].toInt() - 1]} ${parts[0]}"
+        } else {
+            categoria.ultimaFecha
+        }
+    } catch (e: Exception) {
+        categoria.ultimaFecha
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -192,14 +276,19 @@ private fun RendimientoItemCard(item: RendimientoItem) {
             // Información de rendimiento
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = item.categoria,
+                    text = categoria.categoria.replaceFirstChar { it.uppercase() },
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
-                    text = item.fechaRegistro,
+                    text = fechaFormateada,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "${categoria.registros} registros",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                 )
             }
 
@@ -207,23 +296,23 @@ private fun RendimientoItemCard(item: RendimientoItem) {
             Column(horizontalAlignment = Alignment.End) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "${item.valor}",
+                        text = categoria.total.toInt().toString(),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    if (item.tendencia == TendenciaRendimiento.SUBIENDO) {
+                    if (tendenciaIcon != null) {
+                        Spacer(modifier = Modifier.width(4.dp))
                         Icon(
-                            imageVector = Icons.Default.TrendingUp,
-                            contentDescription = "Subiendo",
+                            imageVector = tendenciaIcon,
+                            contentDescription = categoria.tendencia,
                             modifier = Modifier.size(20.dp),
-                            tint = MaterialTheme.colorScheme.primary
+                            tint = tendenciaColor
                         )
                     }
                 }
                 Text(
-                    text = item.unidad,
+                    text = categoria.unidad,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -232,17 +321,55 @@ private fun RendimientoItemCard(item: RendimientoItem) {
     }
 }
 
-// Modelos de datos
-data class RendimientoItem(
-    val categoria: String,
-    val valor: Int,
-    val unidad: String,
-    val tendencia: TendenciaRendimiento,
-    val fechaRegistro: String
-)
+@Composable
+private fun ErrorContent(
+    error: String,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = error,
+            style = MaterialTheme.typography.bodyLarge,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.error
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Button(onClick = onRetry) {
+            Text("Reintentar")
+        }
+    }
+}
 
-enum class TendenciaRendimiento {
-    SUBIENDO,
-    BAJANDO,
-    ESTABLE
+@Composable
+private fun EmptyContent(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = Icons.Default.Inventory2,
+            contentDescription = null,
+            modifier = Modifier.size(64.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "Sin registros de rendimiento",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "Cuando tu empresa registre tu rendimiento, aparecerá aquí.",
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+        )
+    }
 }

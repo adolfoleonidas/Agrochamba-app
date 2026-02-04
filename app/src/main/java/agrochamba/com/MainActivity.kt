@@ -405,9 +405,9 @@ fun MainAppScreen() {
 
         NavHost(navController, startDestination = Screen.Jobs.route, Modifier.padding(innerPadding)) {
             composable(Screen.Jobs.route) {
-                // TODO: Obtener rendimiento real del usuario desde el backend
-                // Por ahora usamos un valor placeholder (null = no mostrar badge)
-                val rendimientoScore: Int? = 146 // Placeholder - conectar con API cuando esté lista
+                // Obtener rendimiento real del usuario desde el backend
+                val rendimientoViewModel: agrochamba.com.ui.rendimiento.RendimientoViewModel = viewModel()
+                val rendimientoScore = rendimientoViewModel.uiState.totalGeneral.takeIf { it > 0 }?.toInt()
 
                 JobsScreen(
                     userProfile = userProfile,
