@@ -530,7 +530,7 @@ fun MainAppScreen() {
             }
             composable(Screen.Fotocheck.route) {
                 FotocheckScreen(
-                    userProfile = profileViewModel.userProfile.value,
+                    userProfile = profileViewModel.uiState.userProfile,
                     onBack = { navController.popBackStack() }
                 )
             }
