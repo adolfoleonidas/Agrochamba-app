@@ -76,6 +76,7 @@ if (!AGROCHAMBA_USE_MODULE_LOADER) {
             '30-credits-system.php',           // Sistema de créditos para monetización
             '31-avisos-operativos.php',        // Sistema de avisos operativos para la app
             '32-rendimiento-trabajador.php',   // Sistema de rendimiento de trabajadores
+            '33-contratos-campanas.php',       // Sistema de contratos y campañas laborales
         );
 
         // Cargar cada módulo

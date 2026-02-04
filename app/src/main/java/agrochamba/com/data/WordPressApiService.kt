@@ -467,6 +467,83 @@ interface WordPressApiService {
         @Header("Authorization") token: String,
         @Path("id") id: Int
     ): Response<Unit>
+
+    // ==========================================
+    // ENDPOINTS DE CONTRATOS Y CAMPAÑAS
+    // ==========================================
+
+    // === CAMPAÑAS ===
+
+    // Listar campañas (públicas o de empresa)
+    @GET("agrochamba/v1/campanas")
+    suspend fun getCampanas(
+        @Query("empresa_id") empresaId: Int? = null,
+        @Query("estado") estado: String = "activa",
+        @Query("per_page") perPage: Int = 20
+    ): CampanasListResponse
+
+    // Crear campaña (empresas)
+    @POST("agrochamba/v1/campanas")
+    suspend fun createCampana(
+        @Header("Authorization") token: String,
+        @Body data: Map<String, @JvmSuppressWildcards Any>
+    ): CreateCampanaResponse
+
+    // === CONTRATOS ===
+
+    // Mis contratos (trabajador)
+    @GET("agrochamba/v1/contratos")
+    suspend fun getMisContratos(
+        @Header("Authorization") token: String,
+        @Query("estado") estado: String? = null
+    ): ContratosListResponse
+
+    // Contratos de mi empresa
+    @GET("agrochamba/v1/contratos/empresa")
+    suspend fun getContratosEmpresa(
+        @Header("Authorization") token: String,
+        @Query("estado") estado: String? = null
+    ): ContratosListResponse
+
+    // Crear oferta de contrato (empresa → trabajador)
+    @POST("agrochamba/v1/contratos")
+    suspend fun createContrato(
+        @Header("Authorization") token: String,
+        @Body data: Map<String, @JvmSuppressWildcards Any>
+    ): CreateContratoResponse
+
+    // Trabajador acepta contrato
+    @PUT("agrochamba/v1/contratos/{id}/aceptar")
+    suspend fun aceptarContrato(
+        @Header("Authorization") token: String,
+        @Path("id") id: Int
+    ): ContratoActionResponse
+
+    // Trabajador rechaza contrato
+    @PUT("agrochamba/v1/contratos/{id}/rechazar")
+    suspend fun rechazarContrato(
+        @Header("Authorization") token: String,
+        @Path("id") id: Int,
+        @Body data: Map<String, String>? = null
+    ): ContratoActionResponse
+
+    // Empresa finaliza contrato
+    @PUT("agrochamba/v1/contratos/{id}/finalizar")
+    suspend fun finalizarContrato(
+        @Header("Authorization") token: String,
+        @Path("id") id: Int
+    ): ContratoActionResponse
+
+    // === TRABAJADORES DISPONIBLES (CRM) ===
+
+    // Obtener trabajadores disponibles para contratar
+    @GET("agrochamba/v1/trabajadores/disponibles")
+    suspend fun getTrabajadoresDisponibles(
+        @Header("Authorization") token: String,
+        @Query("ubicacion") ubicacion: String? = null,
+        @Query("experiencia") experiencia: String? = null,
+        @Query("per_page") perPage: Int = 50
+    ): TrabajadoresDisponiblesResponse
 }
 
 object WordPressApi {
