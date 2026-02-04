@@ -32,15 +32,23 @@ import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Stars
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.PowerSettingsNew
+import androidx.compose.material.icons.filled.ToggleOff
+import androidx.compose.material.icons.filled.ToggleOn
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.Work
 import androidx.compose.material.icons.outlined.Route
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -1041,3 +1049,140 @@ Es fundamental asistir desde temprano para asegurar tu lugar. ¡No dejes pasar e
         mensaje = "La temperatura de hoy sera de 28C. Se recomienda hidratarse constantemente."
     )
 )
+
+// ==========================================
+// DISPONIBILIDAD DEL TRABAJADOR (ESTILO UBER)
+// ==========================================
+
+/**
+ * Banner de disponibilidad para trabajadores - Estilo Uber
+ * Muestra si el trabajador está visible para empresas y permite toggle
+ */
+@Composable
+fun DisponibilidadBanner(
+    disponibleParaTrabajo: Boolean,
+    tieneContratoActivo: Boolean,
+    visibleParaEmpresas: Boolean,
+    ubicacion: String?,
+    isLoading: Boolean,
+    onToggleDisponibilidad: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val backgroundColor = when {
+        tieneContratoActivo -> MaterialTheme.colorScheme.secondaryContainer
+        visibleParaEmpresas -> AgroGreen.copy(alpha = 0.15f)
+        else -> MaterialTheme.colorScheme.surfaceVariant
+    }
+
+    val statusColor = when {
+        tieneContratoActivo -> MaterialTheme.colorScheme.secondary
+        visibleParaEmpresas -> AgroGreen
+        else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+    }
+
+    val statusText = when {
+        tieneContratoActivo -> "Contrato activo"
+        visibleParaEmpresas -> "Disponible para ofertas"
+        else -> "No visible para empresas"
+    }
+
+    val statusDescription = when {
+        tieneContratoActivo -> "Las empresas no pueden contactarte mientras tengas contrato activo"
+        visibleParaEmpresas -> "Las empresas pueden ver tu perfil y contactarte"
+        else -> "Activa tu disponibilidad para que las empresas te encuentren"
+    }
+
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        colors = CardDefaults.cardColors(containerColor = backgroundColor),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Indicador de estado
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(statusColor.copy(alpha = 0.2f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = when {
+                        tieneContratoActivo -> Icons.Default.Work
+                        visibleParaEmpresas -> Icons.Default.PowerSettingsNew
+                        else -> Icons.Default.PowerSettingsNew
+                    },
+                    contentDescription = null,
+                    tint = statusColor,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            // Texto de estado
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = statusText,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = statusColor
+                )
+                Text(
+                    text = statusDescription,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2
+                )
+                if (ubicacion != null && visibleParaEmpresas) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(top = 4.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.LocationOn,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = ubicacion,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            // Toggle (solo si no tiene contrato activo)
+            if (!tieneContratoActivo) {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        strokeWidth = 2.dp,
+                        color = AgroGreen
+                    )
+                } else {
+                    Switch(
+                        checked = disponibleParaTrabajo,
+                        onCheckedChange = { onToggleDisponibilidad() },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = AgroGreen,
+                            uncheckedThumbColor = Color.White,
+                            uncheckedTrackColor = MaterialTheme.colorScheme.outline
+                        )
+                    )
+                }
+            }
+        }
+    }
+}

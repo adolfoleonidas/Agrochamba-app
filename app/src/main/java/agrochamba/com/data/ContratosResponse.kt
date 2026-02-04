@@ -216,3 +216,63 @@ data class UbicacionMapa(
     val lng: Double,
     val cantidad: Int
 )
+
+// ==========================================
+// DISPONIBILIDAD DEL TRABAJADOR (ESTILO UBER)
+// ==========================================
+
+/**
+ * Response para obtener mi estado de disponibilidad
+ */
+@JsonClass(generateAdapter = true)
+data class DisponibilidadResponse(
+    val success: Boolean,
+    @Json(name = "disponible_para_trabajo") val disponibleParaTrabajo: Boolean,
+    @Json(name = "tiene_contrato_activo") val tieneContratoActivo: Boolean,
+    @Json(name = "visible_para_empresas") val visibleParaEmpresas: Boolean,
+    val ubicacion: String?,
+    @Json(name = "ubicacion_lat") val ubicacionLat: Double?,
+    @Json(name = "ubicacion_lng") val ubicacionLng: Double?,
+    val mensaje: String
+)
+
+/**
+ * Response para actualizar disponibilidad
+ */
+@JsonClass(generateAdapter = true)
+data class UpdateDisponibilidadResponse(
+    val success: Boolean,
+    @Json(name = "disponible_para_trabajo") val disponibleParaTrabajo: Boolean,
+    @Json(name = "tiene_contrato_activo") val tieneContratoActivo: Boolean,
+    @Json(name = "visible_para_empresas") val visibleParaEmpresas: Boolean,
+    val mensaje: String
+)
+
+/**
+ * Trabajador disponible con distancia (para empresas)
+ */
+@JsonClass(generateAdapter = true)
+data class TrabajadorDisponibleConDistancia(
+    val id: Int,
+    val nombre: String,
+    val email: String?,
+    val foto: String?,
+    val ubicacion: String?,
+    val lat: Double?,
+    val lng: Double?,
+    @Json(name = "distancia_km") val distanciaKm: Double?,
+    val experiencia: String?,
+    val rendimiento: Double?,
+    @Json(name = "disponible_desde") val disponibleDesde: String?,
+    @Json(name = "ultimo_empleador") val ultimoEmpleador: String?
+)
+
+/**
+ * Response con trabajadores y distancia
+ */
+@JsonClass(generateAdapter = true)
+data class TrabajadoresConDistanciaResponse(
+    val success: Boolean,
+    val data: List<TrabajadorDisponibleConDistancia>,
+    val total: Int
+)

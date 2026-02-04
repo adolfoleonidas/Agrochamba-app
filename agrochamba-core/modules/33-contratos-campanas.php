@@ -779,6 +779,26 @@ function agrochamba_register_contratos_endpoints()
             return in_array('administrator', $user->roles) || in_array('employer', $user->roles);
         },
     ));
+
+    // === DISPONIBILIDAD DEL TRABAJADOR (ESTILO UBER) ===
+
+    // GET /me/disponibilidad - Obtener mi estado de disponibilidad
+    register_rest_route('agrochamba/v1', '/me/disponibilidad', array(
+        'methods'             => 'GET',
+        'callback'            => 'agrochamba_api_get_mi_disponibilidad',
+        'permission_callback' => function () {
+            return is_user_logged_in();
+        },
+    ));
+
+    // PUT /me/disponibilidad - Actualizar mi disponibilidad (toggle tipo Uber)
+    register_rest_route('agrochamba/v1', '/me/disponibilidad', array(
+        'methods'             => 'PUT',
+        'callback'            => 'agrochamba_api_set_mi_disponibilidad',
+        'permission_callback' => function () {
+            return is_user_logged_in();
+        },
+    ));
 }
 
 // ==========================================
@@ -1183,39 +1203,69 @@ function agrochamba_api_finalizar_contrato(WP_REST_Request $request)
 
 function agrochamba_api_get_trabajadores_disponibles(WP_REST_Request $request)
 {
+    $user = wp_get_current_user();
     $ubicacion = $request->get_param('ubicacion');
     $experiencia = $request->get_param('experiencia');
     $per_page = intval($request->get_param('per_page')) ?: 50;
 
+    // Obtener coordenadas de la empresa para calcular distancia
+    $empresa_lat = get_user_meta($user->ID, '_ubicacion_lat', true);
+    $empresa_lng = get_user_meta($user->ID, '_ubicacion_lng', true);
+
     // Obtener IDs de trabajadores con contrato activo
     $con_contrato = agrochamba_get_trabajadores_con_contrato_activo();
 
+    // Solo obtener trabajadores que activaron su disponibilidad (tipo Uber)
     $args = array(
-        'role'    => 'subscriber',
-        'number'  => $per_page,
-        'exclude' => $con_contrato,
+        'role'       => 'subscriber',
+        'number'     => -1, // Obtener todos, luego paginamos
+        'exclude'    => $con_contrato,
+        'meta_query' => array(
+            array(
+                'key'   => '_disponible_para_trabajo',
+                'value' => '1',
+            ),
+        ),
     );
 
     $users = get_users($args);
     $trabajadores = array();
 
-    foreach ($users as $user) {
+    foreach ($users as $user_item) {
         // Obtener historial y ranking
-        $historial = get_user_meta($user->ID, '_historial_contratos', true) ?: array();
+        $historial = get_user_meta($user_item->ID, '_historial_contratos', true) ?: array();
 
-        // Obtener rendimiento total (usando el sistema ya implementado)
-        $rendimiento_total = agrochamba_get_rendimiento_total_trabajador($user->ID);
+        // Obtener rendimiento total
+        $rendimiento_total = agrochamba_get_rendimiento_total_trabajador($user_item->ID);
+
+        // Obtener coordenadas del trabajador
+        $worker_lat = get_user_meta($user_item->ID, '_ubicacion_lat', true);
+        $worker_lng = get_user_meta($user_item->ID, '_ubicacion_lng', true);
+
+        // Calcular distancia si tenemos coordenadas de ambos
+        $distancia = null;
+        if ($empresa_lat && $empresa_lng && $worker_lat && $worker_lng) {
+            $distancia = agrochamba_calcular_distancia(
+                floatval($empresa_lat),
+                floatval($empresa_lng),
+                floatval($worker_lat),
+                floatval($worker_lng)
+            );
+        }
 
         $trabajadores[] = array(
-            'id'               => $user->ID,
-            'nombre'           => $user->display_name,
-            'email'            => $user->user_email,
-            'foto'             => get_user_meta($user->ID, 'profile_photo_url', true),
-            'ubicacion'        => get_user_meta($user->ID, 'ubicacion', true),
+            'id'               => $user_item->ID,
+            'nombre'           => $user_item->display_name,
+            'email'            => $user_item->user_email,
+            'foto'             => get_user_meta($user_item->ID, 'profile_photo_url', true),
+            'ubicacion'        => get_user_meta($user_item->ID, 'ubicacion', true),
+            'lat'              => $worker_lat ? floatval($worker_lat) : null,
+            'lng'              => $worker_lng ? floatval($worker_lng) : null,
+            'distancia_km'     => $distancia,
             'experiencia'      => count($historial) . ' campañas',
             'rendimiento'      => $rendimiento_total,
-            'disponible_desde' => get_user_meta($user->ID, '_fecha_disponible', true),
-            'ultimo_empleador' => agrochamba_get_ultimo_empleador($user->ID),
+            'disponible_desde' => get_user_meta($user_item->ID, '_fecha_disponible', true),
+            'ultimo_empleador' => agrochamba_get_ultimo_empleador($user_item->ID),
         );
     }
 
@@ -1227,6 +1277,18 @@ function agrochamba_api_get_trabajadores_disponibles(WP_REST_Request $request)
         $trabajadores = array_values($trabajadores);
     }
 
+    // Ordenar por distancia (más cercanos primero) si hay coordenadas
+    usort($trabajadores, function ($a, $b) {
+        // Trabajadores sin distancia van al final
+        if ($a['distancia_km'] === null && $b['distancia_km'] === null) return 0;
+        if ($a['distancia_km'] === null) return 1;
+        if ($b['distancia_km'] === null) return -1;
+        return $a['distancia_km'] <=> $b['distancia_km'];
+    });
+
+    // Aplicar paginación después de ordenar
+    $trabajadores = array_slice($trabajadores, 0, $per_page);
+
     return rest_ensure_response(array(
         'success' => true,
         'data'    => $trabajadores,
@@ -1237,17 +1299,24 @@ function agrochamba_api_get_trabajadores_disponibles(WP_REST_Request $request)
 /**
  * Obtener resumen de trabajadores disponibles por ubicación
  * Muestra cuántos trabajadores hay libres en cada zona
+ * Solo incluye trabajadores que activaron su disponibilidad (tipo Uber)
  */
 function agrochamba_api_get_resumen_disponibles(WP_REST_Request $request)
 {
     // Obtener IDs de trabajadores con contrato activo
     $con_contrato = agrochamba_get_trabajadores_con_contrato_activo();
 
-    // Obtener todos los trabajadores disponibles
+    // Solo trabajadores que activaron su disponibilidad (tipo Uber)
     $args = array(
-        'role'    => 'subscriber',
-        'number'  => -1, // Todos
-        'exclude' => $con_contrato,
+        'role'       => 'subscriber',
+        'number'     => -1, // Todos
+        'exclude'    => $con_contrato,
+        'meta_query' => array(
+            array(
+                'key'   => '_disponible_para_trabajo',
+                'value' => '1',
+            ),
+        ),
     );
 
     $users = get_users($args);
@@ -1322,16 +1391,24 @@ function agrochamba_api_get_resumen_disponibles(WP_REST_Request $request)
 /**
  * Obtener mapa de disponibilidad de trabajadores
  * Devuelve datos optimizados para visualizar en un mapa
+ * Solo incluye trabajadores que activaron su disponibilidad (tipo Uber)
  */
 function agrochamba_api_get_mapa_trabajadores(WP_REST_Request $request)
 {
     // Obtener IDs de trabajadores con contrato activo
     $con_contrato = agrochamba_get_trabajadores_con_contrato_activo();
 
+    // Solo trabajadores que activaron su disponibilidad
     $args = array(
-        'role'    => 'subscriber',
-        'number'  => -1,
-        'exclude' => $con_contrato,
+        'role'       => 'subscriber',
+        'number'     => -1,
+        'exclude'    => $con_contrato,
+        'meta_query' => array(
+            array(
+                'key'   => '_disponible_para_trabajo',
+                'value' => '1',
+            ),
+        ),
     );
 
     $users = get_users($args);
@@ -1391,6 +1468,143 @@ function agrochamba_api_get_mapa_trabajadores(WP_REST_Request $request)
         'otros'      => $otros,
         'total'      => count($users),
     ));
+}
+
+// ==========================================
+// CALLBACKS API - DISPONIBILIDAD DEL TRABAJADOR
+// ==========================================
+
+/**
+ * Obtener mi estado de disponibilidad
+ * Tipo Uber: El trabajador indica si está buscando trabajo
+ */
+function agrochamba_api_get_mi_disponibilidad(WP_REST_Request $request)
+{
+    $user_id = get_current_user_id();
+    $user = get_userdata($user_id);
+
+    // Verificar que es trabajador (no empresa)
+    if (in_array('employer', $user->roles)) {
+        return new WP_Error('not_worker', 'Solo trabajadores pueden gestionar disponibilidad', array('status' => 403));
+    }
+
+    $disponible_para_trabajo = get_user_meta($user_id, '_disponible_para_trabajo', true);
+    $tiene_contrato_activo = agrochamba_trabajador_tiene_contrato_activo($user_id);
+    $ubicacion = get_user_meta($user_id, 'ubicacion', true);
+    $ubicacion_lat = get_user_meta($user_id, '_ubicacion_lat', true);
+    $ubicacion_lng = get_user_meta($user_id, '_ubicacion_lng', true);
+
+    // Un trabajador está "visible" para empresas si:
+    // 1. Activó que está disponible para trabajo
+    // 2. No tiene contrato activo
+    $visible_para_empresas = ($disponible_para_trabajo === '1') && !$tiene_contrato_activo;
+
+    return rest_ensure_response(array(
+        'success'               => true,
+        'disponible_para_trabajo' => $disponible_para_trabajo === '1',
+        'tiene_contrato_activo' => $tiene_contrato_activo,
+        'visible_para_empresas' => $visible_para_empresas,
+        'ubicacion'             => $ubicacion ?: null,
+        'ubicacion_lat'         => $ubicacion_lat ? floatval($ubicacion_lat) : null,
+        'ubicacion_lng'         => $ubicacion_lng ? floatval($ubicacion_lng) : null,
+        'mensaje'               => $visible_para_empresas
+            ? 'Estás visible para empresas que buscan trabajadores'
+            : ($tiene_contrato_activo
+                ? 'Tienes un contrato activo. No estás visible para otras empresas.'
+                : 'No estás visible. Activa tu disponibilidad para que las empresas te encuentren.'),
+    ));
+}
+
+/**
+ * Actualizar mi disponibilidad (toggle tipo Uber)
+ * El trabajador indica si está buscando trabajo activamente
+ */
+function agrochamba_api_set_mi_disponibilidad(WP_REST_Request $request)
+{
+    $user_id = get_current_user_id();
+    $user = get_userdata($user_id);
+    $params = $request->get_json_params();
+
+    // Verificar que es trabajador (no empresa)
+    if (in_array('employer', $user->roles)) {
+        return new WP_Error('not_worker', 'Solo trabajadores pueden gestionar disponibilidad', array('status' => 403));
+    }
+
+    // Campos actualizables
+    if (isset($params['disponible'])) {
+        $disponible = $params['disponible'] ? '1' : '0';
+        update_user_meta($user_id, '_disponible_para_trabajo', $disponible);
+
+        if ($disponible === '1') {
+            update_user_meta($user_id, '_fecha_disponible', current_time('mysql'));
+        }
+    }
+
+    // Actualizar ubicación si se proporciona
+    if (isset($params['ubicacion'])) {
+        update_user_meta($user_id, 'ubicacion', sanitize_text_field($params['ubicacion']));
+    }
+
+    // Actualizar coordenadas GPS si se proporcionan
+    if (isset($params['lat']) && isset($params['lng'])) {
+        update_user_meta($user_id, '_ubicacion_lat', floatval($params['lat']));
+        update_user_meta($user_id, '_ubicacion_lng', floatval($params['lng']));
+    }
+
+    // Obtener estado actualizado
+    $disponible_para_trabajo = get_user_meta($user_id, '_disponible_para_trabajo', true);
+    $tiene_contrato_activo = agrochamba_trabajador_tiene_contrato_activo($user_id);
+    $visible_para_empresas = ($disponible_para_trabajo === '1') && !$tiene_contrato_activo;
+
+    return rest_ensure_response(array(
+        'success'               => true,
+        'disponible_para_trabajo' => $disponible_para_trabajo === '1',
+        'tiene_contrato_activo' => $tiene_contrato_activo,
+        'visible_para_empresas' => $visible_para_empresas,
+        'mensaje'               => $visible_para_empresas
+            ? 'Ahora estás visible para empresas'
+            : 'Has desactivado tu disponibilidad',
+    ));
+}
+
+/**
+ * Verificar si un trabajador tiene contrato activo
+ */
+function agrochamba_trabajador_tiene_contrato_activo($user_id)
+{
+    $contratos = get_posts(array(
+        'post_type'      => 'contrato',
+        'posts_per_page' => 1,
+        'post_status'    => 'publish',
+        'meta_query'     => array(
+            array('key' => '_trabajador_id', 'value' => $user_id),
+            array('key' => '_estado', 'value' => 'activo'),
+        ),
+    ));
+
+    return !empty($contratos);
+}
+
+/**
+ * Calcular distancia entre dos puntos (fórmula Haversine)
+ * Retorna distancia en kilómetros
+ */
+function agrochamba_calcular_distancia($lat1, $lng1, $lat2, $lng2)
+{
+    $radio_tierra = 6371; // km
+
+    $lat1_rad = deg2rad($lat1);
+    $lat2_rad = deg2rad($lat2);
+    $delta_lat = deg2rad($lat2 - $lat1);
+    $delta_lng = deg2rad($lng2 - $lng1);
+
+    $a = sin($delta_lat / 2) * sin($delta_lat / 2) +
+         cos($lat1_rad) * cos($lat2_rad) *
+         sin($delta_lng / 2) * sin($delta_lng / 2);
+
+    $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+
+    return round($radio_tierra * $c, 1);
 }
 
 /**

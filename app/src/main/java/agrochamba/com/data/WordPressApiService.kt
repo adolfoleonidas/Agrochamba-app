@@ -556,6 +556,21 @@ interface WordPressApiService {
     suspend fun getMapaTrabajadores(
         @Header("Authorization") token: String
     ): MapaTrabajadoresResponse
+
+    // === DISPONIBILIDAD DEL TRABAJADOR (ESTILO UBER) ===
+
+    // Obtener mi estado de disponibilidad
+    @GET("agrochamba/v1/me/disponibilidad")
+    suspend fun getMiDisponibilidad(
+        @Header("Authorization") token: String
+    ): DisponibilidadResponse
+
+    // Actualizar mi disponibilidad (toggle tipo Uber)
+    @PUT("agrochamba/v1/me/disponibilidad")
+    suspend fun setMiDisponibilidad(
+        @Header("Authorization") token: String,
+        @Body data: Map<String, @JvmSuppressWildcards Any>
+    ): UpdateDisponibilidadResponse
 }
 
 object WordPressApi {
