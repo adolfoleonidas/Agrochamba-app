@@ -748,12 +748,32 @@ function agrochamba_register_contratos_endpoints()
         },
     ));
 
-    // === TRABAJADORES DISPONIBLES ===
+    // === TRABAJADORES DISPONIBLES (CRM DE TALENTO) ===
 
-    // GET /trabajadores/disponibles - CRM de talento
+    // GET /trabajadores/disponibles - Lista de trabajadores libres
     register_rest_route('agrochamba/v1', '/trabajadores/disponibles', array(
         'methods'             => 'GET',
         'callback'            => 'agrochamba_api_get_trabajadores_disponibles',
+        'permission_callback' => function () {
+            $user = wp_get_current_user();
+            return in_array('administrator', $user->roles) || in_array('employer', $user->roles);
+        },
+    ));
+
+    // GET /trabajadores/disponibles/resumen - Resumen por ubicación
+    register_rest_route('agrochamba/v1', '/trabajadores/disponibles/resumen', array(
+        'methods'             => 'GET',
+        'callback'            => 'agrochamba_api_get_resumen_disponibles',
+        'permission_callback' => function () {
+            $user = wp_get_current_user();
+            return in_array('administrator', $user->roles) || in_array('employer', $user->roles);
+        },
+    ));
+
+    // GET /trabajadores/mapa - Mapa de disponibilidad por zona
+    register_rest_route('agrochamba/v1', '/trabajadores/mapa', array(
+        'methods'             => 'GET',
+        'callback'            => 'agrochamba_api_get_mapa_trabajadores',
         'permission_callback' => function () {
             $user = wp_get_current_user();
             return in_array('administrator', $user->roles) || in_array('employer', $user->roles);
@@ -1199,10 +1219,177 @@ function agrochamba_api_get_trabajadores_disponibles(WP_REST_Request $request)
         );
     }
 
+    // Filtrar por ubicación si se especifica
+    if ($ubicacion) {
+        $trabajadores = array_filter($trabajadores, function ($t) use ($ubicacion) {
+            return stripos($t['ubicacion'], $ubicacion) !== false;
+        });
+        $trabajadores = array_values($trabajadores);
+    }
+
     return rest_ensure_response(array(
         'success' => true,
         'data'    => $trabajadores,
         'total'   => count($trabajadores),
+    ));
+}
+
+/**
+ * Obtener resumen de trabajadores disponibles por ubicación
+ * Muestra cuántos trabajadores hay libres en cada zona
+ */
+function agrochamba_api_get_resumen_disponibles(WP_REST_Request $request)
+{
+    // Obtener IDs de trabajadores con contrato activo
+    $con_contrato = agrochamba_get_trabajadores_con_contrato_activo();
+
+    // Obtener todos los trabajadores disponibles
+    $args = array(
+        'role'    => 'subscriber',
+        'number'  => -1, // Todos
+        'exclude' => $con_contrato,
+    );
+
+    $users = get_users($args);
+
+    // Agrupar por ubicación
+    $por_ubicacion = array();
+    $sin_ubicacion = 0;
+    $total_disponibles = 0;
+
+    foreach ($users as $user) {
+        $ubicacion = get_user_meta($user->ID, 'ubicacion', true);
+        $ubicacion = trim($ubicacion);
+
+        if (empty($ubicacion)) {
+            $sin_ubicacion++;
+        } else {
+            // Normalizar ubicación (primera letra mayúscula)
+            $ubicacion_normalizada = ucwords(strtolower($ubicacion));
+
+            if (!isset($por_ubicacion[$ubicacion_normalizada])) {
+                $por_ubicacion[$ubicacion_normalizada] = array(
+                    'ubicacion'    => $ubicacion_normalizada,
+                    'cantidad'     => 0,
+                    'con_experiencia' => 0,
+                    'rendimiento_promedio' => 0,
+                    'trabajadores' => array(),
+                );
+            }
+
+            $historial = get_user_meta($user->ID, '_historial_contratos', true) ?: array();
+            $rendimiento = agrochamba_get_rendimiento_total_trabajador($user->ID);
+
+            $por_ubicacion[$ubicacion_normalizada]['cantidad']++;
+            $por_ubicacion[$ubicacion_normalizada]['rendimiento_promedio'] += $rendimiento;
+
+            if (count($historial) > 0) {
+                $por_ubicacion[$ubicacion_normalizada]['con_experiencia']++;
+            }
+
+            // Guardar referencia del trabajador (solo ID y nombre para no sobrecargar)
+            $por_ubicacion[$ubicacion_normalizada]['trabajadores'][] = array(
+                'id'     => $user->ID,
+                'nombre' => $user->display_name,
+            );
+        }
+
+        $total_disponibles++;
+    }
+
+    // Calcular promedio de rendimiento y ordenar por cantidad
+    foreach ($por_ubicacion as $key => &$data) {
+        if ($data['cantidad'] > 0) {
+            $data['rendimiento_promedio'] = round($data['rendimiento_promedio'] / $data['cantidad'], 1);
+        }
+        // Limitar lista de trabajadores a los primeros 5
+        $data['trabajadores'] = array_slice($data['trabajadores'], 0, 5);
+    }
+
+    // Ordenar por cantidad descendente
+    uasort($por_ubicacion, function ($a, $b) {
+        return $b['cantidad'] - $a['cantidad'];
+    });
+
+    return rest_ensure_response(array(
+        'success'           => true,
+        'total_disponibles' => $total_disponibles,
+        'sin_ubicacion'     => $sin_ubicacion,
+        'por_ubicacion'     => array_values($por_ubicacion),
+    ));
+}
+
+/**
+ * Obtener mapa de disponibilidad de trabajadores
+ * Devuelve datos optimizados para visualizar en un mapa
+ */
+function agrochamba_api_get_mapa_trabajadores(WP_REST_Request $request)
+{
+    // Obtener IDs de trabajadores con contrato activo
+    $con_contrato = agrochamba_get_trabajadores_con_contrato_activo();
+
+    $args = array(
+        'role'    => 'subscriber',
+        'number'  => -1,
+        'exclude' => $con_contrato,
+    );
+
+    $users = get_users($args);
+
+    // Ubicaciones principales del agro peruano con coordenadas aproximadas
+    $ubicaciones_peru = array(
+        'ica'         => array('lat' => -14.0678, 'lng' => -75.7286, 'nombre' => 'Ica'),
+        'lima'        => array('lat' => -12.0464, 'lng' => -77.0428, 'nombre' => 'Lima'),
+        'la libertad' => array('lat' => -8.1159,  'lng' => -79.0300, 'nombre' => 'La Libertad'),
+        'piura'       => array('lat' => -5.1945,  'lng' => -80.6328, 'nombre' => 'Piura'),
+        'lambayeque'  => array('lat' => -6.7011,  'lng' => -79.9065, 'nombre' => 'Lambayeque'),
+        'arequipa'    => array('lat' => -16.4090, 'lng' => -71.5375, 'nombre' => 'Arequipa'),
+        'ancash'      => array('lat' => -9.5300,  'lng' => -77.5280, 'nombre' => 'Ancash'),
+        'tacna'       => array('lat' => -18.0146, 'lng' => -70.2536, 'nombre' => 'Tacna'),
+        'moquegua'    => array('lat' => -17.1940, 'lng' => -70.9355, 'nombre' => 'Moquegua'),
+        'junin'       => array('lat' => -11.1585, 'lng' => -75.9931, 'nombre' => 'Junín'),
+    );
+
+    // Contar trabajadores por ubicación
+    $mapa = array();
+    $otros = 0;
+
+    foreach ($users as $user) {
+        $ubicacion = strtolower(trim(get_user_meta($user->ID, 'ubicacion', true)));
+
+        $encontrado = false;
+        foreach ($ubicaciones_peru as $key => $data) {
+            if (strpos($ubicacion, $key) !== false) {
+                if (!isset($mapa[$key])) {
+                    $mapa[$key] = array(
+                        'id'        => $key,
+                        'nombre'    => $data['nombre'],
+                        'lat'       => $data['lat'],
+                        'lng'       => $data['lng'],
+                        'cantidad'  => 0,
+                    );
+                }
+                $mapa[$key]['cantidad']++;
+                $encontrado = true;
+                break;
+            }
+        }
+
+        if (!$encontrado) {
+            $otros++;
+        }
+    }
+
+    // Ordenar por cantidad
+    uasort($mapa, function ($a, $b) {
+        return $b['cantidad'] - $a['cantidad'];
+    });
+
+    return rest_ensure_response(array(
+        'success'    => true,
+        'ubicaciones'=> array_values($mapa),
+        'otros'      => $otros,
+        'total'      => count($users),
     ));
 }
 

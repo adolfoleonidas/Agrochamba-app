@@ -157,3 +157,62 @@ data class TrabajadorDisponible(
     @Json(name = "disponible_desde") val disponibleDesde: String?,
     @Json(name = "ultimo_empleador") val ultimoEmpleador: String?
 )
+
+// ==========================================
+// RESUMEN DE DISPONIBILIDAD POR UBICACIÓN
+// ==========================================
+
+/**
+ * Response para resumen de trabajadores por ubicación
+ */
+@JsonClass(generateAdapter = true)
+data class ResumenDisponiblesResponse(
+    val success: Boolean,
+    @Json(name = "total_disponibles") val totalDisponibles: Int,
+    @Json(name = "sin_ubicacion") val sinUbicacion: Int,
+    @Json(name = "por_ubicacion") val porUbicacion: List<UbicacionResumen>
+)
+
+/**
+ * Resumen de una ubicación
+ */
+@JsonClass(generateAdapter = true)
+data class UbicacionResumen(
+    val ubicacion: String,
+    val cantidad: Int,
+    @Json(name = "con_experiencia") val conExperiencia: Int,
+    @Json(name = "rendimiento_promedio") val rendimientoPromedio: Double,
+    val trabajadores: List<TrabajadorMinimo>
+)
+
+/**
+ * Datos mínimos de un trabajador (para listas resumidas)
+ */
+@JsonClass(generateAdapter = true)
+data class TrabajadorMinimo(
+    val id: Int,
+    val nombre: String
+)
+
+/**
+ * Response para mapa de trabajadores
+ */
+@JsonClass(generateAdapter = true)
+data class MapaTrabajadoresResponse(
+    val success: Boolean,
+    val ubicaciones: List<UbicacionMapa>,
+    val otros: Int,
+    val total: Int
+)
+
+/**
+ * Ubicación para mapa con coordenadas
+ */
+@JsonClass(generateAdapter = true)
+data class UbicacionMapa(
+    val id: String,
+    val nombre: String,
+    val lat: Double,
+    val lng: Double,
+    val cantidad: Int
+)

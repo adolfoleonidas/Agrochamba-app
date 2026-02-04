@@ -534,7 +534,7 @@ interface WordPressApiService {
         @Path("id") id: Int
     ): ContratoActionResponse
 
-    // === TRABAJADORES DISPONIBLES (CRM) ===
+    // === TRABAJADORES DISPONIBLES (CRM DE TALENTO) ===
 
     // Obtener trabajadores disponibles para contratar
     @GET("agrochamba/v1/trabajadores/disponibles")
@@ -544,6 +544,18 @@ interface WordPressApiService {
         @Query("experiencia") experiencia: String? = null,
         @Query("per_page") perPage: Int = 50
     ): TrabajadoresDisponiblesResponse
+
+    // Resumen de trabajadores disponibles por ubicación
+    @GET("agrochamba/v1/trabajadores/disponibles/resumen")
+    suspend fun getResumenDisponibles(
+        @Header("Authorization") token: String
+    ): ResumenDisponiblesResponse
+
+    // Mapa de disponibilidad de trabajadores (con coordenadas)
+    @GET("agrochamba/v1/trabajadores/mapa")
+    suspend fun getMapaTrabajadores(
+        @Header("Authorization") token: String
+    ): MapaTrabajadoresResponse
 }
 
 object WordPressApi {
