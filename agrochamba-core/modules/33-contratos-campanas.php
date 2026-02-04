@@ -1747,3 +1747,383 @@ function agrochamba_contratos_admin_css()
     </style>
     <?php
 }
+
+// ==========================================
+// EXPIRACIÓN AUTOMÁTICA DE CAMPAÑAS
+// ==========================================
+
+/**
+ * Registrar cron job para expiración automática
+ * Se ejecuta diariamente a las 00:00
+ */
+add_action('init', 'agrochamba_schedule_expiracion_campanas');
+
+function agrochamba_schedule_expiracion_campanas()
+{
+    if (!wp_next_scheduled('agrochamba_expiracion_campanas_cron')) {
+        wp_schedule_event(strtotime('today midnight'), 'daily', 'agrochamba_expiracion_campanas_cron');
+    }
+}
+
+add_action('agrochamba_expiracion_campanas_cron', 'agrochamba_ejecutar_expiracion_campanas');
+
+/**
+ * Ejecutar expiración automática de campañas
+ * - Marca como finalizada las campañas cuya fecha_fin ya pasó
+ * - Finaliza contratos asociados
+ * - Registra metadata de expiración para analytics
+ */
+function agrochamba_ejecutar_expiracion_campanas()
+{
+    $hoy = current_time('Y-m-d');
+
+    // Buscar campañas activas con fecha_fin pasada
+    $campanas_expiradas = get_posts(array(
+        'post_type'      => 'campana',
+        'posts_per_page' => -1,
+        'post_status'    => 'publish',
+        'meta_query'     => array(
+            'relation' => 'AND',
+            array(
+                'key'     => '_estado',
+                'value'   => 'activa',
+            ),
+            array(
+                'key'     => '_fecha_fin',
+                'value'   => $hoy,
+                'compare' => '<',
+                'type'    => 'DATE',
+            ),
+        ),
+    ));
+
+    $campanas_finalizadas = 0;
+    $contratos_finalizados = 0;
+
+    foreach ($campanas_expiradas as $campana) {
+        // Marcar campaña como finalizada
+        update_post_meta($campana->ID, '_estado', 'finalizada');
+        update_post_meta($campana->ID, '_fecha_expiracion_auto', current_time('mysql'));
+        update_post_meta($campana->ID, '_expirado_automaticamente', '1');
+        $campanas_finalizadas++;
+
+        // Finalizar contratos activos asociados a esta campaña
+        $contratos = get_posts(array(
+            'post_type'      => 'contrato',
+            'posts_per_page' => -1,
+            'post_status'    => 'publish',
+            'meta_query'     => array(
+                array('key' => '_campana_id', 'value' => $campana->ID),
+                array('key' => '_estado', 'value' => 'activo'),
+            ),
+        ));
+
+        foreach ($contratos as $contrato) {
+            update_post_meta($contrato->ID, '_estado', 'finalizado');
+            update_post_meta($contrato->ID, '_fecha_finalizacion', current_time('mysql'));
+            update_post_meta($contrato->ID, '_finalizado_por_expiracion', '1');
+
+            // Ejecutar traspaso
+            agrochamba_ejecutar_traspaso_contrato($contrato->ID);
+            $contratos_finalizados++;
+        }
+
+        // Expirar ofertas pendientes de esta campaña
+        $ofertas_pendientes = get_posts(array(
+            'post_type'      => 'contrato',
+            'posts_per_page' => -1,
+            'post_status'    => 'publish',
+            'meta_query'     => array(
+                array('key' => '_campana_id', 'value' => $campana->ID),
+                array('key' => '_estado', 'value' => 'pendiente'),
+            ),
+        ));
+
+        foreach ($ofertas_pendientes as $oferta) {
+            update_post_meta($oferta->ID, '_estado', 'expirado');
+            update_post_meta($oferta->ID, '_fecha_expiracion', current_time('mysql'));
+        }
+    }
+
+    // Log para debugging
+    if ($campanas_finalizadas > 0 || $contratos_finalizados > 0) {
+        error_log("AgroChamba: Expiración automática - {$campanas_finalizadas} campañas, {$contratos_finalizados} contratos finalizados");
+    }
+
+    return array(
+        'campanas_finalizadas'  => $campanas_finalizadas,
+        'contratos_finalizados' => $contratos_finalizados,
+    );
+}
+
+// Limpiar cron al desactivar plugin
+register_deactivation_hook(__FILE__, function () {
+    wp_clear_scheduled_hook('agrochamba_expiracion_campanas_cron');
+});
+
+// ==========================================
+// ANALYTICS Y ESTADÍSTICAS HISTÓRICAS
+// ==========================================
+
+add_action('rest_api_init', 'agrochamba_register_analytics_routes');
+
+function agrochamba_register_analytics_routes()
+{
+    // GET /analytics/campanas - Estadísticas de campañas
+    register_rest_route('agrochamba/v1', '/analytics/campanas', array(
+        'methods'             => 'GET',
+        'callback'            => 'agrochamba_api_analytics_campanas',
+        'permission_callback' => function () {
+            $user = wp_get_current_user();
+            return in_array('administrator', $user->roles) || in_array('employer', $user->roles);
+        },
+    ));
+
+    // GET /analytics/contratos - Estadísticas de contratos
+    register_rest_route('agrochamba/v1', '/analytics/contratos', array(
+        'methods'             => 'GET',
+        'callback'            => 'agrochamba_api_analytics_contratos',
+        'permission_callback' => function () {
+            $user = wp_get_current_user();
+            return in_array('administrator', $user->roles) || in_array('employer', $user->roles);
+        },
+    ));
+
+    // GET /analytics/tendencias - Tendencias por período
+    register_rest_route('agrochamba/v1', '/analytics/tendencias', array(
+        'methods'             => 'GET',
+        'callback'            => 'agrochamba_api_analytics_tendencias',
+        'permission_callback' => function () {
+            $user = wp_get_current_user();
+            return in_array('administrator', $user->roles) || in_array('employer', $user->roles);
+        },
+    ));
+}
+
+/**
+ * Estadísticas de campañas
+ */
+function agrochamba_api_analytics_campanas(WP_REST_Request $request)
+{
+    $user = wp_get_current_user();
+    $año = $request->get_param('año') ?: date('Y');
+    $empresa_id = $request->get_param('empresa_id');
+
+    // Si no es admin, solo puede ver sus propias campañas
+    if (!in_array('administrator', $user->roles)) {
+        $empresa_id = $user->ID;
+    }
+
+    $meta_query = array();
+    if ($empresa_id) {
+        $meta_query[] = array('key' => '_empresa_id', 'value' => $empresa_id);
+    }
+
+    // Todas las campañas
+    $todas = get_posts(array(
+        'post_type'      => 'campana',
+        'posts_per_page' => -1,
+        'post_status'    => 'publish',
+        'meta_query'     => $meta_query,
+        'date_query'     => array(
+            array('year' => $año),
+        ),
+    ));
+
+    // Agrupar por estado
+    $por_estado = array(
+        'activa'     => 0,
+        'pausada'    => 0,
+        'finalizada' => 0,
+        'cancelada'  => 0,
+    );
+
+    // Agrupar por cultivo
+    $por_cultivo = array();
+
+    // Agrupar por ubicación
+    $por_ubicacion = array();
+
+    // Agrupar por mes
+    $por_mes = array_fill(1, 12, 0);
+
+    foreach ($todas as $campana) {
+        $estado = get_post_meta($campana->ID, '_estado', true) ?: 'activa';
+        $cultivo = get_post_meta($campana->ID, '_cultivo', true) ?: 'Sin especificar';
+        $ubicacion = get_post_meta($campana->ID, '_ubicacion', true) ?: 'Sin especificar';
+        $mes = intval(date('n', strtotime($campana->post_date)));
+
+        $por_estado[$estado] = ($por_estado[$estado] ?? 0) + 1;
+        $por_cultivo[$cultivo] = ($por_cultivo[$cultivo] ?? 0) + 1;
+        $por_ubicacion[$ubicacion] = ($por_ubicacion[$ubicacion] ?? 0) + 1;
+        $por_mes[$mes]++;
+    }
+
+    // Ordenar por cantidad
+    arsort($por_cultivo);
+    arsort($por_ubicacion);
+
+    return rest_ensure_response(array(
+        'success'       => true,
+        'año'           => $año,
+        'total'         => count($todas),
+        'por_estado'    => $por_estado,
+        'por_cultivo'   => array_slice($por_cultivo, 0, 10, true),
+        'por_ubicacion' => array_slice($por_ubicacion, 0, 10, true),
+        'por_mes'       => $por_mes,
+    ));
+}
+
+/**
+ * Estadísticas de contratos
+ */
+function agrochamba_api_analytics_contratos(WP_REST_Request $request)
+{
+    $user = wp_get_current_user();
+    $año = $request->get_param('año') ?: date('Y');
+    $empresa_id = $request->get_param('empresa_id');
+
+    if (!in_array('administrator', $user->roles)) {
+        $empresa_id = $user->ID;
+    }
+
+    $meta_query = array();
+    if ($empresa_id) {
+        $meta_query[] = array('key' => '_empresa_id', 'value' => $empresa_id);
+    }
+
+    $todos = get_posts(array(
+        'post_type'      => 'contrato',
+        'posts_per_page' => -1,
+        'post_status'    => 'publish',
+        'meta_query'     => $meta_query,
+        'date_query'     => array(
+            array('year' => $año),
+        ),
+    ));
+
+    $por_estado = array(
+        'pendiente'  => 0,
+        'activo'     => 0,
+        'finalizado' => 0,
+        'cancelado'  => 0,
+        'rechazado'  => 0,
+        'expirado'   => 0,
+    );
+
+    $total_aceptados = 0;
+    $total_rechazados = 0;
+    $tiempos_respuesta = array(); // días entre oferta y aceptación/rechazo
+
+    foreach ($todos as $contrato) {
+        $estado = get_post_meta($contrato->ID, '_estado', true) ?: 'pendiente';
+        $por_estado[$estado] = ($por_estado[$estado] ?? 0) + 1;
+
+        if ($estado === 'activo' || $estado === 'finalizado') {
+            $total_aceptados++;
+
+            $fecha_oferta = get_post_meta($contrato->ID, '_fecha_oferta', true);
+            $fecha_aceptacion = get_post_meta($contrato->ID, '_fecha_aceptacion', true);
+
+            if ($fecha_oferta && $fecha_aceptacion) {
+                $dias = (strtotime($fecha_aceptacion) - strtotime($fecha_oferta)) / 86400;
+                $tiempos_respuesta[] = max(0, $dias);
+            }
+        }
+
+        if ($estado === 'rechazado') {
+            $total_rechazados++;
+        }
+    }
+
+    $tasa_aceptacion = count($todos) > 0
+        ? round(($total_aceptados / count($todos)) * 100, 1)
+        : 0;
+
+    $tiempo_promedio_respuesta = count($tiempos_respuesta) > 0
+        ? round(array_sum($tiempos_respuesta) / count($tiempos_respuesta), 1)
+        : 0;
+
+    return rest_ensure_response(array(
+        'success'                   => true,
+        'año'                       => $año,
+        'total'                     => count($todos),
+        'por_estado'                => $por_estado,
+        'tasa_aceptacion'           => $tasa_aceptacion,
+        'tiempo_promedio_respuesta' => $tiempo_promedio_respuesta,
+        'total_aceptados'           => $total_aceptados,
+        'total_rechazados'          => $total_rechazados,
+    ));
+}
+
+/**
+ * Tendencias históricas
+ */
+function agrochamba_api_analytics_tendencias(WP_REST_Request $request)
+{
+    $user = wp_get_current_user();
+    $años = $request->get_param('años') ?: 3;
+    $empresa_id = $request->get_param('empresa_id');
+
+    if (!in_array('administrator', $user->roles)) {
+        $empresa_id = $user->ID;
+    }
+
+    $año_actual = intval(date('Y'));
+    $tendencias = array();
+
+    for ($i = 0; $i < $años; $i++) {
+        $año = $año_actual - $i;
+
+        $meta_query = array();
+        if ($empresa_id) {
+            $meta_query[] = array('key' => '_empresa_id', 'value' => $empresa_id);
+        }
+
+        // Contar campañas del año
+        $campanas = get_posts(array(
+            'post_type'      => 'campana',
+            'posts_per_page' => -1,
+            'post_status'    => 'publish',
+            'meta_query'     => $meta_query,
+            'date_query'     => array(array('year' => $año)),
+            'fields'         => 'ids',
+        ));
+
+        // Contar contratos del año
+        $contratos = get_posts(array(
+            'post_type'      => 'contrato',
+            'posts_per_page' => -1,
+            'post_status'    => 'publish',
+            'meta_query'     => $meta_query,
+            'date_query'     => array(array('year' => $año)),
+            'fields'         => 'ids',
+        ));
+
+        // Contar trabajadores únicos contratados
+        $trabajadores_unicos = array();
+        foreach ($contratos as $contrato_id) {
+            $trabajador = get_post_meta($contrato_id, '_trabajador_id', true);
+            if ($trabajador) {
+                $trabajadores_unicos[$trabajador] = true;
+            }
+        }
+
+        $tendencias[] = array(
+            'año'                  => $año,
+            'campanas'             => count($campanas),
+            'contratos'            => count($contratos),
+            'trabajadores_unicos'  => count($trabajadores_unicos),
+        );
+    }
+
+    // Ordenar por año ascendente
+    usort($tendencias, function ($a, $b) {
+        return $a['año'] - $b['año'];
+    });
+
+    return rest_ensure_response(array(
+        'success'    => true,
+        'tendencias' => $tendencias,
+    ));
+}
