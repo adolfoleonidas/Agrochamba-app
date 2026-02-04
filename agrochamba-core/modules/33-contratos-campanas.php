@@ -99,6 +99,7 @@ function agrochamba_get_estados_contrato()
         'finalizado' => 'Finalizado',
         'cancelado'  => 'Cancelado',
         'rechazado'  => 'Rechazado',
+        'expirado'   => 'Expirado', // Auto-expirado cuando trabajador acepta otra oferta
     );
 }
 
@@ -935,18 +936,23 @@ function agrochamba_api_crear_contrato(WP_REST_Request $request)
         return new WP_Error('worker_not_found', 'Trabajador no encontrado', array('status' => 404));
     }
 
-    // Verificar que el trabajador no tenga contrato activo
-    $contrato_activo = get_posts(array(
+    // Nota: Ya no bloqueamos si el trabajador tiene contrato activo.
+    // El trabajador puede recibir ofertas y al aceptar una, el sistema
+    // finalizará automáticamente cualquier contrato previo (traspaso automático).
+
+    // Solo verificamos que no haya una oferta pendiente de la misma empresa
+    $oferta_pendiente = get_posts(array(
         'post_type'      => 'contrato',
         'posts_per_page' => 1,
         'meta_query'     => array(
             array('key' => '_trabajador_id', 'value' => $trabajador_id),
-            array('key' => '_estado', 'value' => 'activo'),
+            array('key' => '_empresa_id', 'value' => $user->ID),
+            array('key' => '_estado', 'value' => 'pendiente'),
         ),
     ));
 
-    if (!empty($contrato_activo)) {
-        return new WP_Error('worker_busy', 'El trabajador ya tiene un contrato activo', array('status' => 409));
+    if (!empty($oferta_pendiente)) {
+        return new WP_Error('offer_exists', 'Ya tienes una oferta pendiente para este trabajador', array('status' => 409));
     }
 
     // Crear contrato
@@ -1006,20 +1012,83 @@ function agrochamba_api_aceptar_contrato(WP_REST_Request $request)
         return new WP_Error('invalid_state', 'El contrato no está pendiente', array('status' => 400));
     }
 
-    // Actualizar estado
+    $nueva_empresa_id = get_post_meta($contrato_id, '_empresa_id', true);
+
+    // ==========================================
+    // TRASPASO AUTOMÁTICO
+    // Si el trabajador tiene contrato activo con otra empresa,
+    // finalizarlo automáticamente antes de activar el nuevo
+    // ==========================================
+    $contratos_activos = get_posts(array(
+        'post_type'      => 'contrato',
+        'posts_per_page' => -1,
+        'post_status'    => 'publish',
+        'meta_query'     => array(
+            array('key' => '_trabajador_id', 'value' => $user_id),
+            array('key' => '_estado', 'value' => 'activo'),
+        ),
+    ));
+
+    $empresa_anterior = null;
+    foreach ($contratos_activos as $contrato_anterior) {
+        $empresa_anterior_id = get_post_meta($contrato_anterior->ID, '_empresa_id', true);
+
+        // Finalizar el contrato anterior
+        update_post_meta($contrato_anterior->ID, '_estado', 'finalizado');
+        update_post_meta($contrato_anterior->ID, '_fecha_finalizacion', current_time('mysql'));
+        update_post_meta($contrato_anterior->ID, '_motivo_finalizacion', 'Traspaso automático - Trabajador aceptó contrato con otra empresa');
+
+        // Ejecutar traspaso (guardar historial, etc.)
+        agrochamba_ejecutar_traspaso_contrato($contrato_anterior->ID);
+
+        // Guardar referencia de empresa anterior
+        $empresa_anterior = get_userdata($empresa_anterior_id);
+
+        // Log del traspaso
+        error_log("AgroChamba: Traspaso automático - Trabajador $user_id pasó de empresa $empresa_anterior_id a $nueva_empresa_id");
+    }
+
+    // Activar el nuevo contrato
     update_post_meta($contrato_id, '_estado', 'activo');
     update_post_meta($contrato_id, '_fecha_aceptacion', current_time('mysql'));
 
-    // Marcar trabajador como no disponible
+    // Marcar trabajador como no disponible (tiene contrato activo)
     update_user_meta($user_id, '_disponible', '0');
     update_user_meta($user_id, '_contrato_activo_id', $contrato_id);
 
+    // Expirar automáticamente otras ofertas pendientes de otras empresas
+    $ofertas_pendientes = get_posts(array(
+        'post_type'      => 'contrato',
+        'posts_per_page' => -1,
+        'post_status'    => 'publish',
+        'post__not_in'   => array($contrato_id),
+        'meta_query'     => array(
+            array('key' => '_trabajador_id', 'value' => $user_id),
+            array('key' => '_estado', 'value' => 'pendiente'),
+        ),
+    ));
+
+    foreach ($ofertas_pendientes as $oferta) {
+        update_post_meta($oferta->ID, '_estado', 'expirado');
+        update_post_meta($oferta->ID, '_motivo_expiracion', 'Trabajador aceptó contrato con otra empresa');
+        // TODO: Notificar a la empresa que su oferta expiró
+    }
+
+    // Hook para extensiones
     do_action('agrochamba_contrato_aceptado', $contrato_id, $user_id);
 
+    // Mensaje según si hubo traspaso o no
+    $mensaje = 'Contrato aceptado exitosamente';
+    if ($empresa_anterior) {
+        $mensaje = 'Contrato aceptado. Tu historial ha sido transferido desde ' . $empresa_anterior->display_name;
+    }
+
     return rest_ensure_response(array(
-        'success' => true,
-        'message' => 'Contrato aceptado exitosamente',
-        'data'    => agrochamba_format_contrato(get_post($contrato_id)),
+        'success'           => true,
+        'message'           => $mensaje,
+        'data'              => agrochamba_format_contrato(get_post($contrato_id)),
+        'traspaso_realizado'=> !empty($contratos_activos),
+        'empresa_anterior'  => $empresa_anterior ? $empresa_anterior->display_name : null,
     ));
 }
 
