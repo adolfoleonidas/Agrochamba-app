@@ -40,10 +40,10 @@ data class ProfilePhotoResponse(
 )
 
 data class PhotoUrls(
-    val full: String,
-    val thumbnail: String,
-    val medium: String,
-    val large: String
+    val full: String?,
+    val thumbnail: String?,
+    val medium: String?,
+    val large: String?
 )
 
 data class FavoriteResponse(

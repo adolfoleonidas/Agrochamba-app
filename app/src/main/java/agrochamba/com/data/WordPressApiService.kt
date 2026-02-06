@@ -86,6 +86,19 @@ interface WordPressApiService {
         @Body data: Map<String, @JvmSuppressWildcards Any>
     ): CreateAvisoResponse
 
+    @PUT("agrochamba/v1/avisos/{id}")
+    suspend fun updateAviso(
+        @Header("Authorization") token: String,
+        @Path("id") avisoId: Int,
+        @Body data: Map<String, @JvmSuppressWildcards Any>
+    ): CreateAvisoResponse
+
+    @DELETE("agrochamba/v1/avisos/{id}")
+    suspend fun deleteAviso(
+        @Header("Authorization") token: String,
+        @Path("id") avisoId: Int
+    ): retrofit2.Response<Unit>
+
     @GET("wp/v2/media")
     suspend fun getMediaForPost(@Query("parent") postId: Int): List<MediaItem>
 

@@ -105,11 +105,9 @@ import agrochamba.com.ui.common.CreateAlertBanner
 import agrochamba.com.ui.common.FilterChipsBar
 import agrochamba.com.ui.common.FilterType
 import agrochamba.com.ui.common.NoResultsMessage
-import agrochamba.com.ui.disponibilidad.DisponibilidadViewModel
 import agrochamba.com.ui.home.AvisosOperativosSection
 import agrochamba.com.ui.home.CategoriasSection
 import agrochamba.com.ui.home.CategoriaJob
-import agrochamba.com.ui.home.DisponibilidadBanner
 import agrochamba.com.ui.home.EmpleosDestacadosSection
 import agrochamba.com.ui.home.HomeHeader
 import agrochamba.com.ui.home.HomeSearchBar
@@ -256,11 +254,6 @@ fun JobsListWithSearchScreen(
     val uiState = jobsViewModel.uiState
     android.util.Log.d("JobsListWithSearchScreen", "📊 uiState obtenido: isLoading=${uiState.isLoading}")
 
-    // ViewModel de disponibilidad (solo para trabajadores, no empresas)
-    val isWorker = userProfile?.isEnterprise != true
-    val disponibilidadViewModel: DisponibilidadViewModel = viewModel()
-    val disponibilidadState = disponibilidadViewModel.uiState
-
     // ViewModel de avisos operativos
     val avisosViewModel: AvisosViewModel = viewModel()
     val avisosState = avisosViewModel.uiState
@@ -394,21 +387,6 @@ fun JobsListWithSearchScreen(
                         onRendimientoClick = onNavigateToRendimiento,
                         onFotocheckClick = onNavigateToFotocheck
                     )
-                }
-
-                // Banner de disponibilidad (solo para trabajadores)
-                if (isWorker && !disponibilidadState.isLoading) {
-                    item {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        DisponibilidadBanner(
-                            disponibleParaTrabajo = disponibilidadState.disponibleParaTrabajo,
-                            tieneContratoActivo = disponibilidadState.tieneContratoActivo,
-                            visibleParaEmpresas = disponibilidadState.visibleParaEmpresas,
-                            ubicacion = disponibilidadState.ubicacion,
-                            isLoading = disponibilidadState.isLoading,
-                            onToggleDisponibilidad = { disponibilidadViewModel.toggleDisponibilidad() }
-                        )
-                    }
                 }
 
                 // Barra de búsqueda

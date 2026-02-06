@@ -483,6 +483,8 @@ fun AvisosOperativosSection(
     onVerRutas: () -> Unit,
     isAdminOrEmpresa: Boolean = false,
     onCrearAviso: (TipoAviso, String) -> Unit = { _, _ -> },
+    onEditarAviso: (AvisoOperativo) -> Unit = { },
+    onEliminarAviso: (Int) -> Unit = { },
     modifier: Modifier = Modifier
 ) {
     var showCrearAvisoDialog by remember { mutableStateOf(false) }
@@ -551,7 +553,13 @@ fun AvisosOperativosSection(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             items(avisos) { aviso ->
-                AvisoCard(aviso = aviso, onVerRutas = onVerRutas)
+                AvisoCard(
+                    aviso = aviso,
+                    onVerRutas = onVerRutas,
+                    isAdminOrEmpresa = isAdminOrEmpresa,
+                    onEditar = { onEditarAviso(aviso) },
+                    onEliminar = { onEliminarAviso(aviso.id) }
+                )
             }
         }
 
@@ -765,20 +773,307 @@ fun CrearAvisoDialog(
 }
 
 /**
+ * Dialog para editar un aviso operativo existente
+ */
+@Composable
+fun EditarAvisoDialog(
+    aviso: AvisoOperativo,
+    onDismiss: () -> Unit,
+    onGuardar: () -> Unit,
+    viewModel: AvisosViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+) {
+    // Determinar tipo inicial basado en el aviso
+    val tipoInicial = when (aviso) {
+        is AvisoOperativo.Anuncio -> TipoAviso.ANUNCIO
+        is AvisoOperativo.HorarioIngreso -> TipoAviso.HORARIO
+        is AvisoOperativo.AlertaClima -> TipoAviso.CLIMA
+        is AvisoOperativo.ResumenTrabajos -> TipoAviso.RESUMEN
+    }
+
+    // Obtener mensaje inicial
+    val mensajeInicial = when (aviso) {
+        is AvisoOperativo.Anuncio -> aviso.mensaje
+        is AvisoOperativo.HorarioIngreso -> "Operativos: ${aviso.horaOperativos}, Administrativos: ${aviso.horaAdministrativos}"
+        is AvisoOperativo.AlertaClima -> aviso.mensaje
+        is AvisoOperativo.ResumenTrabajos -> aviso.contenidoCompleto
+    }
+
+    var tipoSeleccionado by remember { mutableStateOf(tipoInicial) }
+    var titulo by remember { mutableStateOf(aviso.titulo) }
+    var mensaje by remember { mutableStateOf(mensajeInicial) }
+    var ubicacion by remember { mutableStateOf(
+        if (aviso is AvisoOperativo.ResumenTrabajos) aviso.ubicacion else ""
+    ) }
+    var horaOperativos by remember { mutableStateOf(
+        if (aviso is AvisoOperativo.HorarioIngreso) aviso.horaOperativos else "06:00 AM"
+    ) }
+    var horaAdministrativos by remember { mutableStateOf(
+        if (aviso is AvisoOperativo.HorarioIngreso) aviso.horaAdministrativos else "08:00 AM"
+    ) }
+
+    val uiState = viewModel.uiState
+
+    AlertDialog(
+        onDismissRequest = { if (!uiState.isUpdating) onDismiss() },
+        title = {
+            Text(
+                text = "Editar Aviso",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Selector de tipo
+                Text(
+                    text = "Tipo de aviso",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TipoAviso.entries.forEach { tipo ->
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { tipoSeleccionado = tipo },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (tipoSeleccionado == tipo)
+                                    MaterialTheme.colorScheme.primaryContainer
+                                else
+                                    MaterialTheme.colorScheme.surfaceVariant
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Icon(
+                                    tipo.icon,
+                                    contentDescription = null,
+                                    tint = if (tipoSeleccionado == tipo)
+                                        MaterialTheme.colorScheme.primary
+                                    else
+                                        MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text(
+                                    text = tipo.label,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = if (tipoSeleccionado == tipo) FontWeight.SemiBold else FontWeight.Normal,
+                                    color = if (tipoSeleccionado == tipo)
+                                        MaterialTheme.colorScheme.primary
+                                    else
+                                        MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Campo de título
+                OutlinedTextField(
+                    value = titulo,
+                    onValueChange = { titulo = it },
+                    label = { Text("Título") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    singleLine = true
+                )
+
+                // Campos específicos por tipo
+                when (tipoSeleccionado) {
+                    TipoAviso.RESUMEN -> {
+                        OutlinedTextField(
+                            value = ubicacion,
+                            onValueChange = { ubicacion = it },
+                            label = { Text("Ubicación") },
+                            placeholder = { Text("Ej: Ica, Lima, Arequipa...") },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            singleLine = true
+                        )
+                    }
+                    TipoAviso.HORARIO -> {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(
+                                value = horaOperativos,
+                                onValueChange = { horaOperativos = it },
+                                label = { Text("Hora Operativos") },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(12.dp),
+                                singleLine = true
+                            )
+                            OutlinedTextField(
+                                value = horaAdministrativos,
+                                onValueChange = { horaAdministrativos = it },
+                                label = { Text("Hora Admin") },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(12.dp),
+                                singleLine = true
+                            )
+                        }
+                    }
+                    else -> { }
+                }
+
+                // Campo de mensaje/contenido
+                OutlinedTextField(
+                    value = mensaje,
+                    onValueChange = { mensaje = it },
+                    label = { Text("Contenido") },
+                    placeholder = {
+                        Text(
+                            text = when (tipoSeleccionado) {
+                                TipoAviso.ANUNCIO -> "Escribe tu anuncio..."
+                                TipoAviso.HORARIO -> "Información adicional (opcional)"
+                                TipoAviso.CLIMA -> "Ej: Temperatura de 28°C, recuerden hidratarse"
+                                TipoAviso.RESUMEN -> "Escribe el resumen de trabajos disponibles..."
+                            }
+                        )
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(120.dp),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                // Mostrar error si existe
+                uiState.updateError?.let { error ->
+                    Text(
+                        text = error,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    viewModel.updateAviso(
+                        avisoId = aviso.id,
+                        tipo = tipoSeleccionado,
+                        titulo = titulo,
+                        mensaje = mensaje,
+                        ubicacion = ubicacion.ifBlank { null },
+                        horaOperativos = horaOperativos.ifBlank { null },
+                        horaAdministrativos = horaAdministrativos.ifBlank { null }
+                    )
+                },
+                enabled = mensaje.isNotBlank() && !uiState.isUpdating
+            ) {
+                if (uiState.isUpdating) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Text(
+                        text = "Guardar",
+                        fontWeight = FontWeight.Bold,
+                        color = if (mensaje.isNotBlank())
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !uiState.isUpdating
+            ) {
+                Text(
+                    text = "Cancelar",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        containerColor = MaterialTheme.colorScheme.surface
+    )
+
+    // Cerrar el dialog cuando se actualice con éxito
+    if (uiState.updateSuccess) {
+        viewModel.clearUpdateState()
+        onGuardar()
+    }
+}
+
+/**
  * Card de Aviso Operativo - Altura fija para consistencia
  */
 @Composable
 fun AvisoCard(
     aviso: AvisoOperativo,
-    onVerRutas: () -> Unit
+    onVerRutas: () -> Unit,
+    isAdminOrEmpresa: Boolean = false,
+    onEditar: () -> Unit = {},
+    onEliminar: () -> Unit = {}
 ) {
-    var showResumenDialog by remember { mutableStateOf(false) }
+    var showDetailDialog by remember { mutableStateOf(false) }
+    var showEditDialog by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
 
     // Dialog para ResumenTrabajos
-    if (aviso is AvisoOperativo.ResumenTrabajos && showResumenDialog) {
+    if (aviso is AvisoOperativo.ResumenTrabajos && showDetailDialog) {
         ResumenTrabajosDialog(
             aviso = aviso,
-            onDismiss = { showResumenDialog = false }
+            onDismiss = { showDetailDialog = false }
+        )
+    }
+
+    // Dialog para AlertaClima y Anuncio
+    if ((aviso is AvisoOperativo.AlertaClima || aviso is AvisoOperativo.Anuncio) && showDetailDialog) {
+        AvisoDetailDialog(
+            aviso = aviso,
+            onDismiss = { showDetailDialog = false }
+        )
+    }
+
+    // Dialog de confirmación para eliminar
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Eliminar aviso") },
+            text = { Text("¿Estás seguro de que deseas eliminar este aviso?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteConfirm = false
+                        onEliminar()
+                    }
+                ) {
+                    Text("Eliminar", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
+    // Dialog de edición
+    if (showEditDialog && aviso.id > 0) {
+        EditarAvisoDialog(
+            aviso = aviso,
+            onDismiss = { showEditDialog = false },
+            onGuardar = {
+                showEditDialog = false
+                onEditar()
+            }
         )
     }
 
@@ -796,33 +1091,76 @@ fun AvisoCard(
                 .padding(16.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Header con icono
+            // Header con icono y botones de edición
             Row(
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clip(CircleShape)
-                        .background(aviso.accentColor.copy(alpha = 0.15f)),
-                    contentAlignment = Alignment.Center
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.weight(1f)
                 ) {
-                    Icon(
-                        aviso.icon,
-                        contentDescription = null,
-                        tint = aviso.accentColor,
-                        modifier = Modifier.size(18.dp)
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(aviso.accentColor.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            aviso.icon,
+                            contentDescription = null,
+                            tint = aviso.accentColor,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    Text(
+                        text = aviso.titulo,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
-                Text(
-                    text = aviso.titulo,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+
+                // Botones de edición (solo para admin/empresa y avisos con ID válido)
+                if (isAdminOrEmpresa && aviso.id > 0) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primaryContainer)
+                                .clickable { showEditDialog = true },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.Build,
+                                contentDescription = "Editar",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.errorContainer)
+                                .clickable { showDeleteConfirm = true },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.Warning,
+                                contentDescription = "Eliminar",
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
+                }
             }
 
             // Contenido del aviso (área central flexible)
@@ -856,12 +1194,17 @@ fun AvisoCard(
                     AvisoActionButton(
                         text = "Leer más",
                         icon = Icons.Default.ChevronRight,
-                        onClick = { showResumenDialog = true },
+                        onClick = { showDetailDialog = true },
                         isPrimary = true
                     )
                 }
-                // AlertaClima y Anuncio no tienen botón de acción
-                else -> { }
+                is AvisoOperativo.AlertaClima, is AvisoOperativo.Anuncio -> {
+                    AvisoActionButton(
+                        text = "Leer más",
+                        icon = Icons.Default.ChevronRight,
+                        onClick = { showDetailDialog = true }
+                    )
+                }
             }
         }
     }
@@ -1045,6 +1388,68 @@ fun ResumenTrabajosDialog(
             ) {
                 Text(
                     text = aviso.contenidoCompleto,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 24.sp
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(
+                    text = "Cerrar",
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        },
+        containerColor = MaterialTheme.colorScheme.surface,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+}
+
+/**
+ * Dialog genérico para mostrar el contenido completo de AlertaClima y Anuncio
+ */
+@Composable
+fun AvisoDetailDialog(
+    aviso: AvisoOperativo,
+    onDismiss: () -> Unit
+) {
+    val mensaje = when (aviso) {
+        is AvisoOperativo.AlertaClima -> aviso.mensaje
+        is AvisoOperativo.Anuncio -> aviso.mensaje
+        else -> ""
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    aviso.icon,
+                    contentDescription = null,
+                    tint = aviso.accentColor,
+                    modifier = Modifier.size(24.dp)
+                )
+                Text(
+                    text = aviso.titulo,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Text(
+                    text = mensaje,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     lineHeight = 24.sp
@@ -1371,40 +1776,45 @@ val AvisoColorResumen = Color(0xFF4CAF50) // Verde
 
 // Data classes para los avisos
 sealed class AvisoOperativo(
+    open val id: Int,
     open val titulo: String,
     open val icon: ImageVector,
     open val accentColor: Color
 ) {
     data class HorarioIngreso(
+        override val id: Int = 0,
         override val titulo: String = "HORARIOS DE INGRESO",
         override val icon: ImageVector = Icons.Default.Schedule,
         override val accentColor: Color = AvisoColorHorario,
         val horaOperativos: String = "06:00 AM",
         val horaAdministrativos: String = "08:00 AM"
-    ) : AvisoOperativo(titulo, icon, accentColor)
+    ) : AvisoOperativo(id, titulo, icon, accentColor)
 
     data class AlertaClima(
+        override val id: Int = 0,
         override val titulo: String = "ALERTA CLIMA",
         override val icon: ImageVector = Icons.Default.Warning,
         override val accentColor: Color = AvisoColorClima,
         val mensaje: String
-    ) : AvisoOperativo(titulo, icon, accentColor)
+    ) : AvisoOperativo(id, titulo, icon, accentColor)
 
     data class Anuncio(
+        override val id: Int = 0,
         override val titulo: String,
         override val icon: ImageVector = Icons.Default.Notifications,
         override val accentColor: Color = AvisoColorAnuncio,
         val mensaje: String
-    ) : AvisoOperativo(titulo, icon, accentColor)
+    ) : AvisoOperativo(id, titulo, icon, accentColor)
 
     data class ResumenTrabajos(
+        override val id: Int = 0,
         override val titulo: String = "RESUMEN DE TRABAJOS",
         override val icon: ImageVector = Icons.Default.Assignment,
         override val accentColor: Color = AvisoColorResumen,
         val ubicacion: String,
         val preview: String,
         val contenidoCompleto: String
-    ) : AvisoOperativo(titulo, icon, accentColor)
+    ) : AvisoOperativo(id, titulo, icon, accentColor)
 }
 
 // Data class para categorias
@@ -1478,21 +1888,25 @@ Es fundamental asistir desde temprano para asegurar tu lugar. ¡No dejes pasar e
 fun agrochamba.com.data.AvisoOperativoResponse.toUiModel(): AvisoOperativo {
     return when (tipo) {
         "resumen_trabajos" -> AvisoOperativo.ResumenTrabajos(
+            id = id,
             titulo = titulo.ifBlank { "RESUMEN DE TRABAJOS" },
             ubicacion = ubicacion ?: "Perú",
             preview = preview ?: contenido?.take(100) ?: "",
             contenidoCompleto = contenido ?: preview ?: ""
         )
         "horario_ingreso" -> AvisoOperativo.HorarioIngreso(
+            id = id,
             titulo = titulo.ifBlank { "HORARIOS DE INGRESO" },
             horaOperativos = horaOperativos ?: "06:00 AM",
             horaAdministrativos = horaAdministrativos ?: "08:00 AM"
         )
         "alerta_clima" -> AvisoOperativo.AlertaClima(
+            id = id,
             titulo = titulo.ifBlank { "ALERTA CLIMA" },
             mensaje = contenido ?: preview ?: "Sin información de clima"
         )
         else -> AvisoOperativo.Anuncio(
+            id = id,
             titulo = titulo.ifBlank { "ANUNCIO" },
             mensaje = contenido ?: preview ?: ""
         )
@@ -1543,8 +1957,7 @@ fun DisponibilidadBanner(
 
     Card(
         modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
+            .fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = backgroundColor),
         shape = RoundedCornerShape(16.dp)
     ) {

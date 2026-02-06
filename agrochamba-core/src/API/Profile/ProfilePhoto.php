@@ -155,11 +155,13 @@ class ProfilePhoto
         }
 
         $photo_url = wp_get_attachment_image_url($attachment_id, 'full');
+        // Asegurar que los valores sean string o null (no false) para compatibilidad con la app
+        $full_url = wp_get_attachment_image_url($attachment_id, 'full');
         $photo_urls = [
-            'full' => wp_get_attachment_image_url($attachment_id, 'full'),
-            'thumbnail' => wp_get_attachment_image_url($attachment_id, 'thumbnail'),
-            'medium' => wp_get_attachment_image_url($attachment_id, 'medium'),
-            'large' => wp_get_attachment_image_url($attachment_id, 'large'),
+            'full' => $full_url ?: null,
+            'thumbnail' => wp_get_attachment_image_url($attachment_id, 'thumbnail') ?: $full_url ?: null,
+            'medium' => wp_get_attachment_image_url($attachment_id, 'medium') ?: $full_url ?: null,
+            'large' => wp_get_attachment_image_url($attachment_id, 'large') ?: $full_url ?: null,
         ];
 
         return new WP_REST_Response([

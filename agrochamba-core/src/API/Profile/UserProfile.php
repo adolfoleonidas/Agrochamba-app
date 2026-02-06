@@ -84,6 +84,8 @@ class UserProfile
             }
         }
 
+        $dni_raw = get_user_meta($user_id, 'dni', true);
+
         $data = [
             'user_id' => $user_id,
             'username' => $user->user_login,
@@ -91,6 +93,7 @@ class UserProfile
             'email' => $user->user_email,
             'first_name' => get_user_meta($user_id, 'first_name', true),
             'last_name' => get_user_meta($user_id, 'last_name', true),
+            'dni' => $dni_raw ? (string)$dni_raw : null,
             'roles' => $user->roles,
             'is_enterprise' => $is_enterprise,
             'profile_photo_id' => $profile_photo_id ? intval($profile_photo_id) : null,
@@ -147,6 +150,7 @@ class UserProfile
         }
 
         $params = $request->get_json_params();
+        error_log('AgroChamba DEBUG update_profile: params recibidos = ' . wp_json_encode($params));
         $old_display_name = $user->display_name;
 
         $updates = [];
@@ -170,6 +174,15 @@ class UserProfile
             $bio = wp_strip_all_tags((string)$params['bio']);
             $meta_updates['bio'] = substr($bio, 0, 1000);
         }
+        if (isset($params['dni'])) {
+            $dni = preg_replace('/[^0-9]/', '', (string)$params['dni']);
+            error_log('AgroChamba DEBUG: DNI recibido = ' . $params['dni'] . ', limpio = ' . $dni . ', len = ' . strlen($dni));
+            if (strlen($dni) === 8) {
+                $meta_updates['dni'] = $dni;
+            }
+        } else {
+            error_log('AgroChamba DEBUG: params NO contiene dni. Keys = ' . implode(', ', array_keys($params)));
+        }
 
         $is_enterprise = in_array('employer', (array)$user->roles, true) || in_array('administrator', (array)$user->roles, true);
 
@@ -179,7 +192,8 @@ class UserProfile
             wp_update_user($userdata);
         }
 
-        // Guardar phone y bio en user_meta para TODOS los usuarios (incluidas empresas)
+        // Guardar phone, bio y dni en user_meta para TODOS los usuarios
+        error_log('AgroChamba DEBUG: meta_updates a guardar = ' . wp_json_encode($meta_updates));
         foreach ($meta_updates as $key => $value) {
             update_user_meta($user_id, $key, $value);
         }

@@ -18,9 +18,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import androidx.lifecycle.viewmodel.compose.viewModel
 import agrochamba.com.data.AuthManager
 import agrochamba.com.data.SettingsManager
 import agrochamba.com.ui.common.BenefitSwitch
+import agrochamba.com.ui.disponibilidad.DisponibilidadViewModel
+import agrochamba.com.ui.home.DisponibilidadBanner
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,7 +35,10 @@ fun SettingsScreen(navController: NavController) {
     val facebookShortenContent = SettingsManager.facebookShortenContent
     val isAdmin = AuthManager.isUserAdmin()
     val isCompany = AuthManager.isUserAnEnterprise()
-    
+    val isWorker = !isCompany && !isAdmin
+    val disponibilidadViewModel: DisponibilidadViewModel = viewModel()
+    val disponibilidadState = disponibilidadViewModel.uiState
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -53,6 +59,26 @@ fun SettingsScreen(navController: NavController) {
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // Sección de Disponibilidad (solo para trabajadores)
+            if (isWorker) {
+                Text(
+                    text = "Disponibilidad para ofertas",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+
+                DisponibilidadBanner(
+                    disponibleParaTrabajo = disponibilidadState.disponibleParaTrabajo,
+                    tieneContratoActivo = disponibilidadState.tieneContratoActivo,
+                    visibleParaEmpresas = disponibilidadState.visibleParaEmpresas,
+                    ubicacion = disponibilidadState.ubicacion,
+                    isLoading = disponibilidadState.isLoading,
+                    onToggleDisponibilidad = { disponibilidadViewModel.toggleDisponibilidad() }
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+            }
+
             // Sección de Sedes (solo para empresas y admins)
             if (isCompany) {
                 Text(
@@ -105,107 +131,110 @@ fun SettingsScreen(navController: NavController) {
                 Spacer(modifier = Modifier.height(24.dp))
             }
             
-            Text(
-                text = "Publicación en Facebook",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
-            
-            // Opción para gestionar páginas de Facebook (solo admins)
-            if (isAdmin) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { navController.navigate("facebook_pages") },
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-                    )
-                ) {
-                    Row(
+            // Sección de Facebook (solo para empresas y admins)
+            if (isCompany || isAdmin) {
+                Text(
+                    text = "Publicación en Facebook",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+
+                // Opción para gestionar páginas de Facebook (solo admins)
+                if (isAdmin) {
+                    Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Facebook,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(32.dp)
+                            .clickable { navController.navigate("facebook_pages") },
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
                         )
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Gestionar Páginas de Facebook",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Medium
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Facebook,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(32.dp)
                             )
-                            Text(
-                                text = "Configura múltiples páginas para publicar",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Gestionar Páginas de Facebook",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    text = "Configura múltiples páginas para publicar",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Icon(
+                                imageVector = Icons.Default.ChevronRight,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        Icon(
-                            imageVector = Icons.Default.ChevronRight,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        BenefitSwitch(
+                            text = "Usar preview del link en lugar de imágenes adjuntas",
+                            checked = facebookUseLinkPreview,
+                            onCheckedChange = {
+                                SettingsManager.applyFacebookUseLinkPreview(it)
+                            }
+                        )
+
+                        Text(
+                            text = if (facebookUseLinkPreview) {
+                                "Las publicaciones mostrarán un preview del link de tu trabajo, lo que puede generar más visitas a tu sitio web."
+                            } else {
+                                "Las imágenes se adjuntarán nativamente en Facebook, mostrando el contenido visual directamente en el post."
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        BenefitSwitch(
+                            text = "Acortar contenido en Facebook",
+                            checked = facebookShortenContent,
+                            onCheckedChange = {
+                                SettingsManager.applyFacebookShortenContent(it)
+                            }
+                        )
+
+                        Text(
+                            text = if (facebookShortenContent) {
+                                "Solo se mostrará una parte del contenido en Facebook. Al final se agregará un link para leer los detalles completos en el sitio web, generando más tráfico."
+                            } else {
+                                "Se mostrará el contenido completo en la publicación de Facebook."
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 8.dp)
                         )
                     }
-                }
-                
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-            
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                )
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    BenefitSwitch(
-                        text = "Usar preview del link en lugar de imágenes adjuntas",
-                        checked = facebookUseLinkPreview,
-                        onCheckedChange = { 
-                            SettingsManager.applyFacebookUseLinkPreview(it)
-                        }
-                    )
-                    
-                    Text(
-                        text = if (facebookUseLinkPreview) {
-                            "Las publicaciones mostrarán un preview del link de tu trabajo, lo que puede generar más visitas a tu sitio web."
-                        } else {
-                            "Las imágenes se adjuntarán nativamente en Facebook, mostrando el contenido visual directamente en el post."
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
-                    BenefitSwitch(
-                        text = "Acortar contenido en Facebook",
-                        checked = facebookShortenContent,
-                        onCheckedChange = { 
-                            SettingsManager.applyFacebookShortenContent(it)
-                        }
-                    )
-                    
-                    Text(
-                        text = if (facebookShortenContent) {
-                            "Solo se mostrará una parte del contenido en Facebook. Al final se agregará un link para leer los detalles completos en el sitio web, generando más tráfico."
-                        } else {
-                            "Se mostrará el contenido completo en la publicación de Facebook."
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
                 }
             }
         }

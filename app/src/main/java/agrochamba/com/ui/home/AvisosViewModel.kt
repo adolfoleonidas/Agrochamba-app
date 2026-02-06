@@ -15,7 +15,13 @@ data class AvisosUiState(
     val error: String? = null,
     val isCreating: Boolean = false,
     val createSuccess: Boolean = false,
-    val createError: String? = null
+    val createError: String? = null,
+    val isUpdating: Boolean = false,
+    val updateSuccess: Boolean = false,
+    val updateError: String? = null,
+    val isDeleting: Boolean = false,
+    val deleteSuccess: Boolean = false,
+    val deleteError: String? = null
 )
 
 class AvisosViewModel : ViewModel() {
@@ -137,5 +143,121 @@ class AvisosViewModel : ViewModel() {
 
     fun clearCreateState() {
         uiState = uiState.copy(createSuccess = false, createError = null)
+    }
+
+    fun updateAviso(
+        avisoId: Int,
+        tipo: TipoAviso,
+        titulo: String,
+        mensaje: String,
+        ubicacion: String? = null,
+        horaOperativos: String? = null,
+        horaAdministrativos: String? = null
+    ) {
+        val token = AuthManager.token ?: return
+
+        viewModelScope.launch {
+            uiState = uiState.copy(isUpdating = true, updateError = null, updateSuccess = false)
+
+            try {
+                val tipoBackend = when (tipo) {
+                    TipoAviso.ANUNCIO -> "anuncio"
+                    TipoAviso.HORARIO -> "horario_ingreso"
+                    TipoAviso.CLIMA -> "alerta_clima"
+                    TipoAviso.RESUMEN -> "resumen_trabajos"
+                }
+
+                val data = mutableMapOf<String, Any>(
+                    "title" to titulo,
+                    "content" to mensaje,
+                    "tipo_aviso" to tipoBackend
+                )
+
+                // Agregar campos específicos por tipo
+                when (tipo) {
+                    TipoAviso.RESUMEN -> {
+                        data["ubicacion"] = ubicacion ?: "Perú"
+                        data["preview"] = mensaje.take(150)
+                    }
+                    TipoAviso.CLIMA -> {
+                        if (ubicacion != null) data["ubicacion"] = ubicacion
+                    }
+                    TipoAviso.HORARIO -> {
+                        data["hora_operativos"] = horaOperativos ?: "06:00 AM"
+                        data["hora_administrativos"] = horaAdministrativos ?: "08:00 AM"
+                    }
+                    else -> { }
+                }
+
+                val response = WordPressApi.retrofitService.updateAviso(
+                    token = "Bearer $token",
+                    avisoId = avisoId,
+                    data = data
+                )
+
+                if (response.success) {
+                    uiState = uiState.copy(
+                        isUpdating = false,
+                        updateSuccess = true
+                    )
+                    // Recargar avisos
+                    loadAvisos()
+                } else {
+                    uiState = uiState.copy(
+                        isUpdating = false,
+                        updateError = response.message
+                    )
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("AvisosViewModel", "Error actualizando aviso", e)
+                uiState = uiState.copy(
+                    isUpdating = false,
+                    updateError = e.message ?: "Error al actualizar el aviso"
+                )
+            }
+        }
+    }
+
+    fun deleteAviso(avisoId: Int) {
+        val token = AuthManager.token ?: return
+
+        viewModelScope.launch {
+            uiState = uiState.copy(isDeleting = true, deleteError = null, deleteSuccess = false)
+
+            try {
+                val response = WordPressApi.retrofitService.deleteAviso(
+                    token = "Bearer $token",
+                    avisoId = avisoId
+                )
+
+                if (response.isSuccessful) {
+                    uiState = uiState.copy(
+                        isDeleting = false,
+                        deleteSuccess = true
+                    )
+                    // Recargar avisos
+                    loadAvisos()
+                } else {
+                    uiState = uiState.copy(
+                        isDeleting = false,
+                        deleteError = "Error al eliminar el aviso: ${response.code()}"
+                    )
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("AvisosViewModel", "Error eliminando aviso", e)
+                uiState = uiState.copy(
+                    isDeleting = false,
+                    deleteError = e.message ?: "Error al eliminar el aviso"
+                )
+            }
+        }
+    }
+
+    fun clearUpdateState() {
+        uiState = uiState.copy(updateSuccess = false, updateError = null)
+    }
+
+    fun clearDeleteState() {
+        uiState = uiState.copy(deleteSuccess = false, deleteError = null)
     }
 }
