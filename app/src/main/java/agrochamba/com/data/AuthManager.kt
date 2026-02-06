@@ -18,6 +18,7 @@ object AuthManager {
     private const val KEY_ROLES = "user_roles"
     private const val KEY_COMPANY_ID = "user_company_id"
     private const val KEY_USER_DNI = "user_dni"
+    private const val KEY_ONBOARDING_COMPLETED = "onboarding_completed"
 
     private var prefs: SharedPreferences? = null
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
@@ -103,5 +104,23 @@ object AuthManager {
     // Nueva función para verificar si es admin
     fun isUserAdmin(): Boolean {
         return userRoles.contains("administrator")
+    }
+
+    // Funciones para el onboarding
+    fun hasCompletedOnboarding(): Boolean {
+        return prefs?.getBoolean(KEY_ONBOARDING_COMPLETED, false) ?: false
+    }
+
+    fun markOnboardingCompleted() {
+        scope.launch(Dispatchers.IO) {
+            prefs?.edit()?.putBoolean(KEY_ONBOARDING_COMPLETED, true)?.apply()
+        }
+    }
+
+    // Para testing: resetear el estado del onboarding
+    fun resetOnboarding() {
+        scope.launch(Dispatchers.IO) {
+            prefs?.edit()?.remove(KEY_ONBOARDING_COMPLETED)?.apply()
+        }
     }
 }

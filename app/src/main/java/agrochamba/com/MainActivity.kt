@@ -67,6 +67,7 @@ import agrochamba.com.ui.theme.AgrochambaTheme
 import agrochamba.com.ui.WebViewScreen
 import agrochamba.com.ui.auth.ProfileViewModel
 import agrochamba.com.ui.fotocheck.FotocheckScreen
+import agrochamba.com.ui.onboarding.WelcomeOnboardingScreen
 import agrochamba.com.ui.rendimiento.RendimientoScreen
 
 sealed class Screen(val route: String, val label: String? = null, val icon: ImageVector? = null) {
@@ -98,6 +99,7 @@ sealed class Screen(val route: String, val label: String? = null, val icon: Imag
     object Credits : Screen("credits")
     object Rendimiento : Screen("rendimiento")
     object Fotocheck : Screen("fotocheck")
+    object WelcomeOnboarding : Screen("welcome_onboarding")
     object Payment : Screen("payment/{jobId}/{amount}/{currency}") {
         fun createRoute(jobId: Int, amount: Double, currency: String): String {
             return "payment/$jobId/$amount/$currency"
@@ -414,7 +416,16 @@ fun MainAppScreen() {
             }
         }
 
-        NavHost(navController, startDestination = Screen.Jobs.route, Modifier.padding(innerPadding)) {
+        // Determinar si mostrar onboarding (solo para trabajadores que no lo han completado)
+        val isWorker = !AuthManager.isUserAnEnterprise()
+        val hasCompletedOnboarding = AuthManager.hasCompletedOnboarding()
+        val startDestination = if (isWorker && !hasCompletedOnboarding) {
+            Screen.WelcomeOnboarding.route
+        } else {
+            Screen.Jobs.route
+        }
+
+        NavHost(navController, startDestination = startDestination, Modifier.padding(innerPadding)) {
             composable(Screen.Jobs.route) {
                 // Obtener rendimiento real del usuario desde el backend
                 val rendimientoViewModel: agrochamba.com.ui.rendimiento.RendimientoViewModel = viewModel()
@@ -542,6 +553,17 @@ fun MainAppScreen() {
                     onBack = { navController.popBackStack() },
                     onConfigureDni = {
                         navController.navigate(Screen.EditProfile.route)
+                    }
+                )
+            }
+            // Onboarding de bienvenida para nuevos usuarios
+            composable(Screen.WelcomeOnboarding.route) {
+                WelcomeOnboardingScreen(
+                    onComplete = {
+                        AuthManager.markOnboardingCompleted()
+                        navController.navigate(Screen.Jobs.route) {
+                            popUpTo(Screen.WelcomeOnboarding.route) { inclusive = true }
+                        }
                     }
                 )
             }
