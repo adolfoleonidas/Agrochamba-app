@@ -46,6 +46,7 @@ class ModuleLoader
         if (is_admin()) {
             \AgroChamba\Admin\FacebookSettings::init();
             \AgroChamba\Admin\EmpresasDashboard::init();
+            \AgroChamba\Admin\ApplicantsMetabox::init();
         }
     }
 
