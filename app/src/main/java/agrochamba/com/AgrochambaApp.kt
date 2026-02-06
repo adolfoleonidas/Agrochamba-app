@@ -2,9 +2,11 @@ package agrochamba.com
 
 import android.app.Application
 import android.util.Log
+import agrochamba.com.notifications.AgroNotificationManager
 import agrochamba.com.utils.ANRWatchdog
 import agrochamba.com.utils.AppLogger
 import agrochamba.com.utils.DebugManager
+import com.google.firebase.messaging.FirebaseMessaging
 import dagger.hilt.android.HiltAndroidApp
 
 @HiltAndroidApp
@@ -23,6 +25,9 @@ class AgrochambaApp : Application() {
         if (DebugManager.isEnabled) {
             ANRWatchdog.start()
         }
+
+        // Inicializar sistema de notificaciones push
+        initializeNotifications()
 
         AppLogger.i("APP", "AgroChambaApp iniciada. Debug: ${DebugManager.isEnabled}")
     }
@@ -49,6 +54,26 @@ class AgrochambaApp : Application() {
             // Llamar al handler por defecto para que el sistema maneje el crash
             // (esto evita que la app quede en estado zombie)
             defaultHandler?.uncaughtException(thread, throwable)
+        }
+    }
+
+    /**
+     * Inicializa el sistema de notificaciones push (FCM)
+     */
+    private fun initializeNotifications() {
+        // Crear canales de notificación (requerido en Android 8+)
+        AgroNotificationManager.initialize(this)
+
+        // Obtener token FCM actual
+        FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                val token = task.result
+                AppLogger.d("FCM", "Token FCM obtenido")
+                // Sincronizar con el servidor
+                AgroNotificationManager.syncFcmToken(this, token)
+            } else {
+                AppLogger.e("FCM", "Error obteniendo token FCM", task.exception)
+            }
         }
     }
 }
