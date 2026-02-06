@@ -39,6 +39,9 @@ class ModuleLoader
         // Integrations
         \AgroChamba\Integrations\FacebookIntegration::init();
 
+        // Notifications
+        \AgroChamba\API\Notifications\NotificationsController::init();
+
         // API Endpoints
         self::init_api_endpoints();
 
@@ -81,6 +84,9 @@ class ModuleLoader
 
             // Applications endpoints (postulaciones)
             \AgroChamba\API\Applications\ApplicationsController::register_routes();
+
+            // Notifications endpoints (push notifications)
+            \AgroChamba\API\Notifications\NotificationsController::register_routes();
         }, 20);
     }
 }

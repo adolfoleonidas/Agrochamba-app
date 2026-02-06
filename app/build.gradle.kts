@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.hilt)
     alias(libs.plugins.kotlin.kapt)
+    alias(libs.plugins.google.services)
 }
 
 android {
@@ -137,7 +138,10 @@ dependencies {
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
     implementation("io.coil-kt:coil-compose:2.7.0")
 
-    // Firebase eliminado - migrado completamente a WordPress
+    // Firebase - Solo para Push Notifications (FCM)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.messaging)
+    implementation(libs.firebase.analytics)
 
     // CameraX + ML Kit para QR Scanner
     implementation("androidx.camera:camera-core:1.4.1")

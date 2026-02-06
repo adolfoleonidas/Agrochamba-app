@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "137668312865",
+    "project_id": "agrochamba-81c87",
+    "storage_bucket": "agrochamba-81c87.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:137668312865:android:db4e2224f964ab8ccb0860",
+        "android_client_info": {
+          "package_name": "com.agrochamba"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDNfffbnIMuuPdSCcvcKkZ_x9irjVR1e8k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

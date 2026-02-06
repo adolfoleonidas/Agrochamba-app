@@ -229,6 +229,9 @@ class ApplicationsController {
         );
         update_post_meta($job_id, self::JOB_META_KEY, $job_applicants);
 
+        // Disparar hook para notificaciones push
+        do_action('agrochamba_new_application', $job_id, $user_id, $message);
+
         // Obtener datos del trabajo para la respuesta
         $job_data = self::get_job_summary($job);
 
@@ -530,6 +533,9 @@ class ApplicationsController {
             );
         }
 
+        // Guardar estado anterior para el hook
+        $old_status = $job_applicants[$applicant_id]['status'];
+
         $job_applicants[$applicant_id]['status'] = $new_status;
         $job_applicants[$applicant_id]['updated_at'] = current_time('mysql');
         update_post_meta($job_id, self::JOB_META_KEY, $job_applicants);
@@ -541,6 +547,9 @@ class ApplicationsController {
             $user_applications[$job_id]['updated_at'] = current_time('mysql');
             update_user_meta($applicant_id, self::USER_META_KEY, $user_applications);
         }
+
+        // Disparar hook para notificaciones push
+        do_action('agrochamba_application_status_changed', $applicant_id, $job_id, $old_status, $new_status);
 
         return new WP_REST_Response(array(
             'success' => true,

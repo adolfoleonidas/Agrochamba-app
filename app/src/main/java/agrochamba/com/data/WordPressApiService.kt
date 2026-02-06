@@ -636,6 +636,17 @@ interface WordPressApiService {
         @Path("jobId") jobId: Int,
         @Body data: Map<String, @JvmSuppressWildcards Any>
     ): ApplicationActionResponse
+
+    // ═══════════════════════════════════════════════════════════════
+    // NOTIFICACIONES PUSH (FCM)
+    // ═══════════════════════════════════════════════════════════════
+
+    // Registrar token FCM para notificaciones push
+    @POST("agrochamba/v1/notifications/register-token")
+    suspend fun registerFcmToken(
+        @Header("Authorization") token: String,
+        @Body data: Map<String, String>
+    ): GenericApiResponse
 }
 
 object WordPressApi {
