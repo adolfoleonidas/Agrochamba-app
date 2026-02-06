@@ -406,6 +406,14 @@ fun MainAppScreen() {
         val profileViewModel: ProfileViewModel = viewModel()
         val userProfile = profileViewModel.uiState.userProfile
 
+        // Recargar perfil cuando cambia el token (ej: logout + login con otro usuario)
+        val currentToken = AuthManager.token
+        LaunchedEffect(currentToken) {
+            if (currentToken != null) {
+                profileViewModel.loadUserProfile()
+            }
+        }
+
         NavHost(navController, startDestination = Screen.Jobs.route, Modifier.padding(innerPadding)) {
             composable(Screen.Jobs.route) {
                 // Obtener rendimiento real del usuario desde el backend
@@ -462,7 +470,7 @@ fun MainAppScreen() {
                 } ?: navController.popBackStack()
             }
             composable(Screen.EditProfile.route) {
-                EditProfileScreen(navController = navController)
+                EditProfileScreen(navController = navController, viewModel = profileViewModel)
             }
             composable(Screen.MyJobs.route) {
                 MyJobsScreen(navController = navController)
@@ -531,7 +539,10 @@ fun MainAppScreen() {
             composable(Screen.Fotocheck.route) {
                 FotocheckScreen(
                     userProfile = profileViewModel.uiState.userProfile,
-                    onBack = { navController.popBackStack() }
+                    onBack = { navController.popBackStack() },
+                    onConfigureDni = {
+                        navController.navigate(Screen.EditProfile.route)
+                    }
                 )
             }
             // Pantalla de pago con Mercado Pago
