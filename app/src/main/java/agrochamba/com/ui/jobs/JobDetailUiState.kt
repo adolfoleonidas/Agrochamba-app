@@ -27,7 +27,15 @@ sealed interface JobDetailUiState {
         val allImageUrls: List<String> = emptyList(),
         val allFullImageUrls: List<String> = emptyList(),
         val companyName: String? = null,
-        val isLoadingCompany: Boolean = false
+        val isLoadingCompany: Boolean = false,
+        // Estado de postulación
+        val isCheckingApplication: Boolean = false,
+        val hasApplied: Boolean = false,
+        val applicationStatus: String? = null,
+        val applicationStatusLabel: String? = null,
+        val isApplying: Boolean = false,
+        val applyError: String? = null,
+        val applySuccess: Boolean = false
     ) : JobDetailUiState
 
     /**
@@ -51,4 +59,8 @@ sealed interface JobDetailAction {
     data class ContactEmail(val email: String) : JobDetailAction
     data class NavigateToCompany(val companyName: String) : JobDetailAction
     data object Retry : JobDetailAction
+    // Acciones de postulación
+    data class ApplyToJob(val message: String = "") : JobDetailAction
+    data object ClearApplyError : JobDetailAction
+    data object ClearApplySuccess : JobDetailAction
 }

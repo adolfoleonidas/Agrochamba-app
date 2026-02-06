@@ -22,6 +22,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
+import kotlinx.coroutines.delay
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,6 +45,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import agrochamba.com.R
 import agrochamba.com.data.*
+import agrochamba.com.data.AuthManager
 import agrochamba.com.ui.common.FormattedText
 import agrochamba.com.utils.htmlToString
 import coil.compose.AsyncImage
@@ -266,18 +268,24 @@ private fun JobDetailSuccessContent(
                 )
             }
 
-            // Botón de contacto flotante
+            // Botones flotantes: Postularme y/o Contactar
+            val isLoggedIn = AuthManager.token != null
+            val isEnterprise = AuthManager.isUserAnEnterprise()
+            val canApply = isLoggedIn && !isEnterprise && !state.hasApplied
+            val hasContact = state.companyProfile?.phone != null || state.companyProfile?.email != null
+
             AnimatedVisibility(
-                visible = state.companyProfile?.phone != null || state.companyProfile?.email != null,
+                visible = canApply || state.hasApplied || hasContact,
                 enter = fadeIn(),
                 exit = fadeOut(),
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(20.dp)
             ) {
-                ContactButton(
-                    phone = state.companyProfile?.phone,
-                    email = state.companyProfile?.email,
+                FloatingActionButtons(
+                    state = state,
+                    isLoggedIn = isLoggedIn,
+                    isEnterprise = isEnterprise,
                     onAction = onAction
                 )
             }
@@ -1061,6 +1069,243 @@ private fun CompanyCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun FloatingActionButtons(
+    state: JobDetailUiState.Success,
+    isLoggedIn: Boolean,
+    isEnterprise: Boolean,
+    onAction: (JobDetailAction) -> Unit
+) {
+    var showApplyDialog by remember { mutableStateOf(false) }
+    var applyMessage by remember { mutableStateOf("") }
+    var showContactOptions by remember { mutableStateOf(false) }
+
+    val hasContact = state.companyProfile?.phone != null || state.companyProfile?.email != null
+    val canApply = isLoggedIn && !isEnterprise && !state.hasApplied
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        // Botón Postularme (solo para trabajadores no postulados)
+        if (canApply) {
+            Button(
+                onClick = { showApplyDialog = true },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .shadow(8.dp, RoundedCornerShape(16.dp)),
+                shape = RoundedCornerShape(16.dp),
+                enabled = !state.isApplying && !state.isCheckingApplication,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF4CAF50)
+                )
+            ) {
+                if (state.isApplying) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = Color.White,
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Icon(
+                        Icons.Filled.Send,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = if (state.isApplying) "Postulando..." else "Postularme",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+
+        // Badge de estado de postulación (si ya se postuló)
+        if (state.hasApplied && state.applicationStatusLabel != null) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .shadow(4.dp, RoundedCornerShape(16.dp)),
+                shape = RoundedCornerShape(16.dp),
+                color = when (state.applicationStatus) {
+                    "aceptado" -> Color(0xFF4CAF50)
+                    "rechazado" -> Color(0xFFF44336)
+                    "visto" -> Color(0xFF2196F3)
+                    else -> Color(0xFFFFA000)
+                }
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        when (state.applicationStatus) {
+                            "aceptado" -> Icons.Filled.CheckCircle
+                            "rechazado" -> Icons.Filled.Cancel
+                            "visto" -> Icons.Filled.RemoveRedEye
+                            else -> Icons.Filled.Schedule
+                        },
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = Color.White
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "Ya postulado: ${state.applicationStatusLabel}",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White
+                    )
+                }
+            }
+        }
+
+        // Botón de contacto (si hay info de contacto)
+        if (hasContact) {
+            OutlinedButton(
+                onClick = {
+                    val phone = state.companyProfile?.phone
+                    val email = state.companyProfile?.email
+                    if (phone != null && email != null) {
+                        showContactOptions = true
+                    } else if (phone != null) {
+                        onAction(JobDetailAction.ContactPhone(phone))
+                    } else if (email != null) {
+                        onAction(JobDetailAction.ContactEmail(email))
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
+            ) {
+                Icon(
+                    Icons.Filled.Phone,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = "Contactar empresa",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+    }
+
+    // Dialog para postularse
+    if (showApplyDialog) {
+        AlertDialog(
+            onDismissRequest = { showApplyDialog = false },
+            title = { Text("Postularme") },
+            text = {
+                Column {
+                    Text(
+                        text = "¿Deseas postularte a este trabajo?",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    OutlinedTextField(
+                        value = applyMessage,
+                        onValueChange = { applyMessage = it },
+                        label = { Text("Mensaje (opcional)") },
+                        placeholder = { Text("Escribe un mensaje para la empresa...") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 3,
+                        maxLines = 5
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onAction(JobDetailAction.ApplyToJob(applyMessage))
+                        showApplyDialog = false
+                        applyMessage = ""
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))
+                ) {
+                    Text("Postularme")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showApplyDialog = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
+    // Dialog de opciones de contacto
+    if (showContactOptions) {
+        AlertDialog(
+            onDismissRequest = { showContactOptions = false },
+            title = { Text("Contactar") },
+            text = { Text("¿Cómo deseas contactar a la empresa?") },
+            confirmButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    state.companyProfile?.phone?.let { phone ->
+                        TextButton(onClick = {
+                            onAction(JobDetailAction.ContactPhone(phone))
+                            showContactOptions = false
+                        }) {
+                            Text("Llamar")
+                        }
+                        TextButton(onClick = {
+                            onAction(JobDetailAction.ContactWhatsApp(phone))
+                            showContactOptions = false
+                        }) {
+                            Text("WhatsApp")
+                        }
+                    }
+                    state.companyProfile?.email?.let { email ->
+                        TextButton(onClick = {
+                            onAction(JobDetailAction.ContactEmail(email))
+                            showContactOptions = false
+                        }) {
+                            Text("Email")
+                        }
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showContactOptions = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
+    // Snackbar de éxito/error
+    if (state.applySuccess) {
+        LaunchedEffect(Unit) {
+            kotlinx.coroutines.delay(3000)
+            onAction(JobDetailAction.ClearApplySuccess)
+        }
+    }
+
+    state.applyError?.let { error ->
+        AlertDialog(
+            onDismissRequest = { onAction(JobDetailAction.ClearApplyError) },
+            title = { Text("Error") },
+            text = { Text(error) },
+            confirmButton = {
+                TextButton(onClick = { onAction(JobDetailAction.ClearApplyError) }) {
+                    Text("OK")
+                }
+            }
+        )
     }
 }
 

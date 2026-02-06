@@ -3,6 +3,7 @@ package agrochamba.com.ui.jobs
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import agrochamba.com.data.AuthManager
 import agrochamba.com.data.CompanyProfileResponse
 import agrochamba.com.data.JobPost
 import agrochamba.com.data.LocationType
@@ -16,6 +17,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -57,10 +59,11 @@ class JobDetailViewModel @Inject constructor() : ViewModel() {
 
         viewModelScope.launch {
             // Primero mostrar los datos que ya tenemos
-            val initialState = buildSuccessState(job, mediaItems, null, isLoadingCompany = true)
+            val initialState = buildSuccessState(job, mediaItems, null, isLoadingCompany = true, isCheckingApplication = true)
             _uiState.value = initialState
 
-            // Luego cargar el perfil de empresa en background
+            // Cargar estado de postulación y perfil de empresa en paralelo
+            launch { checkApplicationStatus(job.id) }
             loadCompanyProfile(job, mediaItems)
         }
     }
@@ -72,7 +75,11 @@ class JobDetailViewModel @Inject constructor() : ViewModel() {
         job: JobPost,
         mediaItems: List<MediaItem>,
         companyProfile: CompanyProfileResponse?,
-        isLoadingCompany: Boolean = false
+        isLoadingCompany: Boolean = false,
+        isCheckingApplication: Boolean = false,
+        hasApplied: Boolean = false,
+        applicationStatus: String? = null,
+        applicationStatusLabel: String? = null
     ): JobDetailUiState.Success {
         val terms = job.embedded?.terms?.flatten() ?: emptyList()
         val companyName = terms.find { it.taxonomy == "empresa" }?.name
@@ -93,7 +100,11 @@ class JobDetailViewModel @Inject constructor() : ViewModel() {
             allImageUrls = allImageUrls,
             allFullImageUrls = allFullImageUrls,
             companyName = companyName,
-            isLoadingCompany = isLoadingCompany
+            isLoadingCompany = isLoadingCompany,
+            isCheckingApplication = isCheckingApplication,
+            hasApplied = hasApplied,
+            applicationStatus = applicationStatus,
+            applicationStatusLabel = applicationStatusLabel
         )
     }
 
@@ -236,7 +247,111 @@ class JobDetailViewModel @Inject constructor() : ViewModel() {
                         initialize(job, currentMediaItems)
                     }
                 }
+                is JobDetailAction.ApplyToJob -> {
+                    applyToJob(action.message)
+                }
+                is JobDetailAction.ClearApplyError -> {
+                    updateSuccessState { it.copy(applyError = null) }
+                }
+                is JobDetailAction.ClearApplySuccess -> {
+                    updateSuccessState { it.copy(applySuccess = false) }
+                }
             }
+        }
+    }
+
+    /**
+     * Verifica el estado de postulación del usuario actual para este trabajo
+     */
+    private suspend fun checkApplicationStatus(jobId: Int) {
+        val token = AuthManager.token
+        if (token == null) {
+            Log.d(TAG, "No token available, user not logged in")
+            updateSuccessState { it.copy(isCheckingApplication = false) }
+            return
+        }
+
+        try {
+            Log.d(TAG, "Checking application status for job $jobId")
+            val response = WordPressApi.retrofitService.getApplicationStatus(
+                token = "Bearer $token",
+                jobId = jobId
+            )
+            Log.d(TAG, "Application status: hasApplied=${response.hasApplied}, status=${response.status}")
+            updateSuccessState { state ->
+                state.copy(
+                    isCheckingApplication = false,
+                    hasApplied = response.hasApplied,
+                    applicationStatus = response.status,
+                    applicationStatusLabel = response.statusLabel
+                )
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error checking application status: ${e.message}", e)
+            updateSuccessState { it.copy(isCheckingApplication = false) }
+        }
+    }
+
+    /**
+     * Postularse al trabajo actual
+     */
+    private fun applyToJob(message: String) {
+        val jobId = currentJob?.id ?: return
+        val token = AuthManager.token ?: return
+
+        viewModelScope.launch {
+            updateSuccessState { it.copy(isApplying = true, applyError = null) }
+
+            try {
+                Log.d(TAG, "Applying to job $jobId")
+                val data = mutableMapOf<String, Any>("job_id" to jobId)
+                if (message.isNotBlank()) {
+                    data["message"] = message
+                }
+
+                val response = WordPressApi.retrofitService.createApplication(
+                    token = "Bearer $token",
+                    data = data
+                )
+
+                if (response.success) {
+                    Log.d(TAG, "Successfully applied to job $jobId")
+                    updateSuccessState { state ->
+                        state.copy(
+                            isApplying = false,
+                            applySuccess = true,
+                            hasApplied = true,
+                            applicationStatus = "pendiente",
+                            applicationStatusLabel = "Pendiente"
+                        )
+                    }
+                } else {
+                    Log.e(TAG, "Failed to apply: ${response.message}")
+                    updateSuccessState { it.copy(isApplying = false, applyError = response.message) }
+                }
+            } catch (e: retrofit2.HttpException) {
+                val errorBody = e.response()?.errorBody()?.string()
+                val errorMessage = when {
+                    errorBody?.contains("already_applied") == true -> "Ya te has postulado a este trabajo"
+                    errorBody?.contains("not_allowed") == true -> "Las empresas no pueden postularse"
+                    else -> e.message ?: "Error al postularse"
+                }
+                Log.e(TAG, "HTTP error applying: $errorMessage", e)
+                updateSuccessState { it.copy(isApplying = false, applyError = errorMessage) }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error applying to job: ${e.message}", e)
+                updateSuccessState { it.copy(isApplying = false, applyError = e.message ?: "Error al postularse") }
+            }
+        }
+    }
+
+    /**
+     * Helper para actualizar el estado Success de forma segura
+     */
+    private fun updateSuccessState(update: (JobDetailUiState.Success) -> JobDetailUiState.Success) {
+        val currentState = _uiState.value
+        if (currentState is JobDetailUiState.Success) {
+            _uiState.value = update(currentState)
         }
     }
 

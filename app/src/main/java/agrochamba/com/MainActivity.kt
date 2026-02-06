@@ -67,6 +67,7 @@ import agrochamba.com.ui.theme.AgrochambaTheme
 import agrochamba.com.ui.WebViewScreen
 import agrochamba.com.ui.auth.ProfileViewModel
 import agrochamba.com.ui.fotocheck.FotocheckScreen
+import agrochamba.com.ui.applications.ApplicationsScreen
 import agrochamba.com.ui.onboarding.WelcomeOnboardingScreen
 import agrochamba.com.ui.rendimiento.RendimientoScreen
 
@@ -100,6 +101,7 @@ sealed class Screen(val route: String, val label: String? = null, val icon: Imag
     object Rendimiento : Screen("rendimiento")
     object Fotocheck : Screen("fotocheck")
     object WelcomeOnboarding : Screen("welcome_onboarding")
+    object Applications : Screen("applications")
     object Payment : Screen("payment/{jobId}/{amount}/{currency}") {
         fun createRoute(jobId: Int, amount: Double, currency: String): String {
             return "payment/$jobId/$amount/$currency"
@@ -564,6 +566,16 @@ fun MainAppScreen() {
                         navController.navigate(Screen.Jobs.route) {
                             popUpTo(Screen.WelcomeOnboarding.route) { inclusive = true }
                         }
+                    }
+                )
+            }
+            // Mis Postulaciones
+            composable(Screen.Applications.route) {
+                ApplicationsScreen(
+                    onBack = { navController.popBackStack() },
+                    onNavigateToJob = { jobId ->
+                        // Navegar al detalle del trabajo
+                        navController.navigate("job_detail/$jobId")
                     }
                 )
             }

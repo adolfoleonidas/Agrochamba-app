@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Work
 import androidx.compose.material.icons.filled.BedroomParent
 import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -249,7 +250,18 @@ fun ProfileScreen(navController: NavController, viewModel: ProfileViewModel = vi
                     isLoading = uiState.isLoadingSaved
                 )
             }
-            
+
+            // Mis Postulaciones (solo para trabajadores, no empresas)
+            if (!AuthManager.isUserAnEnterprise()) {
+                item {
+                    MenuItem(
+                        icon = Icons.Default.Send,
+                        title = "Mis Postulaciones",
+                        onClick = { navController.navigate(Screen.Applications.route) }
+                    )
+                }
+            }
+
             // Créditos (solo para empresas/admin)
             if (AuthManager.isUserAnEnterprise()) {
                 item {

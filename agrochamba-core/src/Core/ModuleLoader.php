@@ -77,6 +77,9 @@ class ModuleLoader
             // Empresas endpoints
             \AgroChamba\API\Empresas\EmpresasController::register_routes();
             \AgroChamba\API\Empresas\EmpresaLogoController::register_routes();
+
+            // Applications endpoints (postulaciones)
+            \AgroChamba\API\Applications\ApplicationsController::register_routes();
         }, 20);
     }
 }

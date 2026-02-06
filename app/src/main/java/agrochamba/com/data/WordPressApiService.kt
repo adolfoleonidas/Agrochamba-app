@@ -590,6 +590,52 @@ interface WordPressApiService {
         @Header("Authorization") token: String,
         @Body data: Map<String, @JvmSuppressWildcards Any>
     ): UpdateDisponibilidadResponse
+
+    // ==========================================
+    // ENDPOINTS DE POSTULACIONES
+    // ==========================================
+
+    // Crear postulación a un trabajo
+    @POST("agrochamba/v1/applications")
+    suspend fun createApplication(
+        @Header("Authorization") token: String,
+        @Body data: Map<String, @JvmSuppressWildcards Any>
+    ): ApplicationResponse
+
+    // Obtener mis postulaciones
+    @GET("agrochamba/v1/applications")
+    suspend fun getMyApplications(
+        @Header("Authorization") token: String
+    ): ApplicationsListResponse
+
+    // Cancelar postulación
+    @DELETE("agrochamba/v1/applications/{jobId}")
+    suspend fun cancelApplication(
+        @Header("Authorization") token: String,
+        @Path("jobId") jobId: Int
+    ): ApplicationActionResponse
+
+    // Verificar si ya me postulé a un trabajo
+    @GET("agrochamba/v1/jobs/{jobId}/application-status")
+    suspend fun getApplicationStatus(
+        @Header("Authorization") token: String,
+        @Path("jobId") jobId: Int
+    ): ApplicationStatusResponse
+
+    // Obtener postulantes de un trabajo (para empresas)
+    @GET("agrochamba/v1/jobs/{jobId}/applicants")
+    suspend fun getJobApplicants(
+        @Header("Authorization") token: String,
+        @Path("jobId") jobId: Int
+    ): ApplicantsListResponse
+
+    // Actualizar estado de postulación (para empresas)
+    @PUT("agrochamba/v1/applications/{jobId}/status")
+    suspend fun updateApplicationStatus(
+        @Header("Authorization") token: String,
+        @Path("jobId") jobId: Int,
+        @Body data: Map<String, @JvmSuppressWildcards Any>
+    ): ApplicationActionResponse
 }
 
 object WordPressApi {
