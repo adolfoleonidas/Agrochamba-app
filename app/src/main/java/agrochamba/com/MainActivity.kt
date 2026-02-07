@@ -614,7 +614,12 @@ fun MainAppScreen() {
                     DiscountDetailScreen(
                         discount = discount,
                         userProfile = profileViewModel.uiState.userProfile,
-                        onNavigateBack = { navController.popBackStack() }
+                        onNavigateBack = { navController.popBackStack() },
+                        onNavigateToFotocheck = {
+                            navController.navigate(Screen.Fotocheck.route) {
+                                launchSingleTop = true
+                            }
+                        }
                     )
                 } else {
                     navController.popBackStack()
