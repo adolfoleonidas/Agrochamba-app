@@ -117,14 +117,23 @@ fun ValidateDiscountScreen(
     var cameraRef by remember { mutableStateOf<Camera?>(null) }
 
     fun handleBarcodeResult(rawValue: String) {
-        // Esperamos formato: agrochamba://discount/{dni}
-        val uri = Uri.parse(rawValue)
+        // Extraer DNI de los distintos formatos posibles:
+        // 1. URL de verificacion: https://agrochamba.com/verificar/72345678
+        // 2. DNI directo (codigo de barras CODE_128): 72345678
+        // 3. Legacy deep link: agrochamba://discount/72345678
         val extractedDni = when {
-            uri.scheme == "agrochamba" && uri.host == "discount" -> {
-                uri.pathSegments.firstOrNull()
+            // Formato URL de verificacion (QR del Fotocheck)
+            rawValue.contains("agrochamba.com/verificar/") -> {
+                val uri = Uri.parse(rawValue)
+                uri.lastPathSegment?.takeIf { it.matches(Regex("^\\d{8,12}$")) }
             }
-            // Tambien aceptar el DNI directo (desde fotocheck normal)
+            // DNI directo (codigo de barras o QR legacy)
             rawValue.matches(Regex("^\\d{8,12}$")) -> rawValue
+            // Legacy deep link
+            rawValue.startsWith("agrochamba://discount/") -> {
+                val uri = Uri.parse(rawValue)
+                uri.pathSegments?.firstOrNull()
+            }
             else -> null
         }
 
@@ -132,7 +141,7 @@ fun ValidateDiscountScreen(
             scannedDni = extractedDni
             viewModel.validateUserForDiscount(discount.id, extractedDni)
         } else {
-            Toast.makeText(context, "QR no valido. Pide al usuario que muestre su QR de Agrochamba.", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, "QR no valido. Pide al usuario que muestre su Fotocheck Agrochamba.", Toast.LENGTH_LONG).show()
             scanned = false
         }
     }

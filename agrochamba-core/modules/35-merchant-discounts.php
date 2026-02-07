@@ -637,3 +637,134 @@ add_action('rest_api_init', function () {
         ));
     }
 }, 20);
+
+// ==========================================
+// PAGINA DE VERIFICACION PUBLICA
+// ==========================================
+// Cuando alguien escanea el QR con cualquier lector,
+// se abre: https://agrochamba.com/verificar/72345678
+// y ve una pagina con los datos basicos del trabajador.
+
+// Registrar rewrite rule: /verificar/{dni}
+if (!function_exists('agrochamba_verificar_rewrite_rules')) {
+    function agrochamba_verificar_rewrite_rules() {
+        add_rewrite_rule(
+            '^verificar/([0-9]{8,12})/?$',
+            'index.php?agrochamba_verificar_dni=$matches[1]',
+            'top'
+        );
+    }
+    add_action('init', 'agrochamba_verificar_rewrite_rules');
+}
+
+// Registrar query var
+if (!function_exists('agrochamba_verificar_query_vars')) {
+    function agrochamba_verificar_query_vars($vars) {
+        $vars[] = 'agrochamba_verificar_dni';
+        return $vars;
+    }
+    add_filter('query_vars', 'agrochamba_verificar_query_vars');
+}
+
+// Renderizar la pagina de verificacion
+if (!function_exists('agrochamba_verificar_template')) {
+    function agrochamba_verificar_template($template) {
+        $dni = get_query_var('agrochamba_verificar_dni');
+        if (empty($dni)) {
+            return $template;
+        }
+
+        $dni = sanitize_text_field($dni);
+
+        // Buscar usuario por DNI
+        $users = get_users(array(
+            'meta_key' => 'dni',
+            'meta_value' => $dni,
+            'number' => 1,
+        ));
+
+        $found = !empty($users);
+        $user = $found ? $users[0] : null;
+        $display_name = $found ? esc_html($user->display_name) : '';
+        $profile_photo = $found ? esc_url(get_user_meta($user->ID, 'profile_photo_url', true)) : '';
+        $member_since = $found ? date('Y', strtotime($user->user_registered)) : '';
+
+        // No exponer datos sensibles; solo confirmar que es usuario verificado
+        header('Content-Type: text/html; charset=UTF-8');
+        echo '<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verificar Usuario - AgroChamba</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0fdf4; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .card { background: white; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.1); max-width: 400px; width: 100%; overflow: hidden; }
+        .header { background: linear-gradient(135deg, #166534, #16a34a); padding: 24px; text-align: center; color: white; }
+        .header h1 { font-size: 14px; letter-spacing: 3px; opacity: 0.8; margin-bottom: 4px; }
+        .header h2 { font-size: 20px; }
+        .body { padding: 32px 24px; text-align: center; }
+        .avatar { width: 80px; height: 80px; border-radius: 50%; margin: 0 auto 16px; background: #dcfce7; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 3px solid #16a34a; }
+        .avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .avatar .initials { font-size: 32px; color: #16a34a; font-weight: bold; }
+        .badge { display: inline-block; padding: 6px 16px; border-radius: 20px; font-size: 14px; font-weight: 600; margin: 12px 0; }
+        .badge.verified { background: #dcfce7; color: #166534; }
+        .badge.not-found { background: #fef2f2; color: #991b1b; }
+        .name { font-size: 22px; font-weight: 700; color: #1a1a1a; margin: 8px 0 4px; }
+        .dni { font-size: 16px; color: #666; letter-spacing: 2px; }
+        .info { font-size: 13px; color: #999; margin-top: 16px; }
+        .footer { padding: 16px; text-align: center; border-top: 1px solid #f0f0f0; }
+        .footer a { color: #16a34a; text-decoration: none; font-weight: 600; font-size: 14px; }
+        .check-icon { font-size: 24px; margin-right: 6px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="header">
+            <h1>AGROCHAMBA</h1>
+            <h2>Verificacion de Usuario</h2>
+        </div>
+        <div class="body">';
+
+        if ($found) {
+            $initials = mb_strtoupper(mb_substr($display_name, 0, 1));
+            echo '<div class="avatar">';
+            if (!empty($profile_photo)) {
+                echo '<img src="' . $profile_photo . '" alt="Foto">';
+            } else {
+                echo '<span class="initials">' . $initials . '</span>';
+            }
+            echo '</div>';
+            echo '<span class="badge verified"><span class="check-icon">&#10003;</span> Usuario Verificado</span>';
+            echo '<div class="name">' . $display_name . '</div>';
+            echo '<div class="dni">DNI: ' . esc_html($dni) . '</div>';
+            echo '<div class="info">Miembro de AgroChamba desde ' . $member_since . '</div>';
+        } else {
+            echo '<div class="avatar"><span class="initials">?</span></div>';
+            echo '<span class="badge not-found">Usuario no encontrado</span>';
+            echo '<div class="dni">DNI: ' . esc_html($dni) . '</div>';
+            echo '<div class="info">Este DNI no esta registrado en AgroChamba</div>';
+        }
+
+        echo '
+        </div>
+        <div class="footer">
+            <a href="https://agrochamba.com">agrochamba.com</a>
+        </div>
+    </div>
+</body>
+</html>';
+        exit;
+    }
+    add_action('template_redirect', 'agrochamba_verificar_template');
+}
+
+// Flush rewrite rules al activar (necesario para que /verificar/ funcione)
+if (!function_exists('agrochamba_discounts_flush_rewrite')) {
+    function agrochamba_discounts_flush_rewrite() {
+        agrochamba_verificar_rewrite_rules();
+        flush_rewrite_rules();
+    }
+    register_activation_hook(AGROCHAMBA_PLUGIN_DIR . '/agrochamba-core.php', 'agrochamba_discounts_flush_rewrite');
+}

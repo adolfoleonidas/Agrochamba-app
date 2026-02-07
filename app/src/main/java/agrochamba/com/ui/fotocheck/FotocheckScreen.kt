@@ -87,7 +87,11 @@ fun FotocheckScreen(
     val profilePhotoUrl = userProfile?.profilePhotoUrl
 
     val qrBitmap = remember(dni) {
-        dni?.let { generateQRCode(it, 512) }
+        // El QR contiene una URL de verificacion: al escanearlo con cualquier
+        // lector QR abre una pagina web con los datos del trabajador.
+        // La app Agrochamba del comercio tambien la reconoce para aplicar descuentos.
+        // El codigo de barras CODE_128 sigue teniendo el DNI puro para maquinas lectoras.
+        dni?.let { generateQRCode("https://agrochamba.com/verificar/$it", 512) }
     }
     val barcodeBitmap = remember(dni) {
         dni?.let { generateBarcode(it, 500, 150) }
@@ -207,7 +211,7 @@ fun FotocheckScreen(
 
                 // Instruccion
                 Text(
-                    text = "Presenta este fotocheck en la maquina lectora para marcar tu asistencia",
+                    text = "QR: escaneable con cualquier app. Codigo de barras: para maquinas lectoras de asistencia.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -417,7 +421,7 @@ private fun FotocheckFront(
 
                 // Instruccion debajo del QR
                 Text(
-                    text = "Acerca directo a la lectora",
+                    text = "Escaneable con cualquier lector QR o la app Agrochamba",
                     style = MaterialTheme.typography.bodySmall,
                     color = Color(0xFF999999),
                     textAlign = TextAlign.Center
