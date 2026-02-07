@@ -647,6 +647,48 @@ interface WordPressApiService {
         @Header("Authorization") token: String,
         @Body data: Map<String, String>
     ): GenericApiResponse
+
+    // ==========================================
+    // ENDPOINTS DE DESCUENTOS CON COMERCIOS ALIADOS
+    // ==========================================
+
+    // Obtener lista de descuentos disponibles
+    @GET("agrochamba/v1/discounts")
+    suspend fun getDiscounts(
+        @Header("Authorization") token: String,
+        @Query("category") category: String? = null,
+        @Query("page") page: Int = 1,
+        @Query("per_page") perPage: Int = 20
+    ): DiscountsListResponse
+
+    // Obtener detalle de un descuento
+    @GET("agrochamba/v1/discounts/{id}")
+    suspend fun getDiscountDetail(
+        @Header("Authorization") token: String,
+        @Path("id") discountId: Int
+    ): MerchantDiscount
+
+    // Validar usuario para canjear descuento (comercio escanea QR del usuario)
+    @POST("agrochamba/v1/discounts/{id}/validate")
+    suspend fun validateDiscount(
+        @Header("Authorization") token: String,
+        @Path("id") discountId: Int,
+        @Body data: Map<String, String>
+    ): DiscountValidationResponse
+
+    // Canjear/redimir descuento (comercio confirma el canje)
+    @POST("agrochamba/v1/discounts/{id}/redeem")
+    suspend fun redeemDiscount(
+        @Header("Authorization") token: String,
+        @Path("id") discountId: Int,
+        @Body data: Map<String, String>
+    ): RedeemDiscountResponse
+
+    // Historial de canjes del usuario
+    @GET("agrochamba/v1/discounts/my-redemptions")
+    suspend fun getMyRedemptions(
+        @Header("Authorization") token: String
+    ): RedemptionHistoryResponse
 }
 
 object WordPressApi {

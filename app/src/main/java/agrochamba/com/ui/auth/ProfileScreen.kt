@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Work
 import androidx.compose.material.icons.filled.BedroomParent
 import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.LocalOffer
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -279,6 +280,15 @@ fun ProfileScreen(navController: NavController, viewModel: ProfileViewModel = vi
                     icon = Icons.Default.BedroomParent,
                     title = "Cuartos",
                     onClick = { navController.navigate(Screen.Rooms.route) }
+                )
+            }
+
+            // Descuentos con comercios aliados (visible para todos)
+            item {
+                MenuItem(
+                    icon = Icons.Default.LocalOffer,
+                    title = "Descuentos",
+                    onClick = { navController.navigate(Screen.Discounts.route) }
                 )
             }
 

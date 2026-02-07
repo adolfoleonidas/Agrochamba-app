@@ -78,6 +78,7 @@ if (!AGROCHAMBA_USE_MODULE_LOADER) {
             '32-rendimiento-trabajador.php',   // Sistema de rendimiento de trabajadores
             '33-contratos-campanas.php',       // Sistema de contratos y campañas laborales
             '34-endpoints-applications.php',   // Postulaciones (API + Admin dashboard)
+            '35-merchant-discounts.php',       // Descuentos con comercios aliados
         );
 
         // Cargar cada módulo

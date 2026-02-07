@@ -69,6 +69,11 @@ import agrochamba.com.ui.auth.ProfileViewModel
 import agrochamba.com.ui.fotocheck.FotocheckScreen
 import agrochamba.com.ui.applications.ApplicationsScreen
 import agrochamba.com.ui.onboarding.WelcomeOnboardingScreen
+import agrochamba.com.ui.discounts.DiscountsScreen
+import agrochamba.com.ui.discounts.DiscountDetailScreen
+import agrochamba.com.ui.discounts.DiscountsViewModel
+import agrochamba.com.ui.discounts.ValidateDiscountScreen
+import agrochamba.com.ui.discounts.RedemptionHistoryScreen
 import agrochamba.com.ui.rendimiento.RendimientoScreen
 
 sealed class Screen(val route: String, val label: String? = null, val icon: ImageVector? = null) {
@@ -102,6 +107,14 @@ sealed class Screen(val route: String, val label: String? = null, val icon: Imag
     object Fotocheck : Screen("fotocheck")
     object WelcomeOnboarding : Screen("welcome_onboarding")
     object Applications : Screen("applications")
+    object Discounts : Screen("discounts")
+    object DiscountDetail : Screen("discount_detail/{discountId}") {
+        fun createRoute(discountId: Int): String = "discount_detail/$discountId"
+    }
+    object RedemptionHistory : Screen("redemption_history")
+    object ValidateDiscount : Screen("validate_discount/{discountId}") {
+        fun createRoute(discountId: Int): String = "validate_discount/$discountId"
+    }
     object Payment : Screen("payment/{jobId}/{amount}/{currency}") {
         fun createRoute(jobId: Int, amount: Double, currency: String): String {
             return "payment/$jobId/$amount/$currency"
@@ -578,6 +591,54 @@ fun MainAppScreen() {
                         navController.navigate("job_detail/$jobId")
                     }
                 )
+            }
+            // Pantalla de descuentos con comercios aliados
+            composable(Screen.Discounts.route) {
+                val discountsViewModel: DiscountsViewModel = viewModel()
+                DiscountsScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToDetail = { discountId ->
+                        navController.navigate(Screen.DiscountDetail.createRoute(discountId))
+                    },
+                    onNavigateToHistory = {
+                        navController.navigate(Screen.RedemptionHistory.route)
+                    },
+                    viewModel = discountsViewModel
+                )
+            }
+            composable(Screen.DiscountDetail.route) { backStackEntry ->
+                val discountId = backStackEntry.arguments?.getString("discountId")?.toIntOrNull()
+                val discountsViewModel: DiscountsViewModel = viewModel()
+                val discount = discountsViewModel.uiState.discounts.find { it.id == discountId }
+                if (discount != null) {
+                    DiscountDetailScreen(
+                        discount = discount,
+                        userProfile = profileViewModel.uiState.userProfile,
+                        onNavigateBack = { navController.popBackStack() }
+                    )
+                } else {
+                    navController.popBackStack()
+                }
+            }
+            composable(Screen.RedemptionHistory.route) {
+                RedemptionHistoryScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+            // Validar descuento (para comercios - escanear QR del usuario)
+            composable(Screen.ValidateDiscount.route) { backStackEntry ->
+                val discountId = backStackEntry.arguments?.getString("discountId")?.toIntOrNull()
+                val discountsViewModel: DiscountsViewModel = viewModel()
+                val discount = discountsViewModel.uiState.discounts.find { it.id == discountId }
+                if (discount != null) {
+                    ValidateDiscountScreen(
+                        discount = discount,
+                        onNavigateBack = { navController.popBackStack() },
+                        viewModel = discountsViewModel
+                    )
+                } else {
+                    navController.popBackStack()
+                }
             }
             // Pantalla de pago con Mercado Pago
             composable(Screen.Payment.route) { backStackEntry ->
