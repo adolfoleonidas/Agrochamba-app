@@ -50,6 +50,7 @@ class ModuleLoader
             \AgroChamba\Admin\FacebookSettings::init();
             \AgroChamba\Admin\EmpresasDashboard::init();
             \AgroChamba\Admin\ApplicantsMetabox::init();
+            \AgroChamba\Admin\ApplicationsDashboard::init();
         }
     }
 
@@ -70,10 +71,10 @@ class ModuleLoader
             \AgroChamba\API\Profile\ProfilePhoto::register_routes();
 
             // Jobs endpoints
-            \AgroChamba\API\Jobs\JobsManager::register_routes();
+            \AgroChamba\API\Jobs\JobsController::register_routes();
 
             // Favorites endpoints
-            \AgroChamba\API\Favorites\FavoritesManager::register_routes();
+            \AgroChamba\API\Favorites\FavoritesController::register_routes();
 
             // Media endpoints
             \AgroChamba\API\Media\ImagesController::register_routes();

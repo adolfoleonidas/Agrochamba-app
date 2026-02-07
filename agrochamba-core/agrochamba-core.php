@@ -77,6 +77,7 @@ if (!AGROCHAMBA_USE_MODULE_LOADER) {
             '31-avisos-operativos.php',        // Sistema de avisos operativos para la app
             '32-rendimiento-trabajador.php',   // Sistema de rendimiento de trabajadores
             '33-contratos-campanas.php',       // Sistema de contratos y campañas laborales
+            '34-endpoints-applications.php',   // Postulaciones (API + Admin dashboard)
         );
 
         // Cargar cada módulo
