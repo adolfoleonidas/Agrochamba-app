@@ -27,7 +27,10 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Pending
 import androidx.compose.material.icons.filled.RemoveRedEye
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Work
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -138,8 +141,7 @@ fun ApplicationsScreen(
                             application = application,
                             onClick = { application.job?.id?.let { onNavigateToJob(it) } },
                             onCancel = {
-                                if (application.status == ApplicationStatus.PENDING.value ||
-                                    application.status == ApplicationStatus.VIEWED.value) {
+                                if (ApplicationStatus.fromValue(application.status).canCancel()) {
                                     showCancelDialog = application.jobId
                                 }
                             }
@@ -179,33 +181,32 @@ fun ApplicationsScreen(
 private fun ApplicationsSummary(applications: List<ApplicationData>) {
     val pending = applications.count { it.status == ApplicationStatus.PENDING.value }
     val viewed = applications.count { it.status == ApplicationStatus.VIEWED.value }
+    val inProcess = applications.count { it.status == ApplicationStatus.IN_PROCESS.value }
+    val interview = applications.count { it.status == ApplicationStatus.INTERVIEW.value }
+    val finalist = applications.count { it.status == ApplicationStatus.FINALIST.value }
     val accepted = applications.count { it.status == ApplicationStatus.ACCEPTED.value }
     val rejected = applications.count { it.status == ApplicationStatus.REJECTED.value }
 
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceEvenly
-    ) {
-        StatusBadge(
-            count = pending,
-            label = "Pendientes",
-            color = Color(0xFFFFA000)
-        )
-        StatusBadge(
-            count = viewed,
-            label = "Vistos",
-            color = Color(0xFF2196F3)
-        )
-        StatusBadge(
-            count = accepted,
-            label = "Aceptados",
-            color = Color(0xFF4CAF50)
-        )
-        StatusBadge(
-            count = rejected,
-            label = "Rechazados",
-            color = Color(0xFFF44336)
-        )
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        // Pipeline row
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            StatusBadge(count = pending, label = "Postulados", color = Color(0xFFFFA000))
+            StatusBadge(count = viewed, label = "CV Visto", color = Color(0xFF2196F3))
+            StatusBadge(count = inProcess, label = "En Proceso", color = Color(0xFF283593))
+            StatusBadge(count = interview, label = "Entrevista", color = Color(0xFFE65100))
+            StatusBadge(count = finalist, label = "Finalista", color = Color(0xFF00695C))
+        }
+        // Final states row
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            StatusBadge(count = accepted, label = "Contratados", color = Color(0xFF4CAF50))
+            StatusBadge(count = rejected, label = "No Selec.", color = Color(0xFFF44336))
+        }
     }
 }
 
@@ -244,6 +245,9 @@ private fun ApplicationCard(
     val statusColor = when (status) {
         ApplicationStatus.PENDING -> Color(0xFFFFA000)
         ApplicationStatus.VIEWED -> Color(0xFF2196F3)
+        ApplicationStatus.IN_PROCESS -> Color(0xFF283593)
+        ApplicationStatus.INTERVIEW -> Color(0xFFE65100)
+        ApplicationStatus.FINALIST -> Color(0xFF00695C)
         ApplicationStatus.ACCEPTED -> Color(0xFF4CAF50)
         ApplicationStatus.REJECTED -> Color(0xFFF44336)
         ApplicationStatus.CANCELLED -> Color(0xFF9E9E9E)
@@ -251,6 +255,9 @@ private fun ApplicationCard(
     val statusIcon = when (status) {
         ApplicationStatus.PENDING -> Icons.Default.Pending
         ApplicationStatus.VIEWED -> Icons.Default.RemoveRedEye
+        ApplicationStatus.IN_PROCESS -> Icons.Default.Groups
+        ApplicationStatus.INTERVIEW -> Icons.Default.DateRange
+        ApplicationStatus.FINALIST -> Icons.Default.Star
         ApplicationStatus.ACCEPTED -> Icons.Default.CheckCircle
         ApplicationStatus.REJECTED -> Icons.Default.Cancel
         ApplicationStatus.CANCELLED -> Icons.Default.Cancel
@@ -295,8 +302,8 @@ private fun ApplicationCard(
                     )
                 }
 
-                // Botón cancelar (solo si está pendiente o visto)
-                if (status == ApplicationStatus.PENDING || status == ApplicationStatus.VIEWED) {
+                // Botón cancelar (solo en estados que lo permiten)
+                if (status.canCancel()) {
                     TextButton(onClick = onCancel) {
                         Text(
                             text = "Cancelar",

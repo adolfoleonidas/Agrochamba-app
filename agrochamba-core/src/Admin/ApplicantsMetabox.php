@@ -134,19 +134,31 @@ class ApplicantsMetabox {
             </div>
             <div class="stat-item stat-pending">
                 <span class="stat-number"><?php echo $stats['pending']; ?></span>
-                <span class="stat-label">Pendientes</span>
+                <span class="stat-label">Postulados</span>
             </div>
             <div class="stat-item stat-viewed">
                 <span class="stat-number"><?php echo $stats['viewed']; ?></span>
-                <span class="stat-label">Vistos</span>
+                <span class="stat-label">CV Vistos</span>
+            </div>
+            <div class="stat-item stat-in-process">
+                <span class="stat-number"><?php echo $stats['in_process']; ?></span>
+                <span class="stat-label">En Proceso</span>
+            </div>
+            <div class="stat-item stat-interview">
+                <span class="stat-number"><?php echo $stats['interview']; ?></span>
+                <span class="stat-label">Entrevista</span>
+            </div>
+            <div class="stat-item stat-finalist">
+                <span class="stat-number"><?php echo $stats['finalist']; ?></span>
+                <span class="stat-label">Finalistas</span>
             </div>
             <div class="stat-item stat-accepted">
                 <span class="stat-number"><?php echo $stats['accepted']; ?></span>
-                <span class="stat-label">Aceptados</span>
+                <span class="stat-label">Contratados</span>
             </div>
             <div class="stat-item stat-rejected">
                 <span class="stat-number"><?php echo $stats['rejected']; ?></span>
-                <span class="stat-label">Rechazados</span>
+                <span class="stat-label">No Seleccionados</span>
             </div>
         </div>
 
@@ -218,15 +230,27 @@ class ApplicantsMetabox {
                         <?php echo self::get_status_badge($status); ?>
                     </td>
                     <td class="applicant-actions">
-                        <?php if ($status !== 'aceptado' && $status !== 'rechazado'): ?>
-                            <button type="button" class="button button-small button-primary accept-btn" data-action="accept" title="Aceptar">
-                                <span class="dashicons dashicons-yes"></span>
-                            </button>
-                            <button type="button" class="button button-small reject-btn" data-action="reject" title="Rechazar">
-                                <span class="dashicons dashicons-no"></span>
-                            </button>
+                        <?php
+                        $transitions = \AgroChamba\API\Applications\ApplicationsController::get_allowed_transitions($status);
+                        $transitions = array_filter($transitions, function($t) { return $t !== 'cancelado'; });
+                        if (!empty($transitions)): ?>
+                            <div class="agro-metabox-dropdown">
+                                <button type="button" class="button button-small agro-metabox-dropdown__toggle" title="Acciones">
+                                    <span class="dashicons dashicons-ellipsis"></span>
+                                </button>
+                                <div class="agro-metabox-dropdown__menu">
+                                    <?php foreach ($transitions as $next_status):
+                                        $next_label = \AgroChamba\API\Applications\ApplicationsController::get_status_label($next_status);
+                                        $css_class = $next_status === 'rechazado' ? 'agro-metabox-dropdown__item--danger' : '';
+                                    ?>
+                                        <button type="button" class="agro-metabox-dropdown__item <?php echo $css_class; ?>" data-action="<?php echo esc_attr($next_status); ?>">
+                                            <?php echo esc_html($next_label); ?>
+                                        </button>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
                         <?php else: ?>
-                            <span class="action-done">✓</span>
+                            <span class="action-done">--</span>
                         <?php endif; ?>
                     </td>
                 </tr>
@@ -259,10 +283,13 @@ class ApplicantsMetabox {
                 font-size: 12px;
                 color: #666;
             }
-            .stat-pending .stat-number { color: #f0ad4e; }
-            .stat-viewed .stat-number { color: #5bc0de; }
-            .stat-accepted .stat-number { color: #5cb85c; }
-            .stat-rejected .stat-number { color: #d9534f; }
+            .stat-pending .stat-number { color: #FFA000; }
+            .stat-viewed .stat-number { color: #2196F3; }
+            .stat-in-process .stat-number { color: #283593; }
+            .stat-interview .stat-number { color: #E65100; }
+            .stat-finalist .stat-number { color: #00695C; }
+            .stat-accepted .stat-number { color: #4CAF50; }
+            .stat-rejected .stat-number { color: #F44336; }
 
             .agrochamba-applicants-table {
                 margin-top: 10px;
@@ -318,10 +345,34 @@ class ApplicantsMetabox {
                 font-weight: 600;
                 text-transform: uppercase;
             }
-            .status-pendiente { background: #fcf8e3; color: #8a6d3b; }
-            .status-visto { background: #d9edf7; color: #31708f; }
-            .status-aceptado { background: #dff0d8; color: #3c763d; }
-            .status-rechazado { background: #f2dede; color: #a94442; }
+            .status-pendiente { background: #FFF3E0; color: #E65100; }
+            .status-visto { background: #E3F2FD; color: #1565C0; }
+            .status-en_proceso { background: #E8EAF6; color: #283593; }
+            .status-entrevista { background: #FBE9E7; color: #BF360C; }
+            .status-finalista { background: #E0F2F1; color: #00695C; }
+            .status-aceptado { background: #E8F5E9; color: #2E7D32; }
+            .status-rechazado { background: #FFEBEE; color: #C62828; }
+
+            .applicant-row.status-en_proceso { background: #f5f5ff; }
+            .applicant-row.status-entrevista { background: #fff8f0; }
+            .applicant-row.status-finalista { background: #f0fffc; }
+
+            /* Dropdown */
+            .agro-metabox-dropdown { position: relative; display: inline-block; }
+            .agro-metabox-dropdown__toggle .dashicons { font-size: 16px; line-height: 28px; }
+            .agro-metabox-dropdown__menu {
+                display: none; position: absolute; right: 0; top: 100%; z-index: 100;
+                background: #fff; border: 1px solid #ddd; border-radius: 6px;
+                box-shadow: 0 4px 12px rgba(0,0,0,.12); min-width: 150px; padding: 4px 0;
+            }
+            .agro-metabox-dropdown.open .agro-metabox-dropdown__menu { display: block; }
+            .agro-metabox-dropdown__item {
+                display: block; width: 100%; padding: 7px 14px; border: none; background: none;
+                text-align: left; cursor: pointer; font-size: 12px; color: #333;
+            }
+            .agro-metabox-dropdown__item:hover { background: #f5f5f5; }
+            .agro-metabox-dropdown__item--danger { color: #dc3232; }
+            .agro-metabox-dropdown__item--danger:hover { background: #fff0f0; }
 
             .applicant-actions .button {
                 padding: 0 8px;
@@ -331,9 +382,7 @@ class ApplicantsMetabox {
                 font-size: 16px;
                 line-height: 28px;
             }
-            .accept-btn:hover { background: #46b450 !important; border-color: #46b450 !important; }
-            .reject-btn { border-color: #dc3232; color: #dc3232; }
-            .reject-btn:hover { background: #dc3232 !important; color: white !important; }
+            .agro-metabox-dropdown__toggle:hover { background: #f0f0f0; }
 
             .applicant-row.status-aceptado { background: #f0fff0; }
             .applicant-row.status-rechazado { background: #fff5f5; opacity: 0.7; }
@@ -347,11 +396,14 @@ class ApplicantsMetabox {
      */
     private static function get_stats($applicants) {
         $stats = array(
-            'total' => count($applicants),
-            'pending' => 0,
-            'viewed' => 0,
-            'accepted' => 0,
-            'rejected' => 0
+            'total'      => count($applicants),
+            'pending'    => 0,
+            'viewed'     => 0,
+            'in_process' => 0,
+            'interview'  => 0,
+            'finalist'   => 0,
+            'accepted'   => 0,
+            'rejected'   => 0,
         );
 
         foreach ($applicants as $applicant) {
@@ -362,6 +414,15 @@ class ApplicantsMetabox {
                     break;
                 case 'visto':
                     $stats['viewed']++;
+                    break;
+                case 'en_proceso':
+                    $stats['in_process']++;
+                    break;
+                case 'entrevista':
+                    $stats['interview']++;
+                    break;
+                case 'finalista':
+                    $stats['finalist']++;
                     break;
                 case 'aceptado':
                     $stats['accepted']++;
@@ -380,10 +441,13 @@ class ApplicantsMetabox {
      */
     private static function get_status_badge($status) {
         $labels = array(
-            'pendiente' => 'Pendiente',
-            'visto' => 'Visto',
-            'aceptado' => 'Aceptado',
-            'rechazado' => 'Rechazado'
+            'pendiente'  => 'Postulado',
+            'visto'      => 'CV Visto',
+            'en_proceso' => 'En Proceso',
+            'entrevista' => 'Entrevista',
+            'finalista'  => 'Finalista',
+            'aceptado'   => 'Contratado',
+            'rechazado'  => 'No Seleccionado',
         );
         $label = $labels[$status] ?? $status;
         return sprintf('<span class="status-badge status-%s">%s</span>', esc_attr($status), esc_html($label));
@@ -397,9 +461,10 @@ class ApplicantsMetabox {
 
         $job_id = isset($_POST['job_id']) ? intval($_POST['job_id']) : 0;
         $user_id = isset($_POST['user_id']) ? intval($_POST['user_id']) : 0;
-        $action = isset($_POST['status_action']) ? sanitize_text_field($_POST['status_action']) : '';
+        $new_status = isset($_POST['status_action']) ? sanitize_text_field($_POST['status_action']) : '';
 
-        if (!$job_id || !$user_id || !$action) {
+        $valid_statuses = \AgroChamba\API\Applications\ApplicationsController::get_all_statuses();
+        if (!$job_id || !$user_id || !in_array($new_status, $valid_statuses)) {
             wp_send_json_error('Parámetros inválidos');
         }
 
@@ -414,12 +479,17 @@ class ApplicantsMetabox {
             wp_send_json_error('Sin permisos');
         }
 
-        // Actualizar estado
-        $new_status = ($action === 'accept') ? 'aceptado' : 'rechazado';
-
         $job_applicants = get_post_meta($job_id, self::JOB_META_KEY, true);
         if (!is_array($job_applicants) || !isset($job_applicants[$user_id])) {
             wp_send_json_error('Postulante no encontrado');
+        }
+
+        $old_status = $job_applicants[$user_id]['status'];
+
+        // Validar transición
+        $allowed = \AgroChamba\API\Applications\ApplicationsController::get_allowed_transitions($old_status);
+        if (!in_array($new_status, $allowed)) {
+            wp_send_json_error('Transición no permitida');
         }
 
         $job_applicants[$user_id]['status'] = $new_status;
@@ -434,9 +504,31 @@ class ApplicantsMetabox {
             update_user_meta($user_id, 'job_applications', $user_applications);
         }
 
+        // Hook para notificaciones
+        do_action('agrochamba_application_status_changed', $user_id, $job_id, $old_status, $new_status);
+
+        // Build updated actions HTML
+        $next_transitions = \AgroChamba\API\Applications\ApplicationsController::get_allowed_transitions($new_status);
+        $next_transitions = array_filter($next_transitions, function($t) { return $t !== 'cancelado'; });
+        $actions_html = '';
+        if (!empty($next_transitions)) {
+            $actions_html .= '<div class="agro-metabox-dropdown">';
+            $actions_html .= '<button type="button" class="button button-small agro-metabox-dropdown__toggle" title="Acciones"><span class="dashicons dashicons-ellipsis"></span></button>';
+            $actions_html .= '<div class="agro-metabox-dropdown__menu">';
+            foreach ($next_transitions as $next) {
+                $label = \AgroChamba\API\Applications\ApplicationsController::get_status_label($next);
+                $css = $next === 'rechazado' ? 'agro-metabox-dropdown__item--danger' : '';
+                $actions_html .= '<button type="button" class="agro-metabox-dropdown__item ' . $css . '" data-action="' . esc_attr($next) . '">' . esc_html($label) . '</button>';
+            }
+            $actions_html .= '</div></div>';
+        } else {
+            $actions_html = '<span class="action-done">--</span>';
+        }
+
         wp_send_json_success(array(
-            'status' => $new_status,
-            'badge' => self::get_status_badge($new_status)
+            'status'       => $new_status,
+            'badge'        => self::get_status_badge($new_status),
+            'actions_html' => $actions_html,
         ));
     }
 

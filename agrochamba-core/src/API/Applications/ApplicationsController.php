@@ -37,6 +37,9 @@ class ApplicationsController {
      */
     const STATUS_PENDING = 'pendiente';
     const STATUS_VIEWED = 'visto';
+    const STATUS_IN_PROCESS = 'en_proceso';
+    const STATUS_INTERVIEW = 'entrevista';
+    const STATUS_FINALIST = 'finalista';
     const STATUS_ACCEPTED = 'aceptado';
     const STATUS_REJECTED = 'rechazado';
     const STATUS_CANCELLED = 'cancelado';
@@ -309,13 +312,14 @@ class ApplicationsController {
             );
         }
 
-        // Verificar que no haya sido aceptada ya
+        // Solo se puede cancelar en estados iniciales del pipeline
         $job_applicants = get_post_meta($job_id, self::JOB_META_KEY, true);
+        $cancellable_statuses = array(self::STATUS_PENDING, self::STATUS_VIEWED, self::STATUS_IN_PROCESS);
         if (is_array($job_applicants) && isset($job_applicants[$user_id])) {
-            if ($job_applicants[$user_id]['status'] === self::STATUS_ACCEPTED) {
+            if (!in_array($job_applicants[$user_id]['status'], $cancellable_statuses)) {
                 return new WP_Error(
                     'cannot_cancel',
-                    'No puedes cancelar una postulación que ya fue aceptada.',
+                    'No puedes cancelar una postulación en estado "' . self::get_status_label($job_applicants[$user_id]['status']) . '".',
                     array('status' => 400)
                 );
             }
@@ -487,11 +491,11 @@ class ApplicationsController {
             return new WP_Error('invalid_user_id', 'ID de usuario inválido.', array('status' => 400));
         }
 
-        $valid_statuses = array(self::STATUS_ACCEPTED, self::STATUS_REJECTED);
-        if (!in_array($new_status, $valid_statuses)) {
+        $all_statuses = self::get_all_statuses();
+        if (!in_array($new_status, $all_statuses)) {
             return new WP_Error(
                 'invalid_status',
-                'Estado inválido. Debe ser: aceptado o rechazado.',
+                'Estado inválido.',
                 array('status' => 400)
             );
         }
@@ -535,6 +539,16 @@ class ApplicationsController {
 
         // Guardar estado anterior para el hook
         $old_status = $job_applicants[$applicant_id]['status'];
+
+        // Validar transición
+        $allowed = self::get_allowed_transitions($old_status);
+        if (!in_array($new_status, $allowed)) {
+            return new WP_Error(
+                'invalid_transition',
+                sprintf('No se puede cambiar de "%s" a "%s".', self::get_status_label($old_status), self::get_status_label($new_status)),
+                array('status' => 400)
+            );
+        }
 
         $job_applicants[$applicant_id]['status'] = $new_status;
         $job_applicants[$applicant_id]['updated_at'] = current_time('mysql');
@@ -588,18 +602,59 @@ class ApplicationsController {
     }
 
     /**
+     * Obtener transiciones permitidas desde un estado
+     *
+     * @param string $current_status
+     * @return array
+     */
+    public static function get_allowed_transitions($current_status) {
+        $transitions = array(
+            self::STATUS_PENDING   => array(self::STATUS_VIEWED, self::STATUS_REJECTED, self::STATUS_CANCELLED),
+            self::STATUS_VIEWED    => array(self::STATUS_IN_PROCESS, self::STATUS_REJECTED, self::STATUS_CANCELLED),
+            self::STATUS_IN_PROCESS => array(self::STATUS_INTERVIEW, self::STATUS_REJECTED, self::STATUS_CANCELLED),
+            self::STATUS_INTERVIEW => array(self::STATUS_FINALIST, self::STATUS_REJECTED),
+            self::STATUS_FINALIST  => array(self::STATUS_ACCEPTED, self::STATUS_REJECTED),
+            self::STATUS_ACCEPTED  => array(),
+            self::STATUS_REJECTED  => array(),
+            self::STATUS_CANCELLED => array(),
+        );
+        return $transitions[$current_status] ?? array();
+    }
+
+    /**
+     * Obtener todos los estados válidos del pipeline
+     *
+     * @return array
+     */
+    public static function get_all_statuses() {
+        return array(
+            self::STATUS_PENDING,
+            self::STATUS_VIEWED,
+            self::STATUS_IN_PROCESS,
+            self::STATUS_INTERVIEW,
+            self::STATUS_FINALIST,
+            self::STATUS_ACCEPTED,
+            self::STATUS_REJECTED,
+            self::STATUS_CANCELLED,
+        );
+    }
+
+    /**
      * Obtener etiqueta de estado
      *
      * @param string $status
      * @return string
      */
-    private static function get_status_label($status) {
+    public static function get_status_label($status) {
         $labels = array(
-            self::STATUS_PENDING => 'Pendiente',
-            self::STATUS_VIEWED => 'Visto por la empresa',
-            self::STATUS_ACCEPTED => 'Aceptado',
-            self::STATUS_REJECTED => 'No seleccionado',
-            self::STATUS_CANCELLED => 'Cancelado',
+            self::STATUS_PENDING    => 'Postulado',
+            self::STATUS_VIEWED     => 'CV Visto',
+            self::STATUS_IN_PROCESS => 'En Proceso',
+            self::STATUS_INTERVIEW  => 'Entrevista',
+            self::STATUS_FINALIST   => 'Finalista',
+            self::STATUS_ACCEPTED   => 'Contratado',
+            self::STATUS_REJECTED   => 'No Seleccionado',
+            self::STATUS_CANCELLED  => 'Cancelado',
         );
         return $labels[$status] ?? 'Desconocido';
     }

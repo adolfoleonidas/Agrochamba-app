@@ -1,30 +1,51 @@
 /**
  * AgroChamba - Applicants Metabox JS
- * Maneja las acciones de aceptar/rechazar postulantes
+ * Maneja las acciones de cambio de estado de postulantes con dropdown contextual
  */
 (function($) {
     'use strict';
 
+    var statusLabels = {
+        'en_proceso': 'EN PROCESO',
+        'entrevista': 'ENTREVISTA',
+        'finalista': 'FINALISTA',
+        'aceptado': 'CONTRATADO',
+        'rechazado': 'NO SELECCIONADO',
+        'visto': 'CV VISTO'
+    };
+
     $(document).ready(function() {
-        // Manejar clic en botones de acción
-        $('.agrochamba-applicants-table').on('click', '.accept-btn, .reject-btn', function(e) {
+        // Toggle dropdown
+        $(document).on('click', '.agro-metabox-dropdown__toggle', function(e) {
             e.preventDefault();
+            e.stopPropagation();
+            var $dropdown = $(this).closest('.agro-metabox-dropdown');
+            $('.agro-metabox-dropdown').not($dropdown).removeClass('open');
+            $dropdown.toggleClass('open');
+        });
+
+        // Close dropdowns on outside click
+        $(document).on('click', function() {
+            $('.agro-metabox-dropdown').removeClass('open');
+        });
+
+        // Handle dropdown item click
+        $('.agrochamba-applicants-table').on('click', '.agro-metabox-dropdown__item', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
 
             var $btn = $(this);
             var $row = $btn.closest('.applicant-row');
             var userId = $row.data('user-id');
-            var action = $btn.data('action');
-            var confirmMsg = action === 'accept'
-                ? agrochambaApplicants.strings.confirmAccept
-                : agrochambaApplicants.strings.confirmReject;
+            var newStatus = $btn.data('action');
+            var label = statusLabels[newStatus] || newStatus;
 
-            if (!confirm(confirmMsg)) {
+            if (!confirm('¿Cambiar estado a ' + label + '?')) {
                 return;
             }
 
-            // Deshabilitar botones
-            $row.find('.button').prop('disabled', true);
-            $btn.text(agrochambaApplicants.strings.updating);
+            $btn.prop('disabled', true).text('...');
+            $('.agro-metabox-dropdown').removeClass('open');
 
             $.ajax({
                 url: agrochambaApplicants.ajaxUrl,
@@ -34,56 +55,25 @@
                     nonce: agrochambaApplicants.nonce,
                     job_id: agrochambaApplicants.jobId,
                     user_id: userId,
-                    status_action: action
+                    status_action: newStatus
                 },
                 success: function(response) {
                     if (response.success) {
-                        // Actualizar UI
-                        $row.removeClass('status-pendiente status-visto')
-                            .addClass('status-' + response.data.status);
+                        $row.attr('class', 'applicant-row status-' + response.data.status);
                         $row.find('.applicant-status').html(response.data.badge);
-                        $row.find('.applicant-actions').html('<span class="action-done">✓</span>');
-
-                        // Actualizar estadísticas
-                        updateStats(action);
+                        if (response.data.actions_html) {
+                            $row.find('.applicant-actions').html(response.data.actions_html);
+                        } else {
+                            $row.find('.applicant-actions').html('<span class="action-done">--</span>');
+                        }
                     } else {
                         alert(response.data || agrochambaApplicants.strings.error);
-                        $row.find('.button').prop('disabled', false);
-                        resetButton($btn, action);
                     }
                 },
                 error: function() {
                     alert(agrochambaApplicants.strings.error);
-                    $row.find('.button').prop('disabled', false);
-                    resetButton($btn, action);
                 }
             });
         });
-
-        function resetButton($btn, action) {
-            var icon = action === 'accept' ? 'yes' : 'no';
-            $btn.html('<span class="dashicons dashicons-' + icon + '"></span>');
-        }
-
-        function updateStats(action) {
-            // Actualizar contadores
-            var $pending = $('.stat-pending .stat-number');
-            var $viewed = $('.stat-viewed .stat-number');
-            var $target = action === 'accept' ? $('.stat-accepted .stat-number') : $('.stat-rejected .stat-number');
-
-            var pendingCount = parseInt($pending.text()) || 0;
-            var viewedCount = parseInt($viewed.text()) || 0;
-            var targetCount = parseInt($target.text()) || 0;
-
-            // Reducir de pendiente o visto
-            if (pendingCount > 0) {
-                $pending.text(pendingCount - 1);
-            } else if (viewedCount > 0) {
-                $viewed.text(viewedCount - 1);
-            }
-
-            // Aumentar aceptado o rechazado
-            $target.text(targetCount + 1);
-        }
     });
 })(jQuery);

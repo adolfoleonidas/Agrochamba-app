@@ -98,11 +98,14 @@ class ApplicationsDashboard
     private static function get_stats(array $applications): array
     {
         $stats = [
-            'total'    => count($applications),
-            'pending'  => 0,
-            'viewed'   => 0,
-            'accepted' => 0,
-            'rejected' => 0,
+            'total'      => count($applications),
+            'pending'    => 0,
+            'viewed'     => 0,
+            'in_process' => 0,
+            'interview'  => 0,
+            'finalist'   => 0,
+            'accepted'   => 0,
+            'rejected'   => 0,
         ];
 
         foreach ($applications as $app) {
@@ -112,6 +115,15 @@ class ApplicationsDashboard
                     break;
                 case 'visto':
                     $stats['viewed']++;
+                    break;
+                case 'en_proceso':
+                    $stats['in_process']++;
+                    break;
+                case 'entrevista':
+                    $stats['interview']++;
+                    break;
+                case 'finalista':
+                    $stats['finalist']++;
                     break;
                 case 'aceptado':
                     $stats['accepted']++;
@@ -128,10 +140,13 @@ class ApplicationsDashboard
     private static function get_status_badge(string $status): string
     {
         $map = [
-            'pendiente' => ['label' => 'Pendiente',  'class' => 'pending'],
-            'visto'     => ['label' => 'Visto',       'class' => 'viewed'],
-            'aceptado'  => ['label' => 'Aceptado',    'class' => 'accepted'],
-            'rechazado' => ['label' => 'Rechazado',   'class' => 'rejected'],
+            'pendiente'  => ['label' => 'Postulado',       'class' => 'pending'],
+            'visto'      => ['label' => 'CV Visto',         'class' => 'viewed'],
+            'en_proceso' => ['label' => 'En Proceso',       'class' => 'in-process'],
+            'entrevista' => ['label' => 'Entrevista',       'class' => 'interview'],
+            'finalista'  => ['label' => 'Finalista',        'class' => 'finalist'],
+            'aceptado'   => ['label' => 'Contratado',       'class' => 'accepted'],
+            'rechazado'  => ['label' => 'No Seleccionado',  'class' => 'rejected'],
         ];
         $info = $map[$status] ?? ['label' => $status, 'class' => 'pending'];
         return sprintf(
@@ -170,22 +185,37 @@ class ApplicationsDashboard
                 <a href="<?php echo esc_url(admin_url('admin.php?page=agrochamba-postulaciones&status=pendiente')); ?>"
                    class="agro-app-stat agro-app-stat--pending <?php echo $filter === 'pendiente' ? 'agro-app-stat--active' : ''; ?>">
                     <span class="agro-app-stat__number"><?php echo esc_html($stats['pending']); ?></span>
-                    <span class="agro-app-stat__label">Pendientes</span>
+                    <span class="agro-app-stat__label">Postulados</span>
                 </a>
                 <a href="<?php echo esc_url(admin_url('admin.php?page=agrochamba-postulaciones&status=visto')); ?>"
                    class="agro-app-stat agro-app-stat--viewed <?php echo $filter === 'visto' ? 'agro-app-stat--active' : ''; ?>">
                     <span class="agro-app-stat__number"><?php echo esc_html($stats['viewed']); ?></span>
-                    <span class="agro-app-stat__label">Vistos</span>
+                    <span class="agro-app-stat__label">CV Vistos</span>
+                </a>
+                <a href="<?php echo esc_url(admin_url('admin.php?page=agrochamba-postulaciones&status=en_proceso')); ?>"
+                   class="agro-app-stat agro-app-stat--in-process <?php echo $filter === 'en_proceso' ? 'agro-app-stat--active' : ''; ?>">
+                    <span class="agro-app-stat__number"><?php echo esc_html($stats['in_process']); ?></span>
+                    <span class="agro-app-stat__label">En Proceso</span>
+                </a>
+                <a href="<?php echo esc_url(admin_url('admin.php?page=agrochamba-postulaciones&status=entrevista')); ?>"
+                   class="agro-app-stat agro-app-stat--interview <?php echo $filter === 'entrevista' ? 'agro-app-stat--active' : ''; ?>">
+                    <span class="agro-app-stat__number"><?php echo esc_html($stats['interview']); ?></span>
+                    <span class="agro-app-stat__label">Entrevista</span>
+                </a>
+                <a href="<?php echo esc_url(admin_url('admin.php?page=agrochamba-postulaciones&status=finalista')); ?>"
+                   class="agro-app-stat agro-app-stat--finalist <?php echo $filter === 'finalista' ? 'agro-app-stat--active' : ''; ?>">
+                    <span class="agro-app-stat__number"><?php echo esc_html($stats['finalist']); ?></span>
+                    <span class="agro-app-stat__label">Finalistas</span>
                 </a>
                 <a href="<?php echo esc_url(admin_url('admin.php?page=agrochamba-postulaciones&status=aceptado')); ?>"
                    class="agro-app-stat agro-app-stat--accepted <?php echo $filter === 'aceptado' ? 'agro-app-stat--active' : ''; ?>">
                     <span class="agro-app-stat__number"><?php echo esc_html($stats['accepted']); ?></span>
-                    <span class="agro-app-stat__label">Aceptados</span>
+                    <span class="agro-app-stat__label">Contratados</span>
                 </a>
                 <a href="<?php echo esc_url(admin_url('admin.php?page=agrochamba-postulaciones&status=rechazado')); ?>"
                    class="agro-app-stat agro-app-stat--rejected <?php echo $filter === 'rechazado' ? 'agro-app-stat--active' : ''; ?>">
                     <span class="agro-app-stat__number"><?php echo esc_html($stats['rejected']); ?></span>
-                    <span class="agro-app-stat__label">Rechazados</span>
+                    <span class="agro-app-stat__label">No Seleccionados</span>
                 </a>
             </div>
 
@@ -287,13 +317,26 @@ class ApplicationsDashboard
                                             <?php echo self::get_status_badge($app['status']); ?>
                                         </td>
                                         <td class="agro-app-cell-actions">
-                                            <?php if (in_array($app['status'], ['pendiente', 'visto'])): ?>
-                                                <button type="button" class="agro-app-btn agro-app-btn--accept" data-action="aceptado" title="Aceptar">
-                                                    <span class="dashicons dashicons-yes"></span>
-                                                </button>
-                                                <button type="button" class="agro-app-btn agro-app-btn--reject" data-action="rechazado" title="Rechazar">
-                                                    <span class="dashicons dashicons-no"></span>
-                                                </button>
+                                            <?php
+                                            $transitions = \AgroChamba\API\Applications\ApplicationsController::get_allowed_transitions($app['status']);
+                                            // Remove 'cancelado' from employer actions (only user can cancel)
+                                            $transitions = array_filter($transitions, function($t) { return $t !== 'cancelado'; });
+                                            if (!empty($transitions)): ?>
+                                                <div class="agro-app-dropdown">
+                                                    <button type="button" class="agro-app-btn agro-app-dropdown__toggle" title="Acciones">
+                                                        <span class="dashicons dashicons-ellipsis"></span>
+                                                    </button>
+                                                    <div class="agro-app-dropdown__menu">
+                                                        <?php foreach ($transitions as $next_status):
+                                                            $label = \AgroChamba\API\Applications\ApplicationsController::get_status_label($next_status);
+                                                            $css_class = $next_status === 'rechazado' ? 'agro-app-dropdown__item--danger' : '';
+                                                        ?>
+                                                            <button type="button" class="agro-app-dropdown__item <?php echo $css_class; ?>" data-action="<?php echo esc_attr($next_status); ?>">
+                                                                <?php echo esc_html($label); ?>
+                                                            </button>
+                                                        <?php endforeach; ?>
+                                                    </div>
+                                                </div>
                                             <?php else: ?>
                                                 <span class="agro-app-muted">--</span>
                                             <?php endif; ?>
@@ -324,10 +367,13 @@ class ApplicationsDashboard
         .agro-app-stat--active { border-color: #00a32a; background: #f0fdf4; }
         .agro-app-stat__number { display: block; font-size: 28px; font-weight: 700; }
         .agro-app-stat__label { font-size: 13px; color: #666; }
-        .agro-app-stat--pending .agro-app-stat__number { color: #f0ad4e; }
-        .agro-app-stat--viewed .agro-app-stat__number { color: #5bc0de; }
-        .agro-app-stat--accepted .agro-app-stat__number { color: #5cb85c; }
-        .agro-app-stat--rejected .agro-app-stat__number { color: #d9534f; }
+        .agro-app-stat--pending .agro-app-stat__number { color: #FFA000; }
+        .agro-app-stat--viewed .agro-app-stat__number { color: #2196F3; }
+        .agro-app-stat--in-process .agro-app-stat__number { color: #283593; }
+        .agro-app-stat--interview .agro-app-stat__number { color: #E65100; }
+        .agro-app-stat--finalist .agro-app-stat__number { color: #00695C; }
+        .agro-app-stat--accepted .agro-app-stat__number { color: #4CAF50; }
+        .agro-app-stat--rejected .agro-app-stat__number { color: #F44336; }
 
         /* Card */
         .agro-app-card { background: #fff; border-radius: 8px; padding: 28px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
@@ -338,10 +384,13 @@ class ApplicationsDashboard
         /* Badge */
         .agro-app-badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; text-transform: uppercase; }
         .agro-app-badge--count { background: #00a32a; color: #fff; }
-        .agro-app-badge--pending { background: #fcf8e3; color: #8a6d3b; }
-        .agro-app-badge--viewed { background: #d9edf7; color: #31708f; }
-        .agro-app-badge--accepted { background: #dff0d8; color: #3c763d; }
-        .agro-app-badge--rejected { background: #f2dede; color: #a94442; }
+        .agro-app-badge--pending { background: #FFF3E0; color: #E65100; }
+        .agro-app-badge--viewed { background: #E3F2FD; color: #1565C0; }
+        .agro-app-badge--in-process { background: #E8EAF6; color: #283593; }
+        .agro-app-badge--interview { background: #FBE9E7; color: #BF360C; }
+        .agro-app-badge--finalist { background: #E0F2F1; color: #00695C; }
+        .agro-app-badge--accepted { background: #E8F5E9; color: #2E7D32; }
+        .agro-app-badge--rejected { background: #FFEBEE; color: #C62828; }
 
         /* Search */
         .agro-app-search { position: relative; max-width: 500px; margin-bottom: 20px; }
@@ -362,6 +411,9 @@ class ApplicationsDashboard
         /* Row status colors */
         .agro-app-row.status-aceptado { background: #f0fff0; }
         .agro-app-row.status-rechazado { background: #fff5f5; opacity: .75; }
+        .agro-app-row.status-en_proceso { background: #f5f5ff; }
+        .agro-app-row.status-entrevista { background: #fff8f0; }
+        .agro-app-row.status-finalista { background: #f0fffc; }
 
         /* User cell */
         .agro-app-user { display: flex; align-items: center; gap: 10px; }
@@ -387,17 +439,29 @@ class ApplicationsDashboard
         /* Date */
         .agro-app-cell-date { white-space: nowrap; color: #666; }
 
-        /* Actions */
-        .agro-app-cell-actions { white-space: nowrap; }
+        /* Actions & Dropdown */
+        .agro-app-cell-actions { white-space: nowrap; position: relative; }
         .agro-app-btn {
             display: inline-flex; align-items: center; justify-content: center;
             width: 32px; height: 32px; border: 1px solid #ddd; border-radius: 4px;
             background: #fff; cursor: pointer; transition: all .15s;
         }
         .agro-app-btn .dashicons { font-size: 18px; width: 18px; height: 18px; }
-        .agro-app-btn--accept:hover { background: #46b450; border-color: #46b450; color: #fff; }
-        .agro-app-btn--reject { border-color: #dc3232; color: #dc3232; }
-        .agro-app-btn--reject:hover { background: #dc3232; border-color: #dc3232; color: #fff; }
+        .agro-app-dropdown { position: relative; display: inline-block; }
+        .agro-app-dropdown__toggle:hover { background: #f0f0f0; border-color: #999; }
+        .agro-app-dropdown__menu {
+            display: none; position: absolute; right: 0; top: 100%; z-index: 100;
+            background: #fff; border: 1px solid #ddd; border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0,0,0,.12); min-width: 160px; padding: 4px 0;
+        }
+        .agro-app-dropdown.open .agro-app-dropdown__menu { display: block; }
+        .agro-app-dropdown__item {
+            display: block; width: 100%; padding: 8px 16px; border: none; background: none;
+            text-align: left; cursor: pointer; font-size: 13px; color: #333; transition: background .15s;
+        }
+        .agro-app-dropdown__item:hover { background: #f5f5f5; }
+        .agro-app-dropdown__item--danger { color: #dc3232; }
+        .agro-app-dropdown__item--danger:hover { background: #fff0f0; }
 
         /* Empty state */
         .agro-app-empty { text-align: center; padding: 50px 20px; }
@@ -421,37 +485,59 @@ class ApplicationsDashboard
                 });
             });
 
-            // Aceptar / Rechazar
-            $('.agro-app-btn').on('click', function() {
+            // Toggle dropdown
+            $(document).on('click', '.agro-app-dropdown__toggle', function(e) {
+                e.stopPropagation();
+                var dropdown = $(this).closest('.agro-app-dropdown');
+                $('.agro-app-dropdown').not(dropdown).removeClass('open');
+                dropdown.toggleClass('open');
+            });
+            $(document).on('click', function() { $('.agro-app-dropdown').removeClass('open'); });
+
+            // Status labels for confirm dialog
+            var statusLabels = {
+                'en_proceso': 'EN PROCESO',
+                'entrevista': 'ENTREVISTA',
+                'finalista': 'FINALISTA',
+                'aceptado': 'CONTRATADO',
+                'rechazado': 'NO SELECCIONADO',
+                'visto': 'CV VISTO'
+            };
+
+            // Dropdown action click
+            $(document).on('click', '.agro-app-dropdown__item', function() {
                 var btn = $(this);
                 var row = btn.closest('tr');
-                var action = btn.data('action');
+                var newStatus = btn.data('action');
                 var jobId = row.data('job-id');
                 var userId = row.data('user-id');
-                var label = action === 'aceptado' ? 'ACEPTAR' : 'RECHAZAR';
+                var label = statusLabels[newStatus] || newStatus;
 
-                if (!confirm('¿Deseas ' + label + ' esta postulacion?')) return;
+                if (!confirm('¿Cambiar estado a ' + label + '?')) return;
 
                 btn.prop('disabled', true).text('...');
+                $('.agro-app-dropdown').removeClass('open');
 
                 $.post(ajaxurl, {
                     action: 'agrochamba_dashboard_update_applicant',
                     nonce: '<?php echo wp_create_nonce('agrochamba_dashboard_applicant'); ?>',
                     job_id: jobId,
                     user_id: userId,
-                    new_status: action
+                    new_status: newStatus
                 }, function(resp) {
                     if (resp.success) {
                         row.find('.agro-app-cell-status').html(resp.data.badge);
-                        row.find('.agro-app-cell-actions').html('<span class="agro-app-muted">--</span>');
-                        row.removeClass('status-pendiente status-visto').addClass('status-' + action);
+                        if (resp.data.actions_html) {
+                            row.find('.agro-app-cell-actions').html(resp.data.actions_html);
+                        } else {
+                            row.find('.agro-app-cell-actions').html('<span class="agro-app-muted">--</span>');
+                        }
+                        row.attr('class', 'agro-app-row status-' + newStatus);
                     } else {
                         alert('Error: ' + (resp.data || 'Desconocido'));
-                        btn.prop('disabled', false).html('<span class="dashicons dashicons-' + (action === 'aceptado' ? 'yes' : 'no') + '"></span>');
                     }
                 }).fail(function() {
                     alert('Error de conexion');
-                    btn.prop('disabled', false).html('<span class="dashicons dashicons-' + (action === 'aceptado' ? 'yes' : 'no') + '"></span>');
                 });
             });
         });
@@ -474,7 +560,8 @@ class ApplicationsDashboard
         $user_id    = intval($_POST['user_id'] ?? 0);
         $new_status = sanitize_text_field($_POST['new_status'] ?? '');
 
-        if (!$job_id || !$user_id || !in_array($new_status, ['aceptado', 'rechazado'])) {
+        $valid_statuses = \AgroChamba\API\Applications\ApplicationsController::get_all_statuses();
+        if (!$job_id || !$user_id || !in_array($new_status, $valid_statuses)) {
             wp_send_json_error('Parametros invalidos');
         }
 
@@ -485,6 +572,13 @@ class ApplicationsDashboard
         }
 
         $old_status = $job_applicants[$user_id]['status'];
+
+        // Validar transición
+        $allowed = \AgroChamba\API\Applications\ApplicationsController::get_allowed_transitions($old_status);
+        if (!in_array($new_status, $allowed)) {
+            wp_send_json_error('Transición no permitida de "' . $old_status . '" a "' . $new_status . '"');
+        }
+
         $job_applicants[$user_id]['status']     = $new_status;
         $job_applicants[$user_id]['updated_at']  = current_time('mysql');
         update_post_meta($job_id, self::JOB_META_KEY, $job_applicants);
@@ -500,9 +594,28 @@ class ApplicationsDashboard
         // Hook para notificaciones
         do_action('agrochamba_application_status_changed', $user_id, $job_id, $old_status, $new_status);
 
+        // Build updated actions HTML
+        $next_transitions = \AgroChamba\API\Applications\ApplicationsController::get_allowed_transitions($new_status);
+        $next_transitions = array_filter($next_transitions, function($t) { return $t !== 'cancelado'; });
+        $actions_html = '';
+        if (!empty($next_transitions)) {
+            $actions_html .= '<div class="agro-app-dropdown">';
+            $actions_html .= '<button type="button" class="agro-app-btn agro-app-dropdown__toggle" title="Acciones"><span class="dashicons dashicons-ellipsis"></span></button>';
+            $actions_html .= '<div class="agro-app-dropdown__menu">';
+            foreach ($next_transitions as $next) {
+                $label = \AgroChamba\API\Applications\ApplicationsController::get_status_label($next);
+                $css = $next === 'rechazado' ? 'agro-app-dropdown__item--danger' : '';
+                $actions_html .= '<button type="button" class="agro-app-dropdown__item ' . $css . '" data-action="' . esc_attr($next) . '">' . esc_html($label) . '</button>';
+            }
+            $actions_html .= '</div></div>';
+        } else {
+            $actions_html = '<span class="agro-app-muted">--</span>';
+        }
+
         wp_send_json_success([
-            'status' => $new_status,
-            'badge'  => self::get_status_badge($new_status),
+            'status'       => $new_status,
+            'badge'        => self::get_status_badge($new_status),
+            'actions_html' => $actions_html,
         ]);
     }
 }

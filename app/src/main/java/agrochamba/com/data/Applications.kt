@@ -82,15 +82,22 @@ data class ApplicantData(
 // ==========================================
 
 enum class ApplicationStatus(val value: String, val label: String) {
-    PENDING("pendiente", "Pendiente"),
-    VIEWED("visto", "Visto por la empresa"),
-    ACCEPTED("aceptado", "Aceptado"),
-    REJECTED("rechazado", "No seleccionado"),
+    PENDING("pendiente", "Postulado"),
+    VIEWED("visto", "CV Visto"),
+    IN_PROCESS("en_proceso", "En Proceso"),
+    INTERVIEW("entrevista", "Entrevista"),
+    FINALIST("finalista", "Finalista"),
+    ACCEPTED("aceptado", "Contratado"),
+    REJECTED("rechazado", "No Seleccionado"),
     CANCELLED("cancelado", "Cancelado");
+
+    fun canCancel(): Boolean = this in listOf(PENDING, VIEWED, IN_PROCESS)
+
+    fun isTerminal(): Boolean = this in listOf(ACCEPTED, REJECTED, CANCELLED)
 
     companion object {
         fun fromValue(value: String): ApplicationStatus {
-            return values().find { it.value == value } ?: PENDING
+            return entries.find { it.value == value } ?: PENDING
         }
     }
 }

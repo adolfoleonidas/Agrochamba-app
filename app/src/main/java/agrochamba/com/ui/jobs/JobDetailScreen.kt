@@ -1137,6 +1137,9 @@ private fun FloatingActionButtons(
                     "aceptado" -> Color(0xFF4CAF50)
                     "rechazado" -> Color(0xFFF44336)
                     "visto" -> Color(0xFF2196F3)
+                    "en_proceso" -> Color(0xFF283593)
+                    "entrevista" -> Color(0xFFE65100)
+                    "finalista" -> Color(0xFF00695C)
                     else -> Color(0xFFFFA000)
                 }
             ) {
@@ -1152,6 +1155,9 @@ private fun FloatingActionButtons(
                             "aceptado" -> Icons.Filled.CheckCircle
                             "rechazado" -> Icons.Filled.Cancel
                             "visto" -> Icons.Filled.RemoveRedEye
+                            "en_proceso" -> Icons.Filled.Groups
+                            "entrevista" -> Icons.Filled.DateRange
+                            "finalista" -> Icons.Filled.Star
                             else -> Icons.Filled.Schedule
                         },
                         contentDescription = null,

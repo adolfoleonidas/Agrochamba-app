@@ -403,18 +403,32 @@ class NotificationsController {
         $job = get_post($job_id);
         if (!$job) return;
 
-        $status_labels = array(
-            'visto' => 'vista por la empresa',
-            'aceptado' => 'aceptada',
-            'rechazado' => 'no seleccionada'
+        // Títulos especiales por estado
+        $special_titles = array(
+            'entrevista' => '¡Te invitaron a entrevista!',
+            'finalista'  => '¡Eres finalista!',
+            'aceptado'   => '¡Has sido contratado!',
         );
+
+        $status_labels = array(
+            'visto'      => 'vista por la empresa',
+            'en_proceso' => 'puesta en proceso de selección',
+            'entrevista' => 'seleccionada para entrevista',
+            'finalista'  => 'seleccionada como finalista',
+            'aceptado'   => 'aceptada. ¡Felicidades!',
+            'rechazado'  => 'no seleccionada',
+        );
+
+        $title = isset($special_titles[$new_status])
+            ? $special_titles[$new_status]
+            : '¡Actualización de postulación!';
 
         $status_label = isset($status_labels[$new_status]) ? $status_labels[$new_status] : $new_status;
 
         self::send_to_user(
             $user_id,
             'APPLICATION_STATUS_CHANGED',
-            '¡Actualización de postulación!',
+            $title,
             "Tu postulación a \"{$job->post_title}\" ha sido {$status_label}.",
             array(
                 'job_id' => $job_id,
